@@ -312,6 +312,9 @@ Seçenekler: --volume N (birim sırası, varsayılan 0), --partition N (APFS bö
   <data name="Svc.DiskCheckFailed" xml:space="preserve">
     <value>{0}: disk denetlenemedi: {1}</value>
   </data>
+  <data name="Svc.DiskNotReady" xml:space="preserve">
+    <value>{0} henüz hazır değil; {1} saniyeye kadar uyarı vermeden yeniden denenecek: {2}</value>
+  </data>
   <data name="Svc.DiskRemovedMeanwhile" xml:space="preserve">
     <value>disk bu sırada çıkarıldı</value>
   </data>

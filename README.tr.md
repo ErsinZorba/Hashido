@@ -25,7 +25,7 @@ Diski takarsınız, birkaç saniye içinde Dosya Gezgini'nde sürücü harfi ola
 | 10 arayüz dili | Türkçe, English, Deutsch, Français, Español, Português (Brasil), Italiano, 日本語, 简体中文, 한국어 |
 
 ## Kurulum
-`Hashido-Setup-1.4.0.exe` dosyasını çalıştırın ve sihirbazı izleyin (İleri › Kur › Son). Windows 10/11 (64 bit) yeter;
+`Hashido-Setup-1.4.1.exe` dosyasını çalıştırın ve sihirbazı izleyin (İleri › Kur › Son). Windows 10/11 (64 bit) yeter;
 başka bir şey kurmanız gerekmez: .NET programla birlikte gelir, [WinFsp](https://winfsp.dev) sürücüsü yoksa sihirbaz onu da kurar.
 Kurulumdan sonra Başlat menüsünde **Hashido** bulunur ve tepsi simgesi her oturumda kendiliğinden açılır.
 
@@ -35,8 +35,9 @@ Kurulumdan sonra Başlat menüsünde **Hashido** bulunur ve tepsi simgesi her ot
   (o zamanki adıyla APFS for Windows) yükseltirseniz program eski klasöründe, `C:\Program Files\APFS for Windows`'ta kalır.
 
 Kaldırmak için: **Ayarlar › Uygulamalar › Yüklü uygulamalar › Hashido › Kaldır**. Kaldırma disklerinize hiçbir şey yazmaz;
-günlük (`C:\ProgramData\APFS for Windows\log.txt`) incelemeniz için bırakılır, WinFsp kaldırılmaz. Arka plan hizmetinin
-gönderilmemiş raporları (`C:\ProgramData\APFS for Windows\reports`) silinir.
+günlük (`C:\ProgramData\APFS for Windows\log.txt`) incelemeniz için bırakılır, WinFsp kaldırılmaz. Gönderilmemiş
+raporlar ile gönderilenlerin listesi (`C:\ProgramData\APFS for Windows\reports`, `%LOCALAPPDATA%\APFS for Windows\reports`) ve otomatik raporlar
+sorusuna verdiğiniz cevap silinir, yeniden kurulumda yeniden sorulur; dil ve güncelleme bildirimi ayarlarınız kalır.
 
 ## Kullanım
 - **Ana pencere** (Başlat menüsü veya tepsi menüsünden "Ana pencereyi aç"): takılı Mac diskleri kart olarak görünür. Her birimin

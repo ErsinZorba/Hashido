@@ -3,7 +3,7 @@
 ; WinFsp yoksa (veya 2.1'den eskiyse) içindeki resmi WinFsp kurulum paketini sessizce kurar.
 
 #ifndef AppVersion
-  #define AppVersion "1.4.0"
+  #define AppVersion "1.4.1"
 #endif
 ; Görünen ad: src/Apfs.Windows/Branding.cs ProductName ile aynı olmalı (BrandingTests). Metinler adı {#AppName} ile alır.
 #define AppName "Hashido"
@@ -44,6 +44,9 @@ ArchitecturesInstallIn64BitMode=x64compatible
 MinVersion=10.0.17763
 ; Tepsiyi ve hizmeti PrepareToInstall kendisi durdurur.
 CloseApplications=no
+; Kaldırma, kaldıran kullanıcının rapor onayını (HKCU) ve tepsinin rapor kuyruğunu ({localappdata}) siler. Yönetici kurulumunda
+; bunlar UAC'yi onaylayan hesabındır (tek kullanıcılı makinede aynı hesap; başka profiller temizlenmez — bilinen sınır).
+UsedUserAreasWarning=no
 
 ; İlk dil, Windows dili listede yoksa kullanılır: İngilizce. Inno Setup'ın resmî Çince çevirisi yok → Çince Windows'ta İngilizce sihirbaz.
 [Languages]
@@ -126,6 +129,8 @@ Type: files; Name: "{autoprograms}\APFS for Windows.lnk"
 ; Hizmetin rapor kuyruğu ve rapor ayarı (config.json): kaldırılıp yeniden kurulunca hizmet eski "açık" ayarıyla başlamasın.
 ; Günlük (log.txt) incelemek için kalır.
 Type: filesandordirs; Name: "{commonappdata}\{#DataDirName}\reports"
+; Tepsinin gönderilmemiş raporları ve gönderilenler listesi (sent.jsonl). Aynı klasördeki tepsi günlüğü kalır.
+Type: filesandordirs; Name: "{localappdata}\{#DataDirName}\reports"
 
 [Icons]
 Name: "{autoprograms}\{#AppName}"; Filename: "{app}\apfs-tray.exe"; Parameters: "--show"; Comment: "{cm:ServiceDescription}"
@@ -228,4 +233,13 @@ end;
 function NeedRestart: Boolean;
 begin
   Result := RestartNeeded;
+end;
+
+// Rapor onayı (UserSettings.ReportsConsent): kalırsa yeniden kurulumda eski "evet" sorulmadan hizmete iletilirdi. Dil ve
+// güncelleme bildirimi ayarları kalır; anahtar ancak boşaldıysa silinir.
+procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+begin
+  if CurUninstallStep <> usPostUninstall then Exit;
+  RegDeleteValue(HKCU, 'Software\APFS for Windows', 'Reports');
+  RegDeleteKeyIfEmpty(HKCU, 'Software\APFS for Windows');
 end;

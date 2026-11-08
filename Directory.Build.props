@@ -8,7 +8,7 @@
     <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
     <!-- Unicode normalizasyonu (NFD) için ICU/NLS gerekli; invariant moda geçilmemeli. -->
     <InvariantGlobalization>false</InvariantGlobalization>
-    <Version>1.4.0</Version>
+    <Version>1.4.1</Version>
     <Authors>Ersin Zorba</Authors>
     <!-- Ürün adı: kaynağı src/Apfs.Windows/Branding.cs (ProductName); burası ve .iss AppName aynı kalmalı (BrandingTests). -->
     <Product>Hashido</Product>

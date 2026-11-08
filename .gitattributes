@@ -1,0 +1,3 @@
+# Sıkıştırma testlerinin girdileri bayt bayt karşılaştırılır: core.autocrlf=true klonda .bin/.txt dosyaları CRLF'e
+# çevrilirse LZFSE/LZVN çıktıları tutmaz. Bu klasörde satır sonu dönüşümü yok.
+tests/Apfs.Tests/data/compression/** -text

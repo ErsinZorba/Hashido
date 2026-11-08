@@ -31,6 +31,7 @@ internal sealed class MountManager : IDisposable
     private readonly HashSet<string> _released = new(StringComparer.OrdinalIgnoreCase); // güvenli kaldırma sonrası yeniden bağlanmasın
     private long _noticeId;
     private readonly ReportRecorder? _reports;
+    private readonly Dictionary<string, int> _devOpenAttempts = new(StringComparer.OrdinalIgnoreCase); // APFS_DEV_OPEN_FAILURES
 
     /// <param name="imageSources">Yalnızca geliştirme (konsol) modunda: fiziksel diskler yerine bu görüntü dosyaları kullanılır.</param>
     /// <param name="reports">Raporlama (onay verilmediyse kayıt hiçbir şey yapmaz; bkz. <see cref="ReportRecorder"/>).</param>
@@ -131,22 +132,25 @@ internal sealed class MountManager : IDisposable
             try
             {
                 device = open();
-                if (device is null) continue;
+                if (device is null) { ForgetUnreadable(key); continue; }
                 if (PartitionLocator.FindApfsPartitions(device).Count == 0)
                 {
+                    ForgetUnreadable(key);
                     device.Dispose();
                     continue;
                 }
                 AttachDisk(key, device);
+                ForgetUnreadable(key);
                 device = null; // sahipliği TrackedDisk'e geçti
             }
             catch (ApfsException e) when (e.Code is ApfsErrorCode.NotFound or ApfsErrorCode.AccessDenied)
             {
                 // disk yok veya erişilemiyor: sessizce geç
+                ForgetUnreadable(key);
             }
             catch (Exception e)
             {
-                AddNotice("uyarı", WinText.U("Notice.DiskUnreadable", key, e.Message), throttleKey: key);
+                OnDiskUnreadable(key, e);
             }
             finally
             {
@@ -156,12 +160,63 @@ internal sealed class MountManager : IDisposable
         CheckForRemovedDisks();
     }
 
+    /// <summary>
+    /// Takılan diskin aygıtı birkaç saniye hazır olmayabilir (ARM sanal makinesinde her takışta "Var olmayan bir aygıt", disk
+    /// 5–16 sn sonra bağlanıyordu). İlk okuma hatasından sonra bu süre boyunca uyarı yerine sessizce (1 sn gecikmeli tarama
+    /// isteğiyle) yeniden denenir; süre dolunca uyarı eskisi gibi çıkar ve 15 sn'lik zamanlayıcıya dönülür.
+    /// </summary>
+    private static readonly TimeSpan UnreadableGrace = TimeSpan.FromSeconds(20);
+
+    /// <summary>Disk anahtarı → okunamadığı ilk an (<see cref="_gate"/> altında); okunabilince ya da kaybolunca silinir.</summary>
+    private readonly Dictionary<string, DateTime> _unreadableSince = new(StringComparer.OrdinalIgnoreCase);
+
+    private void OnDiskUnreadable(string key, Exception e)
+    {
+        var now = DateTime.UtcNow;
+        bool first;
+        TimeSpan elapsed;
+        lock (_gate)
+        {
+            first = !_unreadableSince.TryGetValue(key, out var since);
+            if (first) _unreadableSince[key] = since = now;
+            elapsed = now - since;
+        }
+        if (elapsed < UnreadableGrace)
+        {
+            if (first) ServiceLog.Write(WinText.T("Svc.DiskNotReady", key, (int)UnreadableGrace.TotalSeconds, e.Message));
+            ScanRequested?.Invoke();
+            return;
+        }
+        AddNotice("uyarı", WinText.U("Notice.DiskUnreadable", key, e.Message), throttleKey: key);
+    }
+
+    private void ForgetUnreadable(string key)
+    {
+        lock (_gate) _unreadableSince.Remove(key);
+    }
+
     private IEnumerable<(string Key, Func<IBlockDevice?> Open)> EnumerateSources()
     {
         if (_imageSources is not null)
         {
+            // Yalnız geliştirme modu (testler): her görüntünün ilk N açılışı okuma hatası verir (takılan diskin aygıtı henüz
+            // hazır değil). Her deneme günlüğe yazılır; testler tarama sıklığını buradan sayar.
+            int.TryParse(Environment.GetEnvironmentVariable("APFS_DEV_OPEN_FAILURES"), out int failures);
             foreach (var path in _imageSources)
-                yield return (path, () => File.Exists(path) ? new FileImageDevice(path) : null);
+                yield return (path, () =>
+                {
+                    if (failures > 0)
+                    {
+                        int n;
+                        lock (_gate) n = _devOpenAttempts[path] = _devOpenAttempts.GetValueOrDefault(path) + 1;
+                        if (n <= failures)
+                        {
+                            ServiceLog.Write($"APFS_DEV_OPEN_FAILURES #{n}");
+                            throw new ApfsException(ApfsErrorCode.IoError, "APFS_DEV_OPEN_FAILURES");
+                        }
+                    }
+                    return File.Exists(path) ? new FileImageDevice(path) : null;
+                });
             yield break;
         }
         for (int n = 0; n < MaxPhysicalDrives; n++)
@@ -677,7 +732,10 @@ internal sealed class MountManager : IDisposable
         }
     }
 
-    /// <summary>Hizmetten tarama isteği (diske özel aygıt olayı geldi); hizmet kısa bir gecikmeyle tek tarama yapar.</summary>
+    /// <summary>
+    /// Hizmetten tarama isteği (diske özel aygıt olayı geldi ya da takılan disk henüz hazır değil); hizmet kısa bir gecikmeyle
+    /// tek tarama yapar.
+    /// </summary>
     public event Action? ScanRequested;
 
     private static string ChangedReason =>

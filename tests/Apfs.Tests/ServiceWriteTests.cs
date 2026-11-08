@@ -265,4 +265,53 @@ public class ServiceWriteTests(LinuxFixtures fixtures, TestImages images) : ICla
         Assert.True(mounts == d.Volumes.Count(v => v.State == VolumeStatus.Mounted), $"birim bağlama sayısı {mounts}:\n{svc.Output}");
         Assert.True((await svc.Send<UnlockResponse>(new Request("eject", Disk: d.Id, Force: true))).Ok);
     }
+
+    private static bool IsUnreadableNotice(Notice n, string path) => n.Text.StartsWith(path + " okunamadı", StringComparison.Ordinal);
+
+    private static int OpenFailures(string output) => System.Text.RegularExpressions.Regex.Matches(output, "APFS_DEV_OPEN_FAILURES #").Count;
+
+    /// <summary>
+    /// 1.4.1 (ARM sanal makinesi, her takışta): disk takılınca aygıt henüz hazır değilken okunuyor, "okunamadı" uyarısı çıkıyor,
+    /// disk 5–16 sn sonra yine de bağlanıyordu. Hazır olmayan aygıt hoşgörü süresi içinde sessizce yeniden denenir: ilk iki açılış
+    /// geliştirme kancasıyla hata verir; disk bağlanmalı, uyarı çıkmamalı, günlükte tek bir "henüz hazır değil" satırı olmalı.
+    /// </summary>
+    [Fact]
+    public async Task DiskNotReadyAtFirstIsRetriedSilently()
+    {
+        string path = fixtures.Copy("pop-ci-64m");
+        using var svc = new DevService(path, new Dictionary<string, string> { ["APFS_DEV_OPEN_FAILURES"] = "2" });
+        var d = await svc.WaitDisk(x => x.Volumes.Any(v => v.State == VolumeStatus.Mounted));
+        var st = await svc.Send<StatusResponse>(new Request("status"));
+        Assert.True(OpenFailures(svc.Output) == 2, svc.Output);
+        Assert.False(st.Notices.Any(n => IsUnreadableNotice(n, path)), svc.Output);
+        Assert.True(System.Text.RegularExpressions.Regex.Matches(svc.Output, "henüz hazır değil").Count == 1, svc.Output);
+        Assert.True((await svc.Send<UnlockResponse>(new Request("eject", Disk: d.Id, Force: true))).Ok);
+    }
+
+    /// <summary>
+    /// Hoşgörü gerçek bir okuma hatasını gizlemez: hiç okunamayan disk için uyarı hoşgörü dolunca (20 sn) çıkar, ondan sonra
+    /// hızlı (saniyelik) yeniden tarama durur ve 15 sn'lik zamanlayıcıya dönülür.
+    /// </summary>
+    [Fact]
+    public async Task UnreadableDiskWarnsAfterGracePeriod()
+    {
+        string path = fixtures.Copy("pop-ci-64m");
+        var watch = Stopwatch.StartNew();
+        using var svc = new DevService(path, new Dictionary<string, string> { ["APFS_DEV_OPEN_FAILURES"] = "1000" });
+        Notice? warning = null;
+        while (warning is null && watch.Elapsed < TimeSpan.FromSeconds(35))
+        {
+            var st = await svc.Send<StatusResponse>(new Request("status"));
+            warning = st.Notices.FirstOrDefault(n => IsUnreadableNotice(n, path));
+            if (warning is null) await Task.Delay(500);
+        }
+        Assert.True(warning is not null, $"35 sn içinde uyarı yok:\n{svc.Output}");
+        Assert.True(watch.Elapsed >= TimeSpan.FromSeconds(15), $"uyarı hoşgörüden önce çıktı ({watch.Elapsed}):\n{svc.Output}");
+        Assert.True(System.Text.RegularExpressions.Regex.Matches(svc.Output, "henüz hazır değil").Count == 1, svc.Output);
+
+        int before = OpenFailures(svc.Output);
+        await Task.Delay(TimeSpan.FromSeconds(6));
+        int after = OpenFailures(svc.Output);
+        Assert.True(after - before <= 1, $"uyarıdan sonra 6 sn'de {after - before} deneme (hızlı tarama sürüyor):\n{svc.Output}");
+    }
 }

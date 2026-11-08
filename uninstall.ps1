@@ -45,5 +45,10 @@ if (Test-Path $installDir) { Remove-Item -Recurse -Force $installDir; Write-Host
 # Rapor kuyruğu ve rapor ayarı (sihirbazın [UninstallDelete]'i ile aynı); günlük kalır.
 $reports = Join-Path $env:ProgramData 'APFS for Windows\reports'
 if (Test-Path $reports) { Remove-Item -Recurse -Force $reports; Write-Host "Silindi: $reports" }
+# Bu kullanıcının rapor onayı ve tepsinin rapor kuyruğu (sihirbazla aynı): yeniden kurulumda onay yeniden sorulsun.
+# Dil ve güncelleme bildirimi ayarları ile tepsi günlüğü kalır.
+Remove-ItemProperty 'HKCU:\Software\APFS for Windows' -Name 'Reports' -ErrorAction SilentlyContinue
+$userReports = Join-Path $env:LOCALAPPDATA 'APFS for Windows\reports'
+if (Test-Path $userReports) { Remove-Item -Recurse -Force $userReports; Write-Host "Silindi: $userReports" }
 
 Write-Host 'Hashido kaldırıldı.' -ForegroundColor Green

@@ -312,6 +312,9 @@ Encrypted volumes: --password-prompt (asks for the password) or --password-stdin
   <data name="Svc.DiskCheckFailed" xml:space="preserve">
     <value>{0}: could not check the disk: {1}</value>
   </data>
+  <data name="Svc.DiskNotReady" xml:space="preserve">
+    <value>{0} is not ready yet; retrying without a warning for up to {1} seconds: {2}</value>
+  </data>
   <data name="Svc.DiskRemovedMeanwhile" xml:space="preserve">
     <value>the disk was removed in the meantime</value>
   </data>
