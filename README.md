@@ -35,7 +35,8 @@ installs it too. After installation, **Hashido** is in the Start menu and the tr
   (then called APFS for Windows), the program stays in its old folder, `C:\Program Files\APFS for Windows`.
 
 To uninstall: **Settings › Apps › Installed apps › Hashido › Uninstall**. Uninstalling writes nothing to your disks;
-the log (`C:\ProgramData\APFS for Windows\log.txt`) is kept for you to inspect, and WinFsp is not removed.
+the log (`C:\ProgramData\APFS for Windows\log.txt`) is kept for you to inspect, and WinFsp is not removed. Reports that
+have not been sent yet are deleted.
 
 ## Usage
 - **Main window** (Start menu, or "Open main window" in the tray menu): attached Mac disks appear as cards. Next to each volume:

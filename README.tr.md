@@ -35,7 +35,8 @@ Kurulumdan sonra Başlat menüsünde **Hashido** bulunur ve tepsi simgesi her ot
   (o zamanki adıyla APFS for Windows) yükseltirseniz program eski klasöründe, `C:\Program Files\APFS for Windows`'ta kalır.
 
 Kaldırmak için: **Ayarlar › Uygulamalar › Yüklü uygulamalar › Hashido › Kaldır**. Kaldırma disklerinize hiçbir şey yazmaz;
-günlük (`C:\ProgramData\APFS for Windows\log.txt`) incelemeniz için bırakılır, WinFsp kaldırılmaz.
+günlük (`C:\ProgramData\APFS for Windows\log.txt`) incelemeniz için bırakılır, WinFsp kaldırılmaz. Henüz gönderilmemiş
+raporlar silinir.
 
 ## Kullanım
 - **Ana pencere** (Başlat menüsü veya tepsi menüsünden "Ana pencereyi aç"): takılı Mac diskleri kart olarak görünür. Her birimin

@@ -122,6 +122,11 @@ Source: "redist\{#WinFspMsi}"; DestDir: "{tmp}"; Flags: deleteafterinstall; Chec
 ; 1.3.0 ve öncesinin Başlat menüsü kısayolu (ad değişti; yükseltmede eskisi kalmasın, yenisi [Icons]'ta).
 Type: files; Name: "{autoprograms}\APFS for Windows.lnk"
 
+[UninstallDelete]
+; Hizmetin rapor kuyruğu ve rapor ayarı (config.json): kaldırılıp yeniden kurulunca hizmet eski "açık" ayarıyla başlamasın.
+; Günlük (log.txt) incelemek için kalır.
+Type: filesandordirs; Name: "{commonappdata}\{#DataDirName}\reports"
+
 [Icons]
 Name: "{autoprograms}\{#AppName}"; Filename: "{app}\apfs-tray.exe"; Parameters: "--show"; Comment: "{cm:ServiceDescription}"
 

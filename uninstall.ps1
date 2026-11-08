@@ -42,5 +42,8 @@ if (Test-Path (Join-Path $installDir 'apfs.exe')) { & (Join-Path $installDir 'ap
 Get-Process apfs -ErrorAction SilentlyContinue | Stop-Process -Force
 Start-Sleep -Seconds 1
 if (Test-Path $installDir) { Remove-Item -Recurse -Force $installDir; Write-Host "Silindi: $installDir" }
+# Rapor kuyruğu ve rapor ayarı (sihirbazın [UninstallDelete]'i ile aynı); günlük kalır.
+$reports = Join-Path $env:ProgramData 'APFS for Windows\reports'
+if (Test-Path $reports) { Remove-Item -Recurse -Force $reports; Write-Host "Silindi: $reports" }
 
 Write-Host 'Hashido kaldırıldı.' -ForegroundColor Green
