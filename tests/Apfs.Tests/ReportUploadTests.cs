@@ -145,12 +145,14 @@ public class ReportUploadTests(LinuxFixtures fixtures) : IClassFixture<LinuxFixt
             Assert.Equal(UploadOutcome.Failed, (await up.DrainAsync(new LocalReportSource(q))).Outcome);
         Assert.Equal(5, q.Count);
 
+        // Sunucu 60 sn bekletir, istemcinin süresi 1 sn: zaman aşımı beklemeyi keser. Sınır geniş tutulur: CI'da paralel ağır
+        // testler iş parçacığı havuzunu doldurunca 1 sn'lik zaman aşımı bile 10 sn'yi aşabildi (4 sn sınırıyla titriyordu).
         server.Status = 200;
-        server.Delay = TimeSpan.FromSeconds(5);
+        server.Delay = TimeSpan.FromSeconds(60);
         var watch = System.Diagnostics.Stopwatch.StartNew();
         using (var up = new ReportUploader(server.Url, null, timeout: TimeSpan.FromSeconds(1)))
             Assert.Equal(UploadOutcome.Failed, (await up.DrainAsync(new LocalReportSource(q))).Outcome);
-        Assert.True(watch.Elapsed < TimeSpan.FromSeconds(4), watch.Elapsed.ToString());
+        Assert.True(watch.Elapsed < TimeSpan.FromSeconds(30), watch.Elapsed.ToString());
         Assert.Equal(5, q.Count);
 
         var offline = new Uri($"http://localhost:{FakeReportServer.FreePort()}/v1/events"); // dinleyen yok

@@ -38,9 +38,11 @@ internal sealed class PipeServer(MountManager manager, ReportRecorder reports) :
         {
             try
             {
-                using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
-                timeout.CancelAfter(TimeSpan.FromSeconds(30));
-                var line = await PipeProtocol.ReadLineAsync(server, timeout.Token);
+                // 30 sn yalnız isteği okumaya (takılan istemci kanal örneğini tutmasın). İşlemin kendisi kesilmez: tepsi
+                // set-writable için 5 dk bekler, büyük diskte tam denetim 30 sn'yi aşabilir; yanıt ayrı süreyle yazılır.
+                using var readTimeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                readTimeout.CancelAfter(TimeSpan.FromSeconds(30));
+                var line = await PipeProtocol.ReadLineAsync(server, readTimeout.Token);
                 if (line is null) return;
                 var req = JsonSerializer.Deserialize<Request>(line, PipeProtocol.Json);
                 ServiceLanguage.Apply(req?.Lang);
@@ -57,7 +59,9 @@ internal sealed class PipeServer(MountManager manager, ReportRecorder reports) :
                     "reports-config" => Configure(req.Enable),
                     _ => new UnlockResponse(false, WinText.T("Svc.UnknownRequest")),
                 };
-                await PipeProtocol.WriteLineAsync(server, response, timeout.Token);
+                using var writeTimeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                writeTimeout.CancelAfter(TimeSpan.FromSeconds(30));
+                await PipeProtocol.WriteLineAsync(server, response, writeTimeout.Token);
             }
             catch (Exception e) when (e is IOException or JsonException or InvalidDataException or OperationCanceledException)
             {

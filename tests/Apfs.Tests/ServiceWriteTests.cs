@@ -229,6 +229,24 @@ public class ServiceWriteTests(LinuxFixtures fixtures, TestImages images) : ICla
     }
 
     /// <summary>
+    /// Kanalın 30 sn sınırı yalnız isteği okumaya uygulanır: işlem uzun sürse de yanıt istemciye ulaşır. Önceden sınır işlemi ve
+    /// yanıt yazmayı da kapsıyordu; tepsi set-writable için 5 dk beklerken hizmet 30 sn'de bağlantıyı yanıtsız kapatıyordu
+    /// (büyük diskte tam denetim, yük altındaki CI). Kapatma geliştirme kancasıyla 32 sn'ye uzatılır.
+    /// </summary>
+    [Fact]
+    public async Task SlowRequestStillGetsItsResponse()
+    {
+        string path = fixtures.Copy("pop-ci-64m");
+        using var svc = new DevService(path, new Dictionary<string, string> { ["APFS_DEV_CLOSE_DELAY_MS"] = "32000" });
+        var ro = await svc.WaitDisk(d => d.Volumes.Any(v => v.State == VolumeStatus.Mounted));
+        Assert.True((await svc.Send<UnlockResponse>(new Request("set-writable", Disk: ro.Id, Enable: true))).Ok);
+        await svc.WaitDisk(d => d.Writable);
+        var off = await svc.Send<UnlockResponse>(new Request("set-writable", Disk: ro.Id, Enable: false, Force: true));
+        Assert.NotNull(off);
+        Assert.True(off.Ok, off.Message);
+    }
+
+    /// <summary>
     /// 1.4.0 P4.7 bulgusu (ARM sanal makinesi): "Yeniden tara" zamanlanmış taramayla aynı anda çalışınca ikisi de diski henüz
     /// listede görmüyor ve birimleri iki kez bağlıyordu (aynı birim iki sürücü harfi). Bağlama penceresi geliştirme kancasıyla
     /// 3 sn'ye açılır, o sırada birkaç "rescan" gönderilir: her birim yalnız bir kez bağlanmalı.
