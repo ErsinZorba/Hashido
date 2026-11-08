@@ -2,6 +2,7 @@ using System.Globalization;
 using Apfs.Tray;
 using Apfs.Windows.Ipc;
 using Apfs.Windows.Localization;
+using Apfs.Windows.Reporting;
 
 // apfs-tray [--show] [--pipe ad] [--restart]
 //   --show: ana pencereyi aç (Başlat menüsü kısayolu). Program zaten çalışıyorsa açık örneğin penceresi öne gelir.
@@ -32,6 +33,12 @@ if (!first)
     return;
 }
 
+// Çökme raporu (yalnız onay verildiyse; tepsinin kendi kuyruğuna, eşzamanlı). İstisna YUTULMAZ: arayüz iş parçacığındaki
+// istisna da işlenmeyen istisnaya dönüşür ve süreç çöker (WinForms'un "devam et" penceresi bozuk durumda sürdürürdü).
+var localReports = new ReportRecorder(ReportRecorder.DefaultUserDirectory);
+AppDomain.CurrentDomain.UnhandledException += (_, e) => localReports.RecordCrash(e.ExceptionObject as Exception, "tray");
+Application.SetUnhandledExceptionMode(UnhandledExceptionMode.ThrowException);
+
 ApplicationConfiguration.Initialize();
-Application.Run(new TrayApp(showEvent, show));
+Application.Run(new TrayApp(showEvent, show, localReports));
 mutex.ReleaseMutex(); // yeniden başlatılan örnek beklemesin

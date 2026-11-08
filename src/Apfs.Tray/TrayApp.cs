@@ -1,5 +1,7 @@
 using Apfs.Tray.Ui;
+using Apfs.Windows;
 using Apfs.Windows.Ipc;
+using Apfs.Windows.Reporting;
 
 namespace Apfs.Tray;
 
@@ -14,30 +16,68 @@ internal sealed class TrayApp : ApplicationContext
     private readonly TrayFlyout _flyout;
     private readonly WindowsFormsSynchronizationContext _ui = new();
     private readonly RegisteredWaitHandle _showWait;
+    private readonly TrayFeatures _features;
     private MainForm? _main;
+    private Uri? _balloonLink; // son balon bir güncelleme bildirimiyse tıklayınca açılacak sayfa
 
     /// <param name="showEvent">Başka bir örnek (Başlat menüsü kısayolu) "pencereyi göster" dediğinde işaretlenir.</param>
-    public TrayApp(EventWaitHandle showEvent, bool showMain)
+    /// <param name="localReports">Tepsinin kendi rapor kuyruğu (çökme kancası da buna yazar).</param>
+    public TrayApp(EventWaitHandle showEvent, bool showMain, ReportRecorder localReports)
     {
-        _icon = new NotifyIcon { Icon = Theme.AppIcon(SystemInformation.SmallIconSize.Width), Text = "APFS for Windows", Visible = true, ContextMenuStrip = new ContextMenuStrip() };
+        _icon = new NotifyIcon { Icon = Theme.AppIcon(SystemInformation.SmallIconSize.Width), Text = Branding.ProductName, Visible = true, ContextMenuStrip = new ContextMenuStrip() };
         _icon.ContextMenuStrip.Opening += (_, _) => BuildMenu();
         _icon.MouseClick += (_, e) => { if (e.Button == MouseButtons.Left) _flyout!.Toggle(); };
-        _icon.BalloonTipClicked += (_, _) => ShowMain();
+        _icon.BalloonTipClicked += (_, _) =>
+        {
+            if (_balloonLink is { } link) OpenLink(link);
+            else ShowMain();
+        };
+        _icon.BalloonTipClosed += (_, _) => _balloonLink = null;
 
         _flyout = new TrayFlyout(_app, ShowMain);
         _app.Changed += UpdateTooltip;
-        _app.Notify += (text, level) => _icon.ShowBalloonTip(5000, "APFS for Windows", text, level);
+        _app.Notify += (text, level) => { _balloonLink = null; _icon.ShowBalloonTip(5000, Branding.ProductName, text, level); };
         _showWait = ThreadPool.RegisterWaitForSingleObject(showEvent, (_, _) => _ui.Post(_ => ShowMain(), null), null, Timeout.Infinite, executeOnlyOnce: false);
+        _features = new TrayFeatures(_ui, localReports);
+        _features.UpdateFound += (text, page) =>
+        {
+            _balloonLink = page;
+            _icon.ShowBalloonTip(8000, Branding.ProductName, text, ToolTipIcon.Info);
+        };
         _app.Start();
+        _features.Start();
         if (showMain) ShowMain();
+        // İlk açılışta (ya da daha önce cevaplanmadıysa) bir kez raporlama onayı sorulur; cevap gelene kadar hiçbir şey toplanmaz
+        if (UserSettings.ReportsConsent is null) _ui.Post(_ => AskConsent(), null);
+    }
+
+    private static void OpenLink(Uri page) =>
+        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(page.ToString()) { UseShellExecute = true });
+
+    private bool _askingConsent;
+
+    private void AskConsent()
+    {
+        if (_askingConsent || UserSettings.ReportsConsent is not null) return;
+        _askingConsent = true;
+        try
+        {
+            using var form = new ConsentForm();
+            var owner = _main is { Visible: true } m ? m : null;
+            if (owner is null) form.ShowDialog(); else form.ShowDialog(owner);
+            if (form.Answer is not { } answer) return; // kapatıldı: bir sonraki açılışta yine sorulur
+            UserSettings.ReportsConsent = answer;
+            _features.ConsentChanged();
+        }
+        finally { _askingConsent = false; }
     }
 
     private void ShowMain()
     {
         if (_main is null || _main.IsDisposed)
         {
-            _main = new MainForm(_app);
-            _main.HiddenToTray += () => _icon.ShowBalloonTip(4000, "APFS for Windows",
+            _main = new MainForm(_app, _features);
+            _main.HiddenToTray += () => _icon.ShowBalloonTip(4000, Branding.ProductName,
                 WinText.U("Tray.StillRunning"), ToolTipIcon.Info);
             _main.RestartRequested += Restart;
         }
@@ -47,11 +87,11 @@ internal sealed class TrayApp : ApplicationContext
     private void UpdateTooltip()
     {
         string t;
-        if (_app.ServiceDown) t = WinText.U("Tray.TipServiceDown");
+        if (_app.ServiceDown) t = WinText.U("Tray.TipServiceDown", Branding.ProductName);
         else
         {
             int mounted = _app.MountedVolumes.Count();
-            t = mounted == 0 ? WinText.U("Tray.TipNoVolumes") : WinText.U("Tray.TipMounted", mounted);
+            t = mounted == 0 ? WinText.U("Tray.TipNoVolumes", Branding.ProductName) : WinText.U("Tray.TipMounted", Branding.ProductName, mounted);
         }
         _icon.Text = t.Length > 63 ? t[..63] : t;
     }
@@ -99,6 +139,7 @@ internal sealed class TrayApp : ApplicationContext
     {
         _showWait.Unregister(null);
         _app.Dispose();
+        _features.Dispose();
         _icon.Visible = false;
         _icon.Dispose();
         _flyout.Dispose();

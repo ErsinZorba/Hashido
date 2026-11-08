@@ -53,6 +53,7 @@ public class WriteGateTests(LinuxFixtures fixtures, TestImages images) : IClassF
         using var c = TestImages.Open(images.Get("encrypted").Path);
         var g = WriteGate.Evaluate(c);
         Assert.False(g.Allowed);
+        AssertReasonKeys(g);
         Assert.Null(g.Grant);
         Assert.Contains(g.Reasons, r => r.Contains("şifreli", StringComparison.Ordinal));
     }
@@ -65,6 +66,7 @@ public class WriteGateTests(LinuxFixtures fixtures, TestImages images) : IClassF
         using var c = TestImages.Open(path);
         var g = WriteGate.Evaluate(c);
         Assert.False(g.Allowed);
+        AssertReasonKeys(g);
         Assert.Contains(g.Reasons, r => r.Contains("anlık görüntü", StringComparison.Ordinal));
     }
 
@@ -76,6 +78,7 @@ public class WriteGateTests(LinuxFixtures fixtures, TestImages images) : IClassF
         using var c = TestImages.Open(path);
         var g = WriteGate.Evaluate(c);
         Assert.False(g.Allowed);
+        AssertReasonKeys(g);
         Assert.Contains(g.Reasons, r => r.Contains("yedek", StringComparison.Ordinal));
     }
 
@@ -88,6 +91,7 @@ public class WriteGateTests(LinuxFixtures fixtures, TestImages images) : IClassF
         using var c = TestImages.Open(path);
         var g = WriteGate.Evaluate(c);
         Assert.False(g.Allowed);
+        AssertReasonKeys(g);
         Assert.Contains(g.Reasons, r => r.Contains("şifreleme işlemi henüz bitmemiş", StringComparison.Ordinal));
         var report = Apfs.Diagnostics.FullCheck.Run(c);
         Assert.True(report.OwnershipIncomplete);
@@ -104,6 +108,7 @@ public class WriteGateTests(LinuxFixtures fixtures, TestImages images) : IClassF
         using var c = TestImages.Open(path);
         var g = WriteGate.Evaluate(c);
         Assert.False(g.Allowed);
+        AssertReasonKeys(g);
         Assert.Contains(g.Reasons, r => r.Contains("çözümleyemediği", StringComparison.Ordinal));
     }
 
@@ -115,6 +120,7 @@ public class WriteGateTests(LinuxFixtures fixtures, TestImages images) : IClassF
         using var c = TestImages.Open(path);
         var g = WriteGate.Evaluate(c);
         Assert.False(g.Allowed);
+        AssertReasonKeys(g);
         Assert.NotNull(g.Report);
         Assert.False(g.Report.IsClean);
     }
@@ -134,6 +140,25 @@ public class WriteGateTests(LinuxFixtures fixtures, TestImages images) : IClassF
             w.Read(10_000 * 4096L, back);
             Assert.Equal(data, back);
             Assert.Throws<ApfsException>(() => w.Write(w.Length - 100, data));
+        }
+    }
+
+    /// <summary>
+    /// 1.4.0 P2.1: <see cref="GateResult.ReasonKeys"/> metinlerle aynı sırada ve uzunlukta; her anahtarın Türkçe kalıbı (yer
+    /// tutucular joker) aynı sıradaki metni birebir üretir. Raporlama metin yerine anahtarı gönderir.
+    /// </summary>
+    internal static void AssertReasonKeys(GateResult g)
+    {
+        Assert.Equal(g.Reasons.Count, g.ReasonKeys.Count);
+        Assert.NotEmpty(g.Reasons);
+        string dir = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "src", "Apfs.Core", "Resources");
+        var tr = ResourceTests.Load(Path.Combine(dir, "User.tr.resx"));
+        for (int i = 0; i < g.Reasons.Count; i++)
+        {
+            Assert.True(tr.TryGetValue(g.ReasonKeys[i], out var template), $"bilinmeyen anahtar {g.ReasonKeys[i]}");
+            string pattern = "^" + string.Join(".*", System.Text.RegularExpressions.Regex.Split(template, @"\{\d+[^{}]*\}")
+                .Select(System.Text.RegularExpressions.Regex.Escape)) + "$";
+            Assert.Matches(new System.Text.RegularExpressions.Regex(pattern, System.Text.RegularExpressions.RegexOptions.Singleline), g.Reasons[i]);
         }
     }
 

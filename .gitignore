@@ -10,3 +10,6 @@ publish/
 
 installer/redist/
 fixtures/
+
+worker/node_modules/
+worker/.wrangler/

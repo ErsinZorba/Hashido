@@ -30,6 +30,9 @@
   <data name="Action.Checking" xml:space="preserve">
     <value>正在检查…</value>
   </data>
+  <data name="Action.Close" xml:space="preserve">
+    <value>关闭</value>
+  </data>
   <data name="Action.ContinueAnyway" xml:space="preserve">
     <value>仍然继续</value>
   </data>
@@ -44,6 +47,9 @@
   </data>
   <data name="Action.Exit" xml:space="preserve">
     <value>退出</value>
+  </data>
+  <data name="Action.OK" xml:space="preserve">
+    <value>确定</value>
   </data>
   <data name="Action.Open" xml:space="preserve">
     <value>打开</value>
@@ -65,6 +71,9 @@
   </data>
   <data name="Action.Saving" xml:space="preserve">
     <value>正在保存…</value>
+  </data>
+  <data name="Action.Settings" xml:space="preserve">
+    <value>设置</value>
   </data>
   <data name="Action.Unlock" xml:space="preserve">
     <value>解锁</value>
@@ -92,6 +101,38 @@
   </data>
   <data name="Card.WriteRefused" xml:space="preserve">
     <value>无法启用写入：{0}</value>
+  </data>
+  <data name="Consent.Heading" xml:space="preserve">
+    <value>愿意帮助改进 {0} 吗？</value>
+  </data>
+  <data name="Consent.NeverHeading" xml:space="preserve">
+    <value>绝不会发送的内容</value>
+  </data>
+  <data name="Consent.NeverList" xml:space="preserve">
+    <value>• 文件、文件夹和磁盘的名称，文件内容
+• 序列号、标识符、确切大小
+• 密码、密钥、密码提示
+• 计算机名和用户名；不会保存你的 IP 地址</value>
+  </data>
+  <data name="Consent.No" xml:space="preserve">
+    <value>否</value>
+  </data>
+  <data name="Consent.Privacy" xml:space="preserve">
+    <value>隐私声明</value>
+  </data>
+  <data name="Consent.SentHeading" xml:space="preserve">
+    <value>会发送的内容</value>
+  </data>
+  <data name="Consent.SentList" xml:space="preserve">
+    <value>• 程序和 Windows 版本、处理器类型、界面语言
+• 操作（连接、解锁、写入、安全弹出）及其结果和错误代码
+• 磁盘的技术信息：连接类型（USB、NVMe 等）、大致容量范围、卷数、加密类型、格式特性</value>
+  </data>
+  <data name="Consent.Text" xml:space="preserve">
+    <value>{0} 可以自动发送有关错误、崩溃和成功操作的匿名报告。这些报告能让我们了解哪些磁盘和情况会导致问题，尤其是在实验性的写入功能中。你可以随时在 "设置" 中查看已发送的内容或关闭此功能。报告会在 18 个月后删除。</value>
+  </data>
+  <data name="Consent.Yes" xml:space="preserve">
+    <value>是，发送</value>
   </data>
   <data name="Disk.Gone" xml:space="preserve">
     <value>此磁盘已不再连接。</value>
@@ -202,7 +243,7 @@
     <value>只会读取磁盘；密码不会保存在任何地方。</value>
   </data>
   <data name="Password.Title" xml:space="preserve">
-    <value>APFS for Windows：加密卷</value>
+    <value>{0}：加密卷</value>
   </data>
   <data name="Release.Changed" xml:space="preserve">
     <value>已被其他程序更改（例如重新格式化）；APFS 驱动器已移除</value>
@@ -222,6 +263,42 @@
   <data name="Release.UnsavedNotWrittenChanged" xml:space="preserve">
     <value>为避免损坏磁盘上的新内容，最近未保存的更改未写入。</value>
   </data>
+  <data name="Sent.Intro" xml:space="preserve">
+    <value>此电脑最近发送的报告（最新的在前，与发送时完全相同）：</value>
+  </data>
+  <data name="Sent.None" xml:space="preserve">
+    <value>尚未发送任何内容。</value>
+  </data>
+  <data name="Sent.Title" xml:space="preserve">
+    <value>已发送的报告</value>
+  </data>
+  <data name="Settings.Language" xml:space="preserve">
+    <value>语言</value>
+  </data>
+  <data name="Settings.LanguageNote" xml:space="preserve">
+    <value>新语言将在程序重新启动后生效。</value>
+  </data>
+  <data name="Settings.Reports" xml:space="preserve">
+    <value>发送有关错误、崩溃和成功操作的匿名报告</value>
+  </data>
+  <data name="Settings.ReportsHeading" xml:space="preserve">
+    <value>自动报告</value>
+  </data>
+  <data name="Settings.ShowSent" xml:space="preserve">
+    <value>显示已发送的内容</value>
+  </data>
+  <data name="Settings.Title" xml:space="preserve">
+    <value>{0} 设置</value>
+  </data>
+  <data name="Settings.UpdateNotify" xml:space="preserve">
+    <value>有新版本发布时通知我</value>
+  </data>
+  <data name="Settings.UpdatesHeading" xml:space="preserve">
+    <value>更新</value>
+  </data>
+  <data name="Settings.WhatIsSent" xml:space="preserve">
+    <value>会发送哪些内容？</value>
+  </data>
   <data name="Tray.MenuEject" xml:space="preserve">
     <value>{0}{1}：安全弹出</value>
   </data>
@@ -235,13 +312,13 @@
     <value>程序仍在通知区域中运行。你可以从这里访问磁盘。</value>
   </data>
   <data name="Tray.TipMounted" xml:space="preserve">
-    <value>APFS for Windows：已装载 {0} 个卷</value>
+    <value>{0}：已装载 {1} 个卷</value>
   </data>
   <data name="Tray.TipNoVolumes" xml:space="preserve">
-    <value>APFS for Windows：未装载任何卷</value>
+    <value>{0}：未装载任何卷</value>
   </data>
   <data name="Tray.TipServiceDown" xml:space="preserve">
-    <value>APFS for Windows：服务未运行</value>
+    <value>{0}：服务未运行</value>
   </data>
   <data name="Unlock.Failed" xml:space="preserve">
     <value>无法解锁。</value>
@@ -254,6 +331,12 @@
   </data>
   <data name="Unlock.NotWaiting" xml:space="preserve">
     <value>此卷已不再等待输入密码。</value>
+  </data>
+  <data name="Update.Available" xml:space="preserve">
+    <value>版本 {0} 已发布。单击可打开下载页面。</value>
+  </data>
+  <data name="Update.Link" xml:space="preserve">
+    <value>版本 {0} 已发布</value>
   </data>
   <data name="Volume.DefaultName" xml:space="preserve">
     <value>卷 {0}</value>

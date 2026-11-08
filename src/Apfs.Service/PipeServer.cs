@@ -1,11 +1,12 @@
 using System.Text.Json;
 using Apfs.Windows;
 using Apfs.Windows.Ipc;
+using Apfs.Windows.Reporting;
 
 namespace Apfs.Service;
 
 /// <summary>Tepsi uygulamasının bağlandığı adlandırılmış kanal sunucusu. Her bağlantı: tek istek, tek yanıt.</summary>
-internal sealed class PipeServer(MountManager manager) : IDisposable
+internal sealed class PipeServer(MountManager manager, ReportRecorder reports) : IDisposable
 {
     private readonly CancellationTokenSource _cts = new();
     private Task? _loop;
@@ -51,6 +52,9 @@ internal sealed class PipeServer(MountManager manager) : IDisposable
                     "rescan" => await Task.Run(() => { manager.ForgetReleased(); manager.Rescan(); return new UnlockResponse(true, WinText.T("Svc.Rescanned")); }, ct),
                     "eject" when req.Disk is not null => await Task.Run(() => manager.Eject(req.Disk, req.Force), ct),
                     "set-writable" when req.Disk is not null => await Task.Run(() => manager.SetWritable(req.Disk, req.Container, req.Enable, req.Force), ct),
+                    "reports-pull" => PullReports(req.ReportAfter),
+                    "reports-ack" => Ack(req.ReportAfter),
+                    "reports-config" => Configure(req.Enable),
                     _ => new UnlockResponse(false, WinText.T("Svc.UnknownRequest")),
                 };
                 await PipeProtocol.WriteLineAsync(server, response, timeout.Token);
@@ -64,6 +68,25 @@ internal sealed class PipeServer(MountManager manager) : IDisposable
                 ServiceLog.Write(WinText.T("Svc.RequestFailed", e.GetType().Name, e.Message));
             }
         }
+    }
+
+    private ReportsResponse PullReports(long after)
+    {
+        var (list, more) = reports.Queue.Pull(after, PipeProtocol.MaxReportPageBytes);
+        return new ReportsResponse(list, more, reports.Enabled);
+    }
+
+    private UnlockResponse Ack(long upto)
+    {
+        reports.Queue.Ack(upto);
+        return new UnlockResponse(true, "");
+    }
+
+    private UnlockResponse Configure(bool enabled)
+    {
+        if (enabled != reports.Enabled) ServiceLog.Write(enabled ? WinText.T("Svc.ReportsEnabled") : WinText.T("Svc.ReportsDisabled"));
+        reports.SetEnabled(enabled);
+        return new UnlockResponse(true, "");
     }
 
     public void Dispose()

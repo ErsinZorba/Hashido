@@ -1,12 +1,16 @@
-﻿; APFS for Windows kurulum sihirbazı (Inno Setup 6). Derlemek için: tools\build-installer.ps1
+﻿; Hashido (eski adıyla APFS for Windows) kurulum sihirbazı (Inno Setup 6). Derlemek için: tools\build-installer.ps1
 ; Kurduğu her şey install.ps1 ile aynıdır: program dosyaları, LocalSystem hizmeti, oturum açılışında tepsi, WinFsp Launcher kaydı.
 ; WinFsp yoksa (veya 2.1'den eskiyse) içindeki resmi WinFsp kurulum paketini sessizce kurar.
 
 #ifndef AppVersion
-  #define AppVersion "1.3.0"
+  #define AppVersion "1.4.0"
 #endif
-#define AppName "APFS for Windows"
+; Görünen ad: src/Apfs.Windows/Branding.cs ProductName ile aynı olmalı (BrandingTests). Metinler adı {#AppName} ile alır.
+#define AppName "Hashido"
+; Teknik kimlikler: ad değişse de DEĞİŞMEZ (yükseltmede eski değerler bulunsun; hizmetin günlük klasörü sabit).
 #define ServiceName "APFSforWindows"
+#define DataDirName "APFS for Windows"
+#define RunValueName "APFS for Windows"
 #define SrcDir "..\publish\APFS for Windows"
 #define WinFspMsi "winfsp-2.1.25156.msi"
 
@@ -16,17 +20,18 @@ AppName={#AppName}
 AppVersion={#AppVersion}
 AppVerName={#AppName} {#AppVersion}
 AppPublisher=Ersin Zorba
-AppPublisherURL=https://github.com/ErsinZorba/APFS-for-Windows
-AppSupportURL=https://github.com/ErsinZorba/APFS-for-Windows/issues
+AppPublisherURL=https://github.com/ErsinZorba/Hashido
+AppSupportURL=https://github.com/ErsinZorba/Hashido/issues
 VersionInfoVersion={#AppVersion}
-; Kurulum yeri sabit: hizmet ve "apfs register" Program Files\APFS for Windows yolunu kullanır.
+; Yeni kurulum Program Files\Hashido; 1.3.0 ve öncesinden yükseltmede Inno önceki klasörü kullanır (UsePreviousAppDir,
+; AppId aynı) → "APFS for Windows"ta kalır, taşınmaz. Hizmet ve "apfs register" yolu {app}'tan/kendi klasöründen alır.
 DefaultDirName={autopf}\{#AppName}
 DisableDirPage=yes
 DisableProgramGroupPage=yes
 ; GPL kullanım için kabul şartı koymaz (madde 9): "kabul ediyorum" sayfası yerine kısa bilgi sayfası (dile göre, [Languages]).
 ; GPL'in tam metni program klasöründeki LICENSE dosyasıdır (build-release.ps1 kopyalar).
 OutputDir=..\publish
-OutputBaseFilename=APFS-for-Windows-Setup-{#AppVersion}
+OutputBaseFilename=Hashido-Setup-{#AppVersion}
 SetupIconFile=..\src\Apfs.Tray\app.ico
 UninstallDisplayIcon={app}\apfs-tray.exe
 UninstallDisplayName={#AppName}
@@ -53,15 +58,16 @@ Name: "ja"; MessagesFile: "compiler:Languages\Japanese.isl"; InfoBeforeFile: "li
 Name: "ko"; MessagesFile: "compiler:Languages\Korean.isl"; InfoBeforeFile: "lisans-bilgisi.ko.txt"
 
 [CustomMessages]
-en.LaunchApp=Open APFS for Windows
-tr.LaunchApp=APFS for Windows'u aç
-de.LaunchApp=APFS for Windows öffnen
-fr.LaunchApp=Ouvrir APFS for Windows
-es.LaunchApp=Abrir APFS for Windows
-ptbr.LaunchApp=Abrir o APFS for Windows
-it.LaunchApp=Apri APFS for Windows
-ja.LaunchApp=APFS for Windows を開く
-ko.LaunchApp=APFS for Windows 열기
+; Türkçede ada ek getirilmez ("…'u aç" ad değişince yanlış ek olur): "… uygulamasını aç".
+en.LaunchApp=Open {#AppName}
+tr.LaunchApp={#AppName} uygulamasını aç
+de.LaunchApp={#AppName} öffnen
+fr.LaunchApp=Ouvrir {#AppName}
+es.LaunchApp=Abrir {#AppName}
+ptbr.LaunchApp=Abrir o {#AppName}
+it.LaunchApp=Apri {#AppName}
+ja.LaunchApp={#AppName} を開く
+ko.LaunchApp={#AppName} 열기
 en.InstallingWinFsp=Installing the WinFsp file system driver...
 tr.InstallingWinFsp=WinFsp dosya sistemi sürücüsü kuruluyor...
 de.InstallingWinFsp=Der Dateisystemtreiber WinFsp wird installiert...
@@ -89,15 +95,15 @@ ptbr.WinFspFailed=Não foi possível instalar o WinFsp (código %1). Os discos d
 it.WinFspFailed=Impossibile installare WinFsp (codice %1). I dischi Mac non possono essere montati. Installa WinFsp da https://winfsp.dev ed esegui di nuovo questa installazione.
 ja.WinFspFailed=WinFsp をインストールできませんでした (コード %1)。Mac のディスクをマウントできません。https://winfsp.dev から WinFsp をインストールしてから、このセットアップをもう一度実行してください。
 ko.WinFspFailed=WinFsp를 설치하지 못했습니다(코드 %1). Mac 디스크를 마운트할 수 없습니다. https://winfsp.dev 에서 WinFsp를 설치한 후 이 설치 프로그램을 다시 실행하세요.
-en.ServiceFailed=The background service could not be started (code %1). Details: C:\ProgramData\APFS for Windows\log.txt
-tr.ServiceFailed=Arka plan hizmeti başlatılamadı (kod %1). Ayrıntı: C:\ProgramData\APFS for Windows\log.txt
-de.ServiceFailed=Der Hintergrunddienst konnte nicht gestartet werden (Code %1). Details: C:\ProgramData\APFS for Windows\log.txt
-fr.ServiceFailed=Impossible de démarrer le service d'arrière-plan (code %1). Détails : C:\ProgramData\APFS for Windows\log.txt
-es.ServiceFailed=No se pudo iniciar el servicio en segundo plano (código %1). Detalles: C:\ProgramData\APFS for Windows\log.txt
-ptbr.ServiceFailed=Não foi possível iniciar o serviço em segundo plano (código %1). Detalhes: C:\ProgramData\APFS for Windows\log.txt
-it.ServiceFailed=Impossibile avviare il servizio in background (codice %1). Dettagli: C:\ProgramData\APFS for Windows\log.txt
-ja.ServiceFailed=バックグラウンド サービスを開始できませんでした (コード %1)。詳細: C:\ProgramData\APFS for Windows\log.txt
-ko.ServiceFailed=백그라운드 서비스를 시작하지 못했습니다(코드 %1). 자세한 내용: C:\ProgramData\APFS for Windows\log.txt
+en.ServiceFailed=The background service could not be started (code %1). Details: C:\ProgramData\{#DataDirName}\log.txt
+tr.ServiceFailed=Arka plan hizmeti başlatılamadı (kod %1). Ayrıntı: C:\ProgramData\{#DataDirName}\log.txt
+de.ServiceFailed=Der Hintergrunddienst konnte nicht gestartet werden (Code %1). Details: C:\ProgramData\{#DataDirName}\log.txt
+fr.ServiceFailed=Impossible de démarrer le service d'arrière-plan (code %1). Détails : C:\ProgramData\{#DataDirName}\log.txt
+es.ServiceFailed=No se pudo iniciar el servicio en segundo plano (código %1). Detalles: C:\ProgramData\{#DataDirName}\log.txt
+ptbr.ServiceFailed=Não foi possível iniciar o serviço em segundo plano (código %1). Detalhes: C:\ProgramData\{#DataDirName}\log.txt
+it.ServiceFailed=Impossibile avviare il servizio in background (codice %1). Dettagli: C:\ProgramData\{#DataDirName}\log.txt
+ja.ServiceFailed=バックグラウンド サービスを開始できませんでした (コード %1)。詳細: C:\ProgramData\{#DataDirName}\log.txt
+ko.ServiceFailed=백그라운드 서비스를 시작하지 못했습니다(코드 %1). 자세한 내용: C:\ProgramData\{#DataDirName}\log.txt
 en.ServiceDescription=Mounts attached Mac (APFS) disks as drives in Windows (read-only by default; optional writing).
 tr.ServiceDescription=Takılan Mac (APFS) disklerini Windows'ta sürücü olarak bağlar (önce salt okunur; isteğe bağlı yazma).
 de.ServiceDescription=Bindet angeschlossene Mac-Datenträger (APFS) als Laufwerke in Windows ein (standardmäßig schreibgeschützt; Schreiben optional).
@@ -112,11 +118,15 @@ ko.ServiceDescription=연결된 Mac(APFS) 디스크를 Windows 드라이브로 �
 Source: "{#SrcDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 Source: "redist\{#WinFspMsi}"; DestDir: "{tmp}"; Flags: deleteafterinstall; Check: NeedsWinFsp
 
+[InstallDelete]
+; 1.3.0 ve öncesinin Başlat menüsü kısayolu (ad değişti; yükseltmede eskisi kalmasın, yenisi [Icons]'ta).
+Type: files; Name: "{autoprograms}\APFS for Windows.lnk"
+
 [Icons]
 Name: "{autoprograms}\{#AppName}"; Filename: "{app}\apfs-tray.exe"; Parameters: "--show"; Comment: "{cm:ServiceDescription}"
 
 [Registry]
-Root: HKLM; Subkey: "SOFTWARE\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "{#AppName}"; \
+Root: HKLM; Subkey: "SOFTWARE\Microsoft\Windows\CurrentVersion\Run"; ValueType: string; ValueName: "{#RunValueName}"; \
   ValueData: """{app}\apfs-tray.exe"""; Flags: uninsdeletevalue
 
 [Run]
@@ -180,7 +190,8 @@ begin
   Sc := ExpandConstant('{sys}\sc.exe');
   Bin := '"\"' + ExpandConstant('{app}') + '\apfs-service.exe\""';
   if Run(Sc, 'query {#ServiceName}') = 0 then
-    Run(Sc, 'config {#ServiceName} binPath= ' + Bin + ' start= auto')
+    { Yükseltmede görünen ad da güncellenir (hizmet adı teknik kimlik, değişmez) }
+    Run(Sc, 'config {#ServiceName} binPath= ' + Bin + ' start= auto DisplayName= "{#AppName}"')
   else
     Run(Sc, 'create {#ServiceName} binPath= ' + Bin + ' start= auto DisplayName= "{#AppName}"');
   Run(Sc, 'description {#ServiceName} "' + CustomMessage('ServiceDescription') + '"');

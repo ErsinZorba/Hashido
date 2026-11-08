@@ -1,11 +1,11 @@
-﻿APFS for Windows
+﻿Hashido
 Copyright (C) 2026 Ersin Zorba
 
 Bu program özgür ve açık kaynaklı bir yazılımdır. GNU Genel Kamu Lisansı sürüm 3 (GPLv3) ile dağıtılır: programı ücretsiz kullanabilir, kopyalayabilir ve başkalarına verebilirsiniz. Değiştirip dağıtırsanız, değiştirdiğiniz sürümün kaynak kodunu da aynı lisansla paylaşmanız gerekir.
 
 Program hiçbir garanti olmadan sunulur. Programın Mac disklerinize yazmasına izin vermeden önce yedek almanızı öneririz.
 
-Kaynak kodu: https://github.com/ErsinZorba/APFS-for-Windows
+Kaynak kodu: https://github.com/ErsinZorba/Hashido
 
 Lisansın tam metni, kurulumdan sonra program klasöründeki LICENSE dosyasındadır.
 

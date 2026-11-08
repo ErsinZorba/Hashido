@@ -161,8 +161,15 @@ public class DiskChangeTests(LinuxFixtures fixtures, TestImages images) : IClass
         Overwrite(path, new byte[length]);
         await WaitGone(svc);
 
-        // Hizmet ne commit ne blok 0 yazdı: görüntü sıfır kaldı
-        var after = File.ReadAllBytes(path);
+        // Hizmet ne commit ne blok 0 yazdı: görüntü sıfır kaldı. Önce bırakılan oturumun yazma tanıtıcısının kapanmasını bekle
+        // (FileShare.Read başka bir yazıcı açıkken açılmaz): yavaş CI koşucusunda disk listeden düştüğü anda henüz kapanmamıştı.
+        // Kapandıktan sonra okumak, hizmetin artık yazamayacağını da garanti eder.
+        byte[] after = [];
+        for (var deadline = DateTime.UtcNow.AddSeconds(30); ; await Task.Delay(200))
+        {
+            try { after = File.ReadAllBytes(path); break; }
+            catch (IOException) when (DateTime.UtcNow < deadline) { }
+        }
         Assert.Equal(length, after.LongLength);
         int firstNonZero = Array.FindIndex(after, b => b != 0);
         Assert.True(firstNonZero < 0, $"bırakılan oturum diske yazdı (ilk sıfır olmayan bayt {firstNonZero})");

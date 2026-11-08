@@ -1,18 +1,34 @@
 ﻿<#
 .SYNOPSIS
-  APFS for Windows'u kaldırır (YÖNETİCİ olarak çalıştırın). Bağlı diskler ayrılır; disklerinize hiçbir şey yazılmaz.
+  Hashido'yu kaldırır (YÖNETİCİ olarak çalıştırın). Bağlı diskler ayrılır; disklerinize hiçbir şey yazılmaz.
   Günlük dosyası (C:\ProgramData\APFS for Windows) incelemeniz için bırakılır. WinFsp kaldırılmaz.
 #>
 $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = [Text.Encoding]::UTF8
-$installDir = Join-Path $env:ProgramFiles 'APFS for Windows'
 $serviceName = 'APFSforWindows'
+# Kurulum klasörü: hizmetin klasörü (Program Files altındaysa); hizmet yoksa programı içeren "Hashido" ya da eski
+# "APFS for Windows" (1.3.0 ve öncesi; yükseltenler orada kalır). Hizmet silinmeden önce okunur.
+function Get-InstallDir {
+    $img = (Get-ItemProperty "HKLM:\SYSTEM\CurrentControlSet\Services\$serviceName" -ErrorAction SilentlyContinue).ImagePath
+    if ($img) {
+        $exe = $img.Trim().Trim('"')
+        if ($exe -match '\\apfs-service\.exe$' -and $exe.StartsWith($env:ProgramFiles + '\', [StringComparison]::OrdinalIgnoreCase)) {
+            return Split-Path -Parent $exe
+        }
+    }
+    foreach ($name in 'Hashido', 'APFS for Windows') {
+        $d = Join-Path $env:ProgramFiles $name
+        if (Test-Path (Join-Path $d 'apfs.exe')) { return $d }
+    }
+    return Join-Path $env:ProgramFiles 'Hashido'
+}
+$installDir = Get-InstallDir
 
 $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 if (-not $isAdmin) { Write-Host 'PowerShell''i "Yönetici olarak çalıştır" ile açıp tekrar deneyin.' -ForegroundColor Red; exit 1 }
 
 Get-Process apfs-tray -ErrorAction SilentlyContinue | Stop-Process -Force
-Remove-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Run' -Name 'APFS for Windows' -ErrorAction SilentlyContinue
+Remove-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Run' -Name 'APFS for Windows' -ErrorAction SilentlyContinue  # değer adı teknik kimlik
 
 $svc = Get-Service $serviceName -ErrorAction SilentlyContinue
 if ($svc) {
@@ -27,4 +43,4 @@ Get-Process apfs -ErrorAction SilentlyContinue | Stop-Process -Force
 Start-Sleep -Seconds 1
 if (Test-Path $installDir) { Remove-Item -Recurse -Force $installDir; Write-Host "Silindi: $installDir" }
 
-Write-Host 'APFS for Windows kaldırıldı.' -ForegroundColor Green
+Write-Host 'Hashido kaldırıldı.' -ForegroundColor Green

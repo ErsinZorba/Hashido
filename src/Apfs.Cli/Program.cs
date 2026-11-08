@@ -51,7 +51,7 @@ catch (Exception e)
 
 static int Help()
 {
-    Console.WriteLine(WinText.T("Cli.Help"));
+    Console.WriteLine(WinText.T("Cli.Help", Branding.ProductName));
     return 0;
 }
 

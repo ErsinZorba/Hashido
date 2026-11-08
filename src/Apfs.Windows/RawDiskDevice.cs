@@ -19,6 +19,7 @@ public sealed class RawDiskDevice : IBlockDevice
     private const uint OpenExisting = 3;
     private const uint IoctlDiskGetLengthInfo = 0x0007405C;
     private const uint IoctlDiskGetDriveGeometryEx = 0x000700A0;
+    private const uint IoctlStorageQueryProperty = 0x002D1400;
 
     private readonly SafeFileHandle _handle;
     private readonly Lock _lock = new();
@@ -110,6 +111,24 @@ public sealed class RawDiskDevice : IBlockDevice
         // DISK_GEOMETRY_EX.Geometry.BytesPerSector: Cylinders(8) + MediaType(4) + TracksPerCylinder(4) + SectorsPerTrack(4)
         int bps = BitConverter.ToInt32(outBuf[20..]);
         return bps is 512 or 1024 or 2048 or 4096 ? bps : 512;
+    }
+
+    /// <summary>
+    /// Bağlantı türü (STORAGE_BUS_TYPE: 7 USB, 0xB SATA, 0x11 NVMe, 0xF VHD…; IOCTL_STORAGE_QUERY_PROPERTY, var olan okuma
+    /// tanıtıcısıyla). Öğrenilemezse null. Raporlama için; aygıtın adı/seri numarası okunmaz.
+    /// </summary>
+    public int? QueryBusType()
+    {
+        Span<byte> query = stackalloc byte[12]; // PropertyId = StorageDeviceProperty (0), QueryType = PropertyStandardQuery (0)
+        query.Clear();
+        Span<byte> outBuf = stackalloc byte[512];
+        unsafe
+        {
+            fixed (byte* q = query)
+                if (!DeviceIoControl(_handle, IoctlStorageQueryProperty, (IntPtr)q, 12, ref MemoryMarshal.GetReference(outBuf), 512, out uint n, IntPtr.Zero) || n < 32)
+                    return null;
+        }
+        return BitConverter.ToInt32(outBuf[28..]); // STORAGE_DEVICE_DESCRIPTOR.BusType
     }
 
     public void Dispose() => _handle.Dispose();

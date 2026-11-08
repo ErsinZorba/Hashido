@@ -1,4 +1,6 @@
-# APFS for Windows
+# Hashido
+
+**Read & write APFS drives on Windows** · formerly *APFS for Windows*
 
 **English** | [Türkçe](README.tr.md)
 
@@ -23,11 +25,16 @@ Plug the disk in and within a few seconds it shows up in File Explorer with a dr
 | 10 interface languages | English, Türkçe, Deutsch, Français, Español, Português (Brasil), Italiano, 日本語, 简体中文, 한국어 |
 
 ## Installation
-Run `APFS-for-Windows-Setup-1.3.0.exe` and follow the wizard (Next › Install › Finish). Windows 10/11 (64-bit) is all you need;
+Run `Hashido-Setup-1.4.0.exe` and follow the wizard (Next › Install › Finish). Windows 10/11 (64-bit) is all you need;
 nothing else has to be installed: .NET comes with the program, and if the [WinFsp](https://winfsp.dev) driver is missing the wizard
-installs it too. After installation, **APFS for Windows** is in the Start menu and the tray icon starts automatically at every sign-in.
+installs it too. After installation, **Hashido** is in the Start menu and the tray icon starts automatically at every sign-in.
 
-To uninstall: **Settings › Apps › Installed apps › APFS for Windows › Uninstall**. Uninstalling writes nothing to your disks;
+- **Processor:** x64 (Intel/AMD). On Windows 11 on ARM (ARM64) the program runs through Windows' built-in x64 emulation;
+  there is no separate ARM64 package.
+- **Program folder:** new installations go to `C:\Program Files\Hashido`. If you upgrade from version 1.3.0 or earlier
+  (then called APFS for Windows), the program stays in its old folder, `C:\Program Files\APFS for Windows`.
+
+To uninstall: **Settings › Apps › Installed apps › Hashido › Uninstall**. Uninstalling writes nothing to your disks;
 the log (`C:\ProgramData\APFS for Windows\log.txt`) is kept for you to inspect, and WinFsp is not removed.
 
 ## Usage
@@ -46,7 +53,7 @@ the main window (it shows the name of the current language) and pick one from th
 for the other languages).
 
 The translations other than English and Turkish have not been reviewed by native speakers. If you see a wrong or unclear
-translation, please report it in [Issues](https://github.com/ErsinZorba/APFS-for-Windows/issues) (language, the text on screen and
+translation, please report it in [Issues](https://github.com/ErsinZorba/Hashido/issues) (language, the text on screen and
 the correct wording).
 
 ## Writing (experimental)
@@ -116,7 +123,8 @@ apfs dump <source> [path]              Development: internal structure dump (wit
 apfs mount <source> [X:]               Manual mount (Ctrl+C unmounts); --all for internal volumes
 ```
 `<source>`: a disk image file or `\\.\PhysicalDriveN` (requires administrator). For encrypted volumes `--password-prompt`.
-After installation the tool is not added to PATH; run it with its full path: `& "C:\Program Files\APFS for Windows\apfs.exe" info \\.\PhysicalDrive2`
+After installation the tool is not added to PATH; run it with its full path: `& "C:\Program Files\Hashido\apfs.exe" info \\.\PhysicalDrive2`
+(after an upgrade from 1.3.0 or earlier: `C:\Program Files\APFS for Windows\apfs.exe`).
 
 ## File names
 - All Unicode names are supported. The Mac storing names in a different Unicode form (NFD) is not a problem.
@@ -135,11 +143,52 @@ Writing to disks with several volumes in the same partition; changing the passwo
 repair, formatting; snapshots and the Time Machine structure; Fusion Drive; the sealed macOS system volume; DMG/sparsebundle files;
 HFS+; hardware encryption of Apple Silicon/T2 internal disks.
 
+## Privacy
+Last updated: 2026-11-08. This statement is binding in English; translations are for information only. The same text is in [worker/PRIVACY.md](worker/PRIVACY.md).
+
+**Automatic reports are off until you say yes.** The first time the program starts it asks once whether it may send anonymous
+reports. Until you answer "Yes, send", nothing is collected or sent. You can change your choice at any time in **Settings**;
+turning reports off also deletes the reports on your computer that have not been sent yet.
+
+**What is sent and why.** Reports describe errors, crashes and successful operations (connecting a disk, unlocking, enabling
+writing, a writing session, safely ejecting). They help find bugs and show which disks and situations cause problems, especially
+with the experimental writing feature. A report contains only: program and Windows version, processor type, interface language,
+the operation, its result and error code, a rough duration range, the day; technical disk details: connection type (USB, NVMe…),
+sector and block size, partition scheme, number of APFS partitions and volumes, a rough size range (powers of two), APFS format
+feature flags, volume roles, encryption type, case sensitivity, whether snapshots exist, the name and version of the software
+that last wrote the volume (e.g. `apfs_kext (2313.1)`), a rough file count range; for writing sessions, rough ranges of the
+number of saves, bytes and operations and how the session ended; for crashes, the error type and the names of the program's
+own functions where it happened. The exact list of allowed fields is [`worker/schema.json`](worker/schema.json); the program and
+the server both reject any report with a field not in that list.
+
+**Never sent:** file, folder, volume or disk names, file contents, serial numbers, UUIDs or other identifiers, exact sizes,
+passwords, keys or password hints, computer name, user name, file paths, error messages, or any permanent device identifier.
+
+**Where it goes.** The program sends reports over HTTPS to `hashido-api.zorba.dev`, a Cloudflare Worker run by the developer,
+which stores them in a Cloudflare D1 database (Western Europe). Your IP address is not stored and the server keeps no request
+logs; Cloudflare processes the IP address only briefly to deliver the request (see Cloudflare's privacy policy). Reports are
+not sold, not used for advertising and not shared with anyone else.
+
+**How long.** Reports are deleted automatically 18 months after they are received.
+
+**On your computer.** Reports waiting to be sent are kept in `%ProgramData%\APFS for Windows\reports\` (at most 200) and, for
+the tray program's own crash reports, in `%LOCALAPPDATA%\APFS for Windows\reports\`. The last 20 reports sent are shown, exactly
+as sent, under **Settings › Show what was sent**.
+
+**Your rights.** Because reports contain no identifier, nobody (including the developer) can tell which reports came from you,
+so individual reports cannot be found or deleted on request. Turning reports off stops all future reports.
+
+**Update check.** Unless you turn it off in Settings, the program asks GitHub (`api.github.com`) once a day whether a newer
+version exists. Nothing about you or your disks is sent; GitHub sees the request as described in GitHub's privacy statement.
+
+**Contact.** Questions and requests: [GitHub Issues](https://github.com/ErsinZorba/Hashido/issues). Changes to this
+statement are visible in the repository history.
+
 ## Development
 ```
 dotnet build
 dotnet test
-powershell -File tools\build-installer.ps1   # setup wizard: publish\APFS-for-Windows-Setup-<version>.exe
+powershell -File tools\build-installer.ps1   # setup wizard: publish\Hashido-Setup-<version>.exe
 ```
 `build-installer.ps1` needs Inno Setup 6 (`winget install --id JRSoftware.InnoSetup -e`) and WinFsp's official
 `winfsp-2.1.25156.msi` package under `installer\redist\` (not added to git; the script checks its signature). For the program folder
@@ -152,6 +201,12 @@ the linux-apfs-rw driver) run inside WSL (`tools/make-linux-fixtures.sh`, `tools
 `tools/mac/` (Mac kit). To test the real disk path on a virtual disk, `tools/vhd-write-test.ps1` (administrator).
 Interface texts: `src/Apfs.Core/Resources` and `src/Apfs.Windows/Resources` (`User.<language>.resx`; technical texts `Tech.resx`
 in English and Turkish only). Long tests: `APFS_LONG=1 dotnet test`.
+
+## The name
+Hashido (橋戸) is Japanese for "bridge gate", a real family and place name: a gate between your Mac disk and Windows.
+It also carries "hash": every structure on an APFS disk has a checksum, and the program verifies these checksums and the
+name hashes so that every byte arrives intact. Up to version 1.3.0 the program was called APFS for Windows; some technical
+names (the service, the `C:\ProgramData\APFS for Windows` folder, the settings key) keep the old name so that upgrades work.
 
 ## License
 Copyright (C) 2026 Ersin Zorba. GNU General Public License version 3 (version 3 only; `GPL-3.0-only`), text in [LICENSE](LICENSE).

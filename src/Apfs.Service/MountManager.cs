@@ -1,11 +1,15 @@
+using System.Diagnostics;
+using System.Text.Json.Nodes;
 using Apfs.Container;
 using Apfs.Crypto;
+using Apfs.Diagnostics;
 using Apfs.IO;
 using Apfs.Mount;
 using Apfs.Partitions;
 using Apfs.Volume;
 using Apfs.Windows;
 using Apfs.Windows.Ipc;
+using Apfs.Windows.Reporting;
 using Apfs.Write;
 
 namespace Apfs.Service;
@@ -26,9 +30,15 @@ internal sealed class MountManager : IDisposable
     private readonly IReadOnlyList<string>? _imageSources;
     private readonly HashSet<string> _released = new(StringComparer.OrdinalIgnoreCase); // güvenli kaldırma sonrası yeniden bağlanmasın
     private long _noticeId;
+    private readonly ReportRecorder? _reports;
 
     /// <param name="imageSources">Yalnızca geliştirme (konsol) modunda: fiziksel diskler yerine bu görüntü dosyaları kullanılır.</param>
-    public MountManager(IReadOnlyList<string>? imageSources = null) => _imageSources = imageSources;
+    /// <param name="reports">Raporlama (onay verilmediyse kayıt hiçbir şey yapmaz; bkz. <see cref="ReportRecorder"/>).</param>
+    public MountManager(IReadOnlyList<string>? imageSources = null, ReportRecorder? reports = null)
+    {
+        _imageSources = imageSources;
+        _reports = reports;
+    }
 
     /// <summary>
     /// Takılı bir disk. <see cref="Device"/> diskin tamamını salt okunur açar (bütün salt okunur kapsayıcılar ve kimlik denetimi
@@ -61,12 +71,18 @@ internal sealed class MountManager : IDisposable
         /// bağlanırken (yazmaya açma/kapama, ret) parola yeniden sorulmaz; disk bırakılınca sıfırlanır. Günlüğe yazılmaz.
         /// </summary>
         public Dictionary<Guid, VolumeKey> Keys { get; } = [];
+        /// <summary>Raporlama: aygıt düzeyi bilgiler (takılırken bir kez).</summary>
+        public DiskFacts? Facts { get; set; }
+        /// <summary>Raporlama: APFS bölüm sırası → kapsayıcının yapı bilgileri (bağlanırken; <see cref="_gate"/> altında).</summary>
+        public Dictionary<int, ContainerFacts> ContainerFacts { get; } = [];
     }
 
     /// <summary>Bir APFS bölümünün yazma oturumu ve onu kapatınca bırakılacak yazılabilir aygıtlar.</summary>
     private sealed class ContainerWrite(WriteSession session, IReadOnlyList<IDisposable> resources)
     {
         public WriteSession Session { get; } = session;
+        /// <summary>Oturumun başlangıcı (raporda süre aralığı).</summary>
+        public Stopwatch Age { get; } = Stopwatch.StartNew();
         public IReadOnlyList<IDisposable> Resources { get; } = resources;
         /// <summary>Yazma tanıtıcısının güvenli kaldırma kaydı (her açık tanıtıcı izlenir; hepsi aynı ReleaseDisk'e gider).</summary>
         public DeviceNotifications.Registration? RemovalWatch { get; set; }
@@ -82,6 +98,8 @@ internal sealed class MountManager : IDisposable
         public string State { get; set; } = VolumeStatus.Failed;
         public string? Hint { get; set; }
         public string? Message { get; set; }
+        /// <summary>Raporlama: hata durumunun kodu (<see cref="ApfsErrorCode"/> adı; ileti değil).</summary>
+        public string? FailureCode { get; set; }
         public ApfsMount? Mount { get; set; }
         public ApfsWritableMount? WritableMount { get; set; }
     }
@@ -145,7 +163,9 @@ internal sealed class MountManager : IDisposable
     {
         var disk = new TrackedDisk(key, device, DescribeDisk(key, device)) { Fingerprint = PartitionLocator.Fingerprint(device) };
         int count = PartitionLocator.FindApfsPartitions(device).Count;
-        for (int p = 0; p < count; p++) MountContainer(disk, p);
+        disk.Facts = new DiskFacts(device is RawDiskDevice r ? ReportEvents.BusToken(r.QueryBusType() ?? -1) : "image", device.SectorSize,
+            PartitionLocator.LooksLikeContainer(device, 0) ? "none" : "gpt", count);
+        for (int p = 0; p < count; p++) MountContainer(disk, p, report: true);
 
         if (device is RawDiskDevice raw)
             disk.RemovalWatch = DeviceNotifications.WatchHandle(raw.Handle, a => OnHandleEvent(key, a));
@@ -156,11 +176,15 @@ internal sealed class MountManager : IDisposable
     /// <paramref name="p"/>. APFS bölümünü diskin salt okunur aygıtından (yeniden) açar ve birimlerini salt okunur bağlar.
     /// Disk yayımlanmış olabileceği için listeler <see cref="_gate"/> altında değiştirilir.
     /// </summary>
-    private void MountContainer(TrackedDisk disk, int p)
+    /// <param name="report">Diskin takılması (rapora "mount" olayı); yazma durumu değişirken yeniden bağlamada olay yok.</param>
+    private void MountContainer(TrackedDisk disk, int p, bool report = false)
     {
+        var watch = Stopwatch.StartNew();
         try
         {
             var c = SourceOpener.OpenContainer(disk.Device, p, ownsDevice: false);
+            ContainerFacts? facts = null;
+            try { facts = Apfs.Diagnostics.ContainerFacts.Of(c); } catch (Exception e) when (e is ApfsException or ObjectDisposedException) { }
             var volumes = new List<TrackedVolume>();
             foreach (var r in c.OpenVolumes(keys: KeysOf(disk)))
             {
@@ -173,27 +197,40 @@ internal sealed class MountManager : IDisposable
                 {
                     tv.State = VolumeStatus.Failed;
                     tv.Message = r.Error.Message;
+                    tv.FailureCode = r.Error.Code.ToString();
                     AddNotice("hata", WinText.U("Notice.VolumeOpenFailed", disk.Description, r.Index, r.Error.Message));
                 }
             }
-            bool published;
+            bool kept;
             lock (_gate)
             {
                 // Disk henüz yayımlanmadıysa (AttachDisk) ya da hâlâ bizdeyse eklenir; bu arada bırakıldıysa geri alınır
-                published = _disks.TryGetValue(disk.Key, out var current);
-                if (!published || ReferenceEquals(current, disk))
+                kept = !_disks.TryGetValue(disk.Key, out var current) || ReferenceEquals(current, disk);
+                if (kept)
                 {
                     disk.Containers[p] = c;
                     disk.Volumes.AddRange(volumes);
-                    return;
+                    if (facts is not null) disk.ContainerFacts[p] = facts;
                 }
             }
+            if (report)
+                _reports?.Record(() =>
+                {
+                    int failed = volumes.Count(v => v.State == VolumeStatus.Failed);
+                    return Event("mount", failed > 0 ? "fail" : "ok", disk, p, facts)
+                        .WithVolumeCounts(volumes.Count(v => v.State == VolumeStatus.Mounted), volumes.Count(v => v.State == VolumeStatus.NeedsPassword),
+                            volumes.Count(v => v.State == VolumeStatus.Hidden), failed)
+                        .WithCode(volumes.FirstOrDefault(v => v.State == VolumeStatus.Failed)?.FailureCode)
+                        .WithDuration(watch.Elapsed);
+                });
+            if (kept) return;
             foreach (var tv in volumes) { try { tv.Mount?.Dispose(); } catch { } }
             c.Dispose();
         }
         catch (ApfsException e)
         {
             AddNotice("hata", WinText.U("Notice.ContainerOpenFailed", disk.Description, e.Message));
+            if (report) _reports?.Record(() => Event("mount", "fail", disk, p, null).WithCode(e.Code.ToString()).WithDuration(watch.Elapsed));
         }
         catch (ObjectDisposedException) { } // disk bu arada bırakıldı (çıkarıldı)
     }
@@ -263,6 +300,7 @@ internal sealed class MountManager : IDisposable
         {
             tv.State = VolumeStatus.Failed;
             tv.Message = e.Message;
+            tv.FailureCode = e.Code.ToString();
             AddNotice("hata", WinText.U("Notice.MountFailed", v.Name, e.Message));
         }
     }
@@ -281,6 +319,7 @@ internal sealed class MountManager : IDisposable
         }
         if (disk is null || tv is null) return new UnlockResponse(false, WinText.U("Unlock.NotWaiting"));
         VolumeKey? key = null;
+        var watch = Stopwatch.StartNew();
         try
         {
             var uuid = tv.Container.VolumeUuid(tv.Oid);
@@ -293,6 +332,8 @@ internal sealed class MountManager : IDisposable
             }
             key = null; // sahipliği diske geçti
             TryMount(disk, tv, v);
+            _reports?.Record(() => Event("unlock", tv.State == VolumeStatus.Mounted ? "ok" : "fail", disk, container)
+                .WithCode(tv.FailureCode).WithDuration(watch.Elapsed));
             return tv.State == VolumeStatus.Mounted
                 ? new UnlockResponse(true, WinText.U("Unlock.Mounted", v.Name, tv.Mount!.MountPoint))
                 : new UnlockResponse(false, tv.Message ?? WinText.U("Unlock.MountFailed"));
@@ -301,6 +342,7 @@ internal sealed class MountManager : IDisposable
         {
             // Parola yanlışsa günlüğe yalnızca olay yazılır, parola asla.
             ServiceLog.Write(WinText.T("Svc.UnlockFailed", disk.Key, tv.Name, e.Code));
+            _reports?.Record(() => Event("unlock", "fail", disk, container).WithCode(e.Code.ToString()).WithDuration(watch.Elapsed));
             return new UnlockResponse(false, e.Message);
         }
         finally
@@ -329,6 +371,7 @@ internal sealed class MountManager : IDisposable
         if (!force && busy.Count > 0)
         {
             ServiceLog.Write(WinText.T("Svc.EjectDeferred", diskKey, string.Join(", ", busy)));
+            _reports?.Record(() => Event("eject", "busy", disk, null));
             return new UnlockResponse(false,
                 WinText.U("Eject.Busy", disk.Description, string.Join(", ", busy)), Busy: true);
         }
@@ -338,13 +381,15 @@ internal sealed class MountManager : IDisposable
             && int.TryParse(diskKey.AsSpan(13), out int number))
             target = DiskEjector.Find(number);
 
-        ReleaseDisk(diskKey, "", rememberReleased: true, notify: false);
+        ReleaseDisk(diskKey, "", rememberReleased: true, notify: false, closeKind: "eject");
         if (target is not { Removable: true })
         {
+            _reports?.Record(() => Event("eject", "detached", disk, null));
             AddNotice("bilgi", WinText.U("Notice.Detached", disk.Description));
             return new UnlockResponse(true, WinText.U("Eject.Detached"));
         }
         var (ok, error) = DiskEjector.Eject(target);
+        _reports?.Record(() => Event("eject", ok ? "ok" : "fail", disk, null));
         if (ok)
         {
             AddNotice("bilgi", WinText.U("Notice.Ejected", disk.Description));
@@ -400,23 +445,35 @@ internal sealed class MountManager : IDisposable
     private UnlockResponse EnableWrite(TrackedDisk disk, int container)
     {
         string key = disk.Key, description = disk.Description;
+        var watch = Stopwatch.StartNew();
         UnmountContainer(disk, container); // bölümün salt okunur sürücüleri; disk ve öbür bölümler bağlı kalır
 
         // 1) Bölümü diskten yeniden aç ve yazma kapısından geçir (salt okunur)
         GateResult gate;
         string? refusal = null;
+        List<string> refusalKeys = []; // raporda metin yerine anahtarlar
+        string? failCode = null;
         try
         {
             using var c = SourceOpener.OpenContainer(disk.Device, container, ownsDevice: false);
             gate = WriteGate.Evaluate(c, KeysOf(disk));
             if (gate.Allowed && c.Superblock.FsOids.Count != 1)
+            {
                 refusal = WinText.U("Write.MultipleVolumes");
-            refusal ??= gate.Allowed ? null : string.Join(" ", gate.Reasons);
+                refusalKeys.Add("Write.MultipleVolumes");
+            }
+            if (refusal is null && !gate.Allowed)
+            {
+                refusal = string.Join(" ", gate.Reasons);
+                refusalKeys.AddRange(gate.ReasonKeys);
+            }
         }
         catch (Exception e)
         {
             gate = new GateResult(false, [], null, null);
             refusal = WinText.U("Write.CheckFailed", e.Message);
+            refusalKeys.Add("Write.CheckFailed");
+            failCode = e is ApfsException ae ? ae.Code.ToString() : e.GetType().Name;
         }
         if (refusal is not null)
         {
@@ -426,6 +483,8 @@ internal sealed class MountManager : IDisposable
                 ServiceLog.Write(WinText.T("Svc.WriteCheck", key, container, Apfs.Diagnostics.CheckReport.HideNames(e)));
             RemountReadOnly(disk, container, refusal);
             AddNotice("uyarı", WinText.U("Notice.WriteRefused", description, refusal));
+            _reports?.Record(() => Event("write-enable", failCode is null ? "refused" : "fail", disk, container)
+                .WithGate(refusalKeys).WithCode(failCode).WithDuration(watch.Elapsed));
             return new UnlockResponse(false, refusal);
         }
 
@@ -464,6 +523,7 @@ internal sealed class MountManager : IDisposable
             if (!attached) throw new ApfsException(ApfsErrorCode.NotFound, WinText.T("Svc.DiskRemovedMeanwhile"));
             AddNotice("bilgi", WinText.U("Notice.MountedWritable", vw.Name, tv.WritableMount.MountPoint));
             ServiceLog.Write(WinText.T("Svc.MountedWritable", key, vw.Name, tv.WritableMount.MountPoint));
+            _reports?.Record(() => Event("write-enable", "ok", disk, container).WithDuration(watch.Elapsed));
             return new UnlockResponse(true, WinText.U("Write.Enabled", vw.Name, tv.WritableMount.MountPoint));
         }
         catch (Exception e)
@@ -475,6 +535,8 @@ internal sealed class MountManager : IDisposable
             foreach (var r in resources) { try { r.Dispose(); } catch { } }
             string msg = WinText.U("Write.EnableFailed", e.Message);
             ServiceLog.Write($"{key}: {msg}");
+            _reports?.Record(() => Event("write-enable", "fail", disk, container)
+                .WithCode(e is ApfsException ae ? ae.Code.ToString() : e.GetType().Name).WithDuration(watch.Elapsed));
             bool stillAttached;
             lock (_gate) stillAttached = _disks.TryGetValue(key, out var current) && ReferenceEquals(current, disk);
             if (stillAttached) RemountReadOnly(disk, container, msg);
@@ -485,7 +547,7 @@ internal sealed class MountManager : IDisposable
 
     private UnlockResponse DisableWrite(TrackedDisk disk, int container)
     {
-        CloseWrite(disk, container, abandon: false); // son commit + blok 0; kimlik kilit içinde tazelenir
+        CloseWrite(disk, container, abandon: false, closeKind: "read-only"); // son commit + blok 0; kimlik kilit içinde tazelenir
         RemountReadOnly(disk, container, null);
         AddNotice("bilgi", WinText.U("Notice.RemountedReadOnly", disk.Description));
         return new UnlockResponse(true, WinText.U("Write.RemountedReadOnly"));
@@ -509,7 +571,8 @@ internal sealed class MountManager : IDisposable
     /// <paramref name="abandon"/>: diskin içeriği başka bir programca değiştirilmiş (veya doğrulanamıyor) — diske HİÇBİR ŞEY
     /// yazılmaz (commit ve blok 0 yok); önce kayıtlar durdurulur ki ayırma sırasında gelen Flush da yazmasın.
     /// </summary>
-    private void CloseWrite(TrackedDisk disk, int container, bool abandon)
+    /// <param name="closeKind">Raporda kapanış biçimi: read-only, eject, removed, changed, service-stop.</param>
+    private void CloseWrite(TrackedDisk disk, int container, bool abandon, string closeKind)
     {
         lock (disk.IdentityLock)
         {
@@ -521,6 +584,9 @@ internal sealed class MountManager : IDisposable
                 volumes = disk.Volumes.Where(v => v.ContainerIndex == container).ToList();
                 disk.Volumes.RemoveAll(v => v.ContainerIndex == container);
             }
+            var stats = volumes.Select(v => v.WritableMount?.FileSystem.Stats).OfType<WriteStats>()
+                .Aggregate(new WriteCounters(0, 0, 0), (a, b) => new WriteCounters(a.Commits + b.Commits, a.Bytes + b.Bytes, a.Operations + b.Operations));
+            bool closeFailed = false;
             foreach (var tv in volumes)
             {
                 try
@@ -545,9 +611,13 @@ internal sealed class MountManager : IDisposable
                 }
                 catch (Exception e)
                 {
+                    closeFailed = true;
                     AddNotice("hata", WinText.U("Notice.CloseWriteFailed", disk.Description, e.Message));
                 }
             }
+            _reports?.Record(() => Event("write-session", closeFailed ? "fail" : abandon ? "abandoned" : "ok", disk, container)
+                .WithWrite(closeFailed ? "failed" : closeKind, stats)
+                .WithDuration(write.Age.Elapsed));
             // Yalnız geliştirme modu (testler): Close ile kimlik tazeleme arasındaki pencereyi genişletir
             if (_imageSources is not null && int.TryParse(Environment.GetEnvironmentVariable("APFS_DEV_CLOSE_DELAY_MS"), out int delay))
                 Thread.Sleep(delay);
@@ -574,7 +644,7 @@ internal sealed class MountManager : IDisposable
         {
             case DeviceNotifications.NotifyAction.QueryRemove:
                 // Windows diski çıkarmak istiyor: tanıtıcıyı geri çağrının içinde, eşzamanlı olarak kapat.
-                ReleaseDisk(key, WinText.U("Release.SafeToRemove"), rememberReleased: true);
+                ReleaseDisk(key, WinText.U("Release.SafeToRemove"), rememberReleased: true, closeKind: "eject");
                 break;
             case DeviceNotifications.NotifyAction.QueryRemoveFailed:
                 lock (_gate) _released.Remove(key);
@@ -654,8 +724,9 @@ internal sealed class MountManager : IDisposable
     /// Tekrar çağrılabilir: diskin her açık tanıtıcısının (salt okunur + her yazma tanıtıcısı) güvenli kaldırma kaydı buraya gelir;
     /// ilk çağrı BÜTÜN tanıtıcıları eşzamanlı kapatır (QueryRemove geri çağrısının içinde), sonrakiler bir şey bulmaz.
     /// </remarks>
+    /// <param name="closeKind">Yazma oturumu varsa raporda kapanış biçimi (bkz. <see cref="CloseWrite"/>).</param>
     private void ReleaseDisk(string key, string reason, bool rememberReleased, bool notify = true, bool abandonWrites = false,
-        TrackedDisk? expected = null, bool contentChanged = false)
+        TrackedDisk? expected = null, bool contentChanged = false, string closeKind = "removed")
     {
         TrackedDisk? disk;
         lock (_gate)
@@ -675,7 +746,7 @@ internal sealed class MountManager : IDisposable
                 mounted = [.. disk.Volumes];
             }
             abandoned = abandonWrites && writes.Count > 0;
-            foreach (int p in writes) CloseWrite(disk, p, abandonWrites);
+            foreach (int p in writes) CloseWrite(disk, p, abandonWrites, contentChanged ? "changed" : closeKind);
             foreach (var tv in mounted)
             {
                 try { tv.Mount?.Dispose(); } catch (Exception e) { ServiceLog.Write(WinText.T("Svc.UnmountError", key, e.Message)); }
@@ -689,6 +760,7 @@ internal sealed class MountManager : IDisposable
             lock (_gate) { keys = [.. disk.Keys.Values]; disk.Keys.Clear(); }
             foreach (var k in keys) k.Dispose(); // çıkarılan/değişen diskin anahtarı bellekte kalmasın
         }
+        if (contentChanged) _reports?.Record(() => Event("disk-changed", abandoned ? "abandoned" : "ok", disk, null));
         if (!notify) return;
         var names = mounted.Where(v => v.State == VolumeStatus.Mounted).Select(v => $"\"{v.Name}\"").ToList();
         string text = $"{disk.Description}{(names.Count > 0 ? " (" + string.Join(", ", names) + ")" : "")} {reason}.";
@@ -698,6 +770,18 @@ internal sealed class MountManager : IDisposable
                 : WinText.U("Release.UnsavedLost"));
         AddNotice(abandoned ? "uyarı" : "bilgi", text);
         ServiceLog.Write($"{key}: {reason}.");
+    }
+
+    // ---------------- Raporlama ----------------
+
+    /// <summary>
+    /// Olay: ortak alanlar + diskin aygıt bilgileri + (bölüm verildiyse) kapsayıcının yapı bilgileri. Yalnız sayılar ve sabit
+    /// simgeler; disk/birim adı, yol, ileti GİRMEZ (<see cref="ReportEvents"/>).
+    /// </summary>
+    private JsonObject Event(string type, string result, TrackedDisk disk, int? container, ContainerFacts? facts = null)
+    {
+        if (facts is null && container is int p) lock (_gate) facts = disk.ContainerFacts.GetValueOrDefault(p);
+        return ReportEvents.Create(type, result, "service").WithDisk(disk.Facts, facts);
     }
 
     // ---------------- Durum ve bildirimler ----------------
@@ -744,6 +828,6 @@ internal sealed class MountManager : IDisposable
     {
         List<string> keys;
         lock (_gate) keys = [.. _disks.Keys];
-        foreach (var k in keys) ReleaseDisk(k, WinText.U("Release.ServiceStopped"), rememberReleased: false);
+        foreach (var k in keys) ReleaseDisk(k, WinText.U("Release.ServiceStopped"), rememberReleased: false, closeKind: "service-stop");
     }
 }

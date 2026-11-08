@@ -9,6 +9,9 @@ using VolumeInfo = Fsp.Interop.VolumeInfo;
 
 namespace Apfs.Mount;
 
+/// <summary>Yazma oturumu sayaçları (ham; rapora yalnız aralık olarak geçer).</summary>
+public readonly record struct WriteStats(long Commits, long Bytes, long Operations);
+
 /// <summary>
 /// APFS birimini WinFsp üzerinden YAZILABİLİR sürücü olarak sunar (Faz 3). Salt okunur sınıf (<see cref="ApfsFileSystem"/>)
 /// değişmeden kalır; bu sınıf yalnızca yazma kapısından geçmiş bir oturumla kurulur.
@@ -28,6 +31,7 @@ public sealed class ApfsWritableFileSystem : FileSystemBase, IDisposable
     internal const int StatusFileIsADirectory = unchecked((int)0xC00000BA);
 
     private const uint FileDirectoryFile = 0x1;
+    private const uint FileWriteData = 0x2, FileAppendData = 0x4; // erişim hakları (grantedAccess)
     private const uint FileAttributeHidden = 0x2, FileAttributeDirectory = 0x10, FileAttributeNormal = 0x80;
 
 
@@ -42,6 +46,7 @@ public sealed class ApfsWritableFileSystem : FileSystemBase, IDisposable
     private readonly Timer _commitTimer;
     private readonly uint _bs;
     private int _openFiles;
+    private long _commits, _bytesWritten, _operations; // _gate altında; raporlama için (yazma oturumu sayaçları)
     private long _lastIoTicks = long.MinValue / 2;
     private bool _disposed;
 
@@ -70,13 +75,16 @@ public sealed class ApfsWritableFileSystem : FileSystemBase, IDisposable
 
     public bool HasPendingChanges { get { lock (_gate) return _vol.IsDirty; } }
 
+    /// <summary>Oturumun sayaçları: başarılı commit, yazılan bayt, değiştiren işlem (oluştur/yaz/boyut/sil/ad/öznitelik) sayısı.</summary>
+    public WriteStats Stats { get { lock (_gate) return new WriteStats(_commits, _bytesWritten, _operations); } }
+
     /// <summary>Bekleyen değişiklikleri kalıcı yapar (zamanlayıcı, Flush, ayırma).</summary>
     public void CommitIfDirty()
     {
         lock (_gate)
         {
             if (_disposed || !_vol.IsDirty) return;
-            try { _session.Commit(); }
+            try { _session.Commit(); _commits++; }
             catch (Exception e) { Error?.Invoke(CoreText.T("Fs.WriteBackFailed", e.Message)); }
         }
     }
@@ -127,9 +135,14 @@ public sealed class ApfsWritableFileSystem : FileSystemBase, IDisposable
         public ulong Id { get; } = id;
     }
 
-    private sealed class OpenHandle(bool isDirectory)
+    private sealed class OpenHandle(bool isDirectory, bool contentReadOnly = false)
     {
         public bool IsDirectory { get; } = isDirectory;
+        /// <summary>
+        /// Klon/sıkıştırılmış dosya yazma hakkı açıkça istenmeden (ör. MAXIMUM_ALLOWED) açıldı: açılış geçer, bu tanıtıcıdan
+        /// içerik değişikliği (yazma, boyut, üzerine yazma) erişim engellendi alır (NTFS'teki READONLY dosya gibi).
+        /// </summary>
+        public bool ContentReadOnly { get; } = contentReadOnly;
         public int Released;
         public List<(string Name, FileInfo Info)>? Listing;
     }
@@ -194,8 +207,27 @@ public sealed class ApfsWritableFileSystem : FileSystemBase, IDisposable
         lock (_gate)
         {
             var ino = Resolve(fileName, out var actual);
+            // Klon / macOS'un sıkıştırdığı dosya: içeriğe yazma erişimi AÇIKÇA istenmişse açılışta reddedilir (Windows'un READONLY
+            // dosyasındaki gibi); yoksa açılış başarılı olur ve ilk yazma uygulamaya "Bad file descriptor" gibi anlaşılmaz bir hatayla
+            // düşer. MAXIMUM_ALLOWED gibi yazma istemeyen açılış ise açılır, yalnız o tanıtıcıdan içerik değişikliği reddedilir
+            // (1.4.0 P2.7). İstenen erişim okunamazsa eski davranış: yazma hakkı verilmişse ret. Okuma, öznitelik/zaman, ad
+            // değiştirme ve silme (DELETE erişimi) etkilenmez.
+            bool contentReadOnly = false;
+            if (!ino.IsDirectory && (grantedAccess & (FileWriteData | FileAppendData)) != 0 && _vol.IsContentReadOnly(ino.Id))
+            {
+                if (!RequestedAccess.TryGet(createOptions, grantedAccess, out uint desired)
+                    || (RequestedAccess.MapGeneric(desired) & (FileWriteData | FileAppendData)) != 0)
+                {
+                    fileNode = null!;
+                    fileDesc = null!;
+                    fileInfo = default;
+                    normalizedName = null!;
+                    return ApfsFileSystem.StatusAccessDenied;
+                }
+                contentReadOnly = true;
+            }
             fileNode = new Node(ino.Id);
-            fileDesc = new OpenHandle(ino.IsDirectory);
+            fileDesc = new OpenHandle(ino.IsDirectory, contentReadOnly);
             if (!ino.IsDirectory) Interlocked.Increment(ref _openFiles);
             fileInfo = InfoOf(ino, actual.Count > 0 ? actual[^1] : "");
             normalizedName = ApfsFileSystem.SameLengthOrNull("\\" + string.Join('\\', actual.Select(WindowsNames.ToWindows)), fileName);
@@ -211,6 +243,7 @@ public sealed class ApfsWritableFileSystem : FileSystemBase, IDisposable
             var (parent, name) = ResolveParent(fileName);
             bool dir = (createOptions & FileDirectoryFile) != 0;
             ulong id = dir ? _vol.CreateDirectory(parent.Id, name) : _vol.CreateFile(parent.Id, name);
+            _operations++;
             if ((fileAttributes & FileAttributeHidden) != 0) _vol.SetHidden(id, true);
             fileNode = new Node(id);
             fileDesc = new OpenHandle(dir);
@@ -224,12 +257,14 @@ public sealed class ApfsWritableFileSystem : FileSystemBase, IDisposable
 
     public override int Overwrite(object fileNode, object fileDesc, uint fileAttributes, bool replaceFileAttributes, ulong allocationSize, out FileInfo fileInfo)
     {
+        if (fileDesc is OpenHandle { ContentReadOnly: true }) { fileInfo = default; return ApfsFileSystem.StatusAccessDenied; }
         lock (_gate)
         {
             ulong id = ((Node)fileNode).Id;
             // macOS'un sıkıştırdığı dosya bu sürümde salt okunur (kullanıcı kararı 2026-10-05: gerçek Mac dosyasında sınanmadı);
             // SetSize bunu RequireWritableFile'da reddeder → "erişim engellendi"
             _vol.SetSize(id, 0);
+            _operations++;
             bool hidden = (fileAttributes & FileAttributeHidden) != 0;
             if (replaceFileAttributes || hidden) _vol.SetHidden(id, hidden);
             fileInfo = InfoOf(id);
@@ -250,6 +285,7 @@ public sealed class ApfsWritableFileSystem : FileSystemBase, IDisposable
             {
                 var (parent, name) = ResolveParent(fileName);
                 _vol.Delete(parent.Id, name);
+                _operations++;
                 Touched();
             }
             catch (ApfsException e) when (e.Code is not ApfsErrorCode.IoError)
@@ -366,6 +402,7 @@ public sealed class ApfsWritableFileSystem : FileSystemBase, IDisposable
     public override unsafe int Write(object fileNode, object fileDesc, IntPtr buffer, ulong offset, uint length, bool writeToEndOfFile,
         bool constrainedIo, out uint bytesTransferred, out FileInfo fileInfo)
     {
+        if (fileDesc is OpenHandle { ContentReadOnly: true }) { bytesTransferred = 0; fileInfo = default; return ApfsFileSystem.StatusAccessDenied; }
         lock (_gate)
         {
             ulong id = ((Node)fileNode).Id;
@@ -377,6 +414,8 @@ public sealed class ApfsWritableFileSystem : FileSystemBase, IDisposable
             }
             if (writeToEndOfFile) offset = size;
             _vol.Write(id, offset, new ReadOnlySpan<byte>((void*)buffer, (int)length));
+            _operations++;
+            _bytesWritten += length;
             bytesTransferred = length;
             fileInfo = InfoOf(id);
             Touched();
@@ -386,11 +425,12 @@ public sealed class ApfsWritableFileSystem : FileSystemBase, IDisposable
 
     public override int SetFileSize(object fileNode, object fileDesc, ulong newSize, bool setAllocationSize, out FileInfo fileInfo)
     {
+        if (fileDesc is OpenHandle { ContentReadOnly: true }) { fileInfo = default; return ApfsFileSystem.StatusAccessDenied; }
         lock (_gate)
         {
             ulong id = ((Node)fileNode).Id;
             // Ayırma boyutu yalnızca bir ipucu; dosyadan küçükse dosya kısalır (WinFsp sözleşmesi)
-            if (!setAllocationSize || newSize < _vol.GetSize(id)) _vol.SetSize(id, newSize);
+            if (!setAllocationSize || newSize < _vol.GetSize(id)) { _vol.SetSize(id, newSize); _operations++; }
             fileInfo = InfoOf(id);
             Touched();
             return ApfsFileSystem.StatusSuccess;
@@ -406,6 +446,7 @@ public sealed class ApfsWritableFileSystem : FileSystemBase, IDisposable
             if (fileAttributes != uint.MaxValue) _vol.SetHidden(id, (fileAttributes & FileAttributeHidden) != 0);
             if (creationTime != 0 || lastAccessTime != 0 || lastWriteTime != 0 || changeTime != 0)
                 _vol.SetTimes(id, FromFileTime(creationTime), FromFileTime(lastWriteTime), FromFileTime(changeTime), FromFileTime(lastAccessTime));
+            _operations++;
             fileInfo = InfoOf(id);
             return ApfsFileSystem.StatusSuccess;
         }
@@ -427,6 +468,7 @@ public sealed class ApfsWritableFileSystem : FileSystemBase, IDisposable
             var (srcParent, srcName) = ResolveParent(fileName);
             var (dstParent, dstName) = ResolveParent(newFileName);
             _vol.Rename(srcParent.Id, srcName, dstParent.Id, dstName, replaceIfExists);
+            _operations++;
             Touched();
             return ApfsFileSystem.StatusSuccess;
         }

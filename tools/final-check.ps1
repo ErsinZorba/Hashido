@@ -1,6 +1,6 @@
 ﻿<#
 .SYNOPSIS
-  (YÖNETİCİ) Kurulu APFS for Windows'un uçtan uca doğrulaması. Önce install.ps1 çalıştırılmış olmalı.
+  (YÖNETİCİ) Kurulu Hashido'nun uçtan uca doğrulaması. Önce install.ps1 çalıştırılmış olmalı.
 .DESCRIPTION
   1. Test VHD'leri (normal, şifreli, bozuk) SALT OKUNUR takılır; hizmetin bunları kendiliğinden bağladığı, şifreli birim için
      parola beklediği ve bozuk birim için anlaşılır bildirim ürettiği doğrulanır. Şifreli test biriminin parolası tepside sorulur.
@@ -16,7 +16,9 @@ $OutputEncoding = New-Object Text.UTF8Encoding $false
 $root = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 $work = Join-Path $env:TEMP 'claude\apfs-test'
 $report = Join-Path $work 'final-report.txt'
-$installDir = Join-Path $env:ProgramFiles 'APFS for Windows'
+# Kurulum klasörü hizmetin yolundan: yeni kurulumda "Hashido", 1.3.0'dan yükseltilmişse "APFS for Windows".
+$svcImage = (Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Services\APFSforWindows' -ErrorAction SilentlyContinue).ImagePath
+$installDir = if ($svcImage) { Split-Path -Parent $svcImage.Trim().Trim('"') } else { Join-Path $env:ProgramFiles 'Hashido' }
 $apfs = Join-Path $installDir 'apfs.exe'
 New-Item -ItemType Directory -Force $work | Out-Null
 $lines = New-Object System.Collections.Generic.List[string]
@@ -39,7 +41,7 @@ $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIden
 if (-not $isAdmin) { Write-Host 'Yönetici olarak çalıştırın.' -ForegroundColor Red; exit 1 }
 $svc = Get-Service APFSforWindows -ErrorAction SilentlyContinue
 if (-not $svc -or $svc.Status -ne 'Running') { Write-Host 'Hizmet çalışmıyor; önce install.ps1 çalıştırın.' -ForegroundColor Red; exit 1 }
-Log "=== $(Get-Date -Format s) APFS for Windows uçtan uca doğrulama ==="
+Log "=== $(Get-Date -Format s) Hashido uçtan uca doğrulama ==="
 
 # --- 1. Test VHD'leri ---
 # Önceki denemelerden takılı kalmış test VHD'lerini çıkar (ör. attach-test-vhd.ps1'in basic.vhd'si)

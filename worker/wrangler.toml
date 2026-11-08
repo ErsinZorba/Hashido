@@ -1,0 +1,25 @@
+# Hashido raporlama alıcısı. Yalnız Cloudflare'in ücretsiz katmanı (Workers Free + D1 Free); sınır aşılırsa istekler
+# hata alır (uygulama bekleyip yeniden dener), ücret çıkmaz.
+name = "hashido-api"
+main = "src/index.js"
+compatibility_date = "2026-10-01"
+
+# Yalnız özel alan; *.workers.dev adresi kapalı.
+workers_dev = false
+routes = [{ pattern = "hashido-api.zorba.dev", custom_domain = true }]
+
+# Günlük yazılmaz (IP ve istek ayrıntısı Cloudflare panelinde de birikmesin).
+logpush = false
+[observability]
+enabled = false
+
+[vars]
+RATE_PER_MINUTE = "60"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "hashido-reports"
+database_id = "7e8aa016-9468-4ce9-87eb-ad2da71fe20b"
+
+[triggers]
+crons = ["17 3 * * *"] # her gün 03:17 UTC: 18 aydan eski olaylar ve eski sayaç satırları silinir

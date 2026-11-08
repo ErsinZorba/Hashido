@@ -257,6 +257,14 @@ public sealed partial class VolumeWriter
     // ---------------------------------------------------------------------------------------------------------------
     // Dışa açık işlemler
 
+    /// <summary>
+    /// İçeriği bu sürümde değiştirilemeyen dosya mı (macOS'un sıkıştırdığı ya da klon; <see cref="RequireWritableFile"/> ile aynı
+    /// kural, salt sorgu). Ad değiştirme, silme, zaman ve gizli bayrağı bu dosyalarda da serbesttir.
+    /// </summary>
+    public bool IsContentReadOnly(ulong id) =>
+        GetInode(id) is { } ino && (ino.Mode & Inode.ModeTypeMask) == Inode.ModeRegular &&
+        ((ino.BsdFlags & Inode.BsdFlagCompressed) != 0 || IsCloned(ino));
+
     /// <summary>Dosyanın görünen boyutu (oturumun güncel görüntüsü).</summary>
     public ulong GetSize(ulong id) => GetInode(id)?.Dstream?.Size ?? 0;
 

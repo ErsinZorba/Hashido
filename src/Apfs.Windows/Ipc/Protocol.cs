@@ -3,6 +3,7 @@ using System.Security.AccessControl;
 using System.Security.Principal;
 using System.Text;
 using System.Text.Json;
+using Apfs.Windows.Reporting;
 
 namespace Apfs.Windows.Ipc;
 
@@ -34,13 +35,22 @@ public sealed record StatusResponse(List<DiskStatus> Disks, List<Notice> Notices
 public sealed record UnlockResponse(bool Ok, string Message, bool Busy = false);
 
 /// <summary>
+/// "reports-pull" yanıtı: hizmet kuyruğundaki olaylar (bir sayfa, ≤ ~48 KiB). <paramref name="More"/>: sayfa sınırı yüzünden
+/// kalanlar var, tepsi son kimlikten devam eder. Eski hizmet bu isteği tanımaz ("bilinmeyen istek" yanıtı): Reports null gelir,
+/// tepsi boş yığın sayar.
+/// </summary>
+public sealed record ReportsResponse(List<QueuedReport>? Reports, bool More = false, bool Enabled = false);
+
+/// <summary>
 /// Tepsiden hizmete istek. "status" (since: son görülen bildirim), "unlock" (disk, birim, parola), "rescan",
 /// "eject" (disk; force: açık dosya olsa da çıkar), "set-writable" (disk, container; enable: yazmayı aç/kapat; force: açık dosya
 /// olsa da). Container: APFS bölüm sırası ("unlock" ve "set-writable"; eski istemcide 0 = ilk bölüm).
 /// Lang: tepsinin arayüz dili (ör. "de"); hizmet bildirimleri ve nedenleri bu dilde üretir. Yoksa hizmetin dili değişmez.
+/// Raporlama (1.4.0): "reports-pull" (ReportAfter: bu kimlikten sonrakiler), "reports-ack" (ReportAfter: bu kimlik dahil
+/// öncekiler silinir), "reports-config" (Enable: kullanıcının onayı; kapatınca kuyruk silinir).
 /// </summary>
 public sealed record Request(string Op, long Since = 0, string? Disk = null, int Volume = 0, string? Password = null, bool Force = false, bool Enable = false,
-    int Container = 0, string? Lang = null);
+    int Container = 0, string? Lang = null, long ReportAfter = 0);
 
 /// <summary>
 /// Adlandırılmış kanal: her bağlantıda tek satır JSON istek, tek satır JSON yanıt. Erişim listesi yalnızca SYSTEM, Yöneticiler ve
@@ -51,6 +61,9 @@ public static class PipeProtocol
     /// <summary>Kanal adı. Yalnızca geliştirme modunda (`--console --pipe ad`) değiştirilir; kurulu hizmet ile çakışmasın diye.</summary>
     public static string PipeName { get; set; } = "APFSforWindows";
     public const int MaxMessageBytes = 64 * 1024;
+
+    /// <summary>"reports-pull" sayfasındaki olayların toplam boyu (yanıt kanal sınırının altında kalsın).</summary>
+    public const int MaxReportPageBytes = 48 * 1024;
 
     /// <summary>İstemcinin arayüz dili; <see cref="SendAsync{T}"/> dili belirtilmemiş her isteğe ekler (tepsi açılışta ayarlar).</summary>
     public static string? ClientLanguage { get; set; }

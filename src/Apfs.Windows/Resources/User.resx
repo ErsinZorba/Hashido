@@ -30,6 +30,9 @@
   <data name="Action.Checking" xml:space="preserve">
     <value>Checking…</value>
   </data>
+  <data name="Action.Close" xml:space="preserve">
+    <value>Close</value>
+  </data>
   <data name="Action.ContinueAnyway" xml:space="preserve">
     <value>Continue anyway</value>
   </data>
@@ -44,6 +47,9 @@
   </data>
   <data name="Action.Exit" xml:space="preserve">
     <value>Exit</value>
+  </data>
+  <data name="Action.OK" xml:space="preserve">
+    <value>OK</value>
   </data>
   <data name="Action.Open" xml:space="preserve">
     <value>Open</value>
@@ -65,6 +71,9 @@
   </data>
   <data name="Action.Saving" xml:space="preserve">
     <value>Saving…</value>
+  </data>
+  <data name="Action.Settings" xml:space="preserve">
+    <value>Settings</value>
   </data>
   <data name="Action.Unlock" xml:space="preserve">
     <value>Unlock</value>
@@ -92,6 +101,38 @@
   </data>
   <data name="Card.WriteRefused" xml:space="preserve">
     <value>Writing could not be enabled: {0}</value>
+  </data>
+  <data name="Consent.Heading" xml:space="preserve">
+    <value>Help make {0} better?</value>
+  </data>
+  <data name="Consent.NeverHeading" xml:space="preserve">
+    <value>Never sent</value>
+  </data>
+  <data name="Consent.NeverList" xml:space="preserve">
+    <value>• File, folder and disk names, file contents
+• Serial numbers, identifiers, exact sizes
+• Passwords, keys, password hints
+• Computer name and user name; your IP address is not stored</value>
+  </data>
+  <data name="Consent.No" xml:space="preserve">
+    <value>No</value>
+  </data>
+  <data name="Consent.Privacy" xml:space="preserve">
+    <value>Privacy statement</value>
+  </data>
+  <data name="Consent.SentHeading" xml:space="preserve">
+    <value>What is sent</value>
+  </data>
+  <data name="Consent.SentList" xml:space="preserve">
+    <value>• Program and Windows version, processor type, interface language
+• The operation (connect, unlock, writing, safely eject), its result and error code
+• Technical disk details: connection type (USB, NVMe…), rough size range, number of volumes, encryption type, format features</value>
+  </data>
+  <data name="Consent.Text" xml:space="preserve">
+    <value>{0} can automatically send anonymous reports about errors, crashes and successful operations. They show us which disks and situations cause problems, especially with the experimental writing feature. You can see what was sent or turn this off at any time in Settings. Reports are deleted after 18 months.</value>
+  </data>
+  <data name="Consent.Yes" xml:space="preserve">
+    <value>Yes, send</value>
   </data>
   <data name="Disk.Gone" xml:space="preserve">
     <value>This disk is no longer attached.</value>
@@ -202,7 +243,7 @@
     <value>The disk is only read; the password is not saved anywhere.</value>
   </data>
   <data name="Password.Title" xml:space="preserve">
-    <value>APFS for Windows: encrypted volume</value>
+    <value>{0}: encrypted volume</value>
   </data>
   <data name="Release.Changed" xml:space="preserve">
     <value>was changed by another program (e.g. reformatted); the APFS drive was removed</value>
@@ -222,6 +263,42 @@
   <data name="Release.UnsavedNotWrittenChanged" xml:space="preserve">
     <value>The latest unsaved changes were not written, so as not to damage the new content on the disk.</value>
   </data>
+  <data name="Sent.Intro" xml:space="preserve">
+    <value>The last reports sent from this computer, newest first, exactly as they were sent:</value>
+  </data>
+  <data name="Sent.None" xml:space="preserve">
+    <value>Nothing has been sent yet.</value>
+  </data>
+  <data name="Sent.Title" xml:space="preserve">
+    <value>Sent reports</value>
+  </data>
+  <data name="Settings.Language" xml:space="preserve">
+    <value>Language</value>
+  </data>
+  <data name="Settings.LanguageNote" xml:space="preserve">
+    <value>A new language takes effect after the program restarts.</value>
+  </data>
+  <data name="Settings.Reports" xml:space="preserve">
+    <value>Send anonymous reports about errors, crashes and successful operations</value>
+  </data>
+  <data name="Settings.ReportsHeading" xml:space="preserve">
+    <value>Automatic reports</value>
+  </data>
+  <data name="Settings.ShowSent" xml:space="preserve">
+    <value>Show what was sent</value>
+  </data>
+  <data name="Settings.Title" xml:space="preserve">
+    <value>{0} settings</value>
+  </data>
+  <data name="Settings.UpdateNotify" xml:space="preserve">
+    <value>Tell me when a new version is released</value>
+  </data>
+  <data name="Settings.UpdatesHeading" xml:space="preserve">
+    <value>Updates</value>
+  </data>
+  <data name="Settings.WhatIsSent" xml:space="preserve">
+    <value>What is sent?</value>
+  </data>
   <data name="Tray.MenuEject" xml:space="preserve">
     <value>{0}{1}: safely eject</value>
   </data>
@@ -235,13 +312,13 @@
     <value>The program keeps running in the notification area. You can reach your disks from here.</value>
   </data>
   <data name="Tray.TipMounted" xml:space="preserve">
-    <value>APFS for Windows: {0} volume(s) mounted</value>
+    <value>{0}: {1} volume(s) mounted</value>
   </data>
   <data name="Tray.TipNoVolumes" xml:space="preserve">
-    <value>APFS for Windows: no volumes mounted</value>
+    <value>{0}: no volumes mounted</value>
   </data>
   <data name="Tray.TipServiceDown" xml:space="preserve">
-    <value>APFS for Windows: service not running</value>
+    <value>{0}: service not running</value>
   </data>
   <data name="Unlock.Failed" xml:space="preserve">
     <value>Could not unlock.</value>
@@ -254,6 +331,12 @@
   </data>
   <data name="Unlock.NotWaiting" xml:space="preserve">
     <value>This volume is no longer waiting for a password.</value>
+  </data>
+  <data name="Update.Available" xml:space="preserve">
+    <value>Version {0} is available. Click to open the download page.</value>
+  </data>
+  <data name="Update.Link" xml:space="preserve">
+    <value>Version {0} is available</value>
   </data>
   <data name="Volume.DefaultName" xml:space="preserve">
     <value>volume {0}</value>

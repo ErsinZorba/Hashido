@@ -30,6 +30,9 @@
   <data name="Action.Checking" xml:space="preserve">
     <value>검사 중…</value>
   </data>
+  <data name="Action.Close" xml:space="preserve">
+    <value>닫기</value>
+  </data>
   <data name="Action.ContinueAnyway" xml:space="preserve">
     <value>그래도 계속</value>
   </data>
@@ -44,6 +47,9 @@
   </data>
   <data name="Action.Exit" xml:space="preserve">
     <value>끝내기</value>
+  </data>
+  <data name="Action.OK" xml:space="preserve">
+    <value>확인</value>
   </data>
   <data name="Action.Open" xml:space="preserve">
     <value>열기</value>
@@ -65,6 +71,9 @@
   </data>
   <data name="Action.Saving" xml:space="preserve">
     <value>저장 중…</value>
+  </data>
+  <data name="Action.Settings" xml:space="preserve">
+    <value>설정</value>
   </data>
   <data name="Action.Unlock" xml:space="preserve">
     <value>잠금 해제</value>
@@ -92,6 +101,38 @@
   </data>
   <data name="Card.WriteRefused" xml:space="preserve">
     <value>쓰기를 사용하도록 설정할 수 없습니다: {0}</value>
+  </data>
+  <data name="Consent.Heading" xml:space="preserve">
+    <value>{0} 개선에 도움을 주시겠습니까?</value>
+  </data>
+  <data name="Consent.NeverHeading" xml:space="preserve">
+    <value>절대 전송되지 않는 정보</value>
+  </data>
+  <data name="Consent.NeverList" xml:space="preserve">
+    <value>• 파일, 폴더, 디스크 이름 및 파일 내용
+• 일련번호, 식별자, 정확한 크기
+• 암호, 키, 암호 힌트
+• 컴퓨터 이름과 사용자 이름(IP 주소는 저장되지 않습니다)</value>
+  </data>
+  <data name="Consent.No" xml:space="preserve">
+    <value>아니요</value>
+  </data>
+  <data name="Consent.Privacy" xml:space="preserve">
+    <value>개인정보 처리방침</value>
+  </data>
+  <data name="Consent.SentHeading" xml:space="preserve">
+    <value>전송되는 정보</value>
+  </data>
+  <data name="Consent.SentList" xml:space="preserve">
+    <value>• 프로그램 및 Windows 버전, 프로세서 종류, 표시 언어
+• 작업(연결, 잠금 해제, 쓰기, 안전하게 꺼내기), 그 결과와 오류 코드
+• 디스크의 기술 정보: 연결 방식(USB, NVMe 등), 대략적인 크기 범위, 볼륨 수, 암호화 종류, 포맷 기능</value>
+  </data>
+  <data name="Consent.Text" xml:space="preserve">
+    <value>{0}은(는) 오류, 충돌 및 성공한 작업에 대한 익명 보고서를 자동으로 보낼 수 있습니다. 이 보고서를 통해 특히 실험적인 쓰기 기능에서 어떤 디스크와 상황이 문제를 일으키는지 알 수 있습니다. 전송한 내용은 언제든지 설정에서 확인하거나 이 기능을 끌 수 있습니다. 보고서는 18개월 후 삭제됩니다.</value>
+  </data>
+  <data name="Consent.Yes" xml:space="preserve">
+    <value>예, 보내기</value>
   </data>
   <data name="Disk.Gone" xml:space="preserve">
     <value>이 디스크는 더 이상 연결되어 있지 않습니다.</value>
@@ -202,7 +243,7 @@
     <value>이 프로그램은 디스크를 읽기만 하며, 암호는 어디에도 저장되지 않습니다.</value>
   </data>
   <data name="Password.Title" xml:space="preserve">
-    <value>APFS for Windows: 암호화된 볼륨</value>
+    <value>{0}: 암호화된 볼륨</value>
   </data>
   <data name="Release.Changed" xml:space="preserve">
     <value>은(는) 다른 프로그램에 의해 내용이 바뀌어(예: 다시 포맷되어) APFS 드라이브가 제거되었습니다</value>
@@ -222,6 +263,42 @@
   <data name="Release.UnsavedNotWrittenChanged" xml:space="preserve">
     <value>디스크의 새 내용이 손상되지 않도록 저장되지 않은 최근 변경 내용은 기록하지 않았습니다.</value>
   </data>
+  <data name="Sent.Intro" xml:space="preserve">
+    <value>이 컴퓨터에서 최근 전송한 보고서입니다(최신순, 전송한 그대로):</value>
+  </data>
+  <data name="Sent.None" xml:space="preserve">
+    <value>아직 전송한 내용이 없습니다.</value>
+  </data>
+  <data name="Sent.Title" xml:space="preserve">
+    <value>전송한 보고서</value>
+  </data>
+  <data name="Settings.Language" xml:space="preserve">
+    <value>언어</value>
+  </data>
+  <data name="Settings.LanguageNote" xml:space="preserve">
+    <value>새 언어는 프로그램을 다시 시작하면 적용됩니다.</value>
+  </data>
+  <data name="Settings.Reports" xml:space="preserve">
+    <value>오류, 충돌 및 성공한 작업에 대한 익명 보고서 보내기</value>
+  </data>
+  <data name="Settings.ReportsHeading" xml:space="preserve">
+    <value>자동 보고서</value>
+  </data>
+  <data name="Settings.ShowSent" xml:space="preserve">
+    <value>전송한 내용 보기</value>
+  </data>
+  <data name="Settings.Title" xml:space="preserve">
+    <value>{0} 설정</value>
+  </data>
+  <data name="Settings.UpdateNotify" xml:space="preserve">
+    <value>새 버전이 나오면 알려 주기</value>
+  </data>
+  <data name="Settings.UpdatesHeading" xml:space="preserve">
+    <value>업데이트</value>
+  </data>
+  <data name="Settings.WhatIsSent" xml:space="preserve">
+    <value>무엇이 전송되나요?</value>
+  </data>
   <data name="Tray.MenuEject" xml:space="preserve">
     <value>{0}{1}: 안전하게 꺼내기</value>
   </data>
@@ -235,13 +312,13 @@
     <value>프로그램은 알림 영역에서 계속 실행됩니다. 여기에서 디스크에 액세스할 수 있습니다.</value>
   </data>
   <data name="Tray.TipMounted" xml:space="preserve">
-    <value>APFS for Windows: 볼륨 {0}개 탑재됨</value>
+    <value>{0}: 볼륨 {1}개 탑재됨</value>
   </data>
   <data name="Tray.TipNoVolumes" xml:space="preserve">
-    <value>APFS for Windows: 탑재된 볼륨 없음</value>
+    <value>{0}: 탑재된 볼륨 없음</value>
   </data>
   <data name="Tray.TipServiceDown" xml:space="preserve">
-    <value>APFS for Windows: 서비스가 실행되고 있지 않음</value>
+    <value>{0}: 서비스가 실행되고 있지 않음</value>
   </data>
   <data name="Unlock.Failed" xml:space="preserve">
     <value>잠금을 해제할 수 없습니다.</value>
@@ -254,6 +331,12 @@
   </data>
   <data name="Unlock.NotWaiting" xml:space="preserve">
     <value>이 볼륨은 더 이상 암호를 기다리지 않습니다.</value>
+  </data>
+  <data name="Update.Available" xml:space="preserve">
+    <value>버전 {0}을(를) 사용할 수 있습니다. 클릭하면 다운로드 페이지가 열립니다.</value>
+  </data>
+  <data name="Update.Link" xml:space="preserve">
+    <value>버전 {0} 사용 가능</value>
   </data>
   <data name="Volume.DefaultName" xml:space="preserve">
     <value>볼륨 {0}</value>

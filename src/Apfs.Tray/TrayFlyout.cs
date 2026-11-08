@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using Apfs.Tray.Ui;
+using Apfs.Windows;
 
 namespace Apfs.Tray;
 
@@ -42,7 +43,7 @@ internal sealed class TrayFlyout : Form
         }, 0, 0);
         header.Controls.Add(new Label
         {
-            Text = "APFS for Windows", Font = Theme.Bold, ForeColor = Theme.Text, AutoSize = true, Anchor = AnchorStyles.Left,
+            Text = Branding.ProductName, Font = Theme.Bold, ForeColor = Theme.Text, AutoSize = true, Anchor = AnchorStyles.Left,
         }, 1, 0);
 
         _list = new DiskListView(app, compact: true)

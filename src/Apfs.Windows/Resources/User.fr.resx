@@ -30,6 +30,9 @@
   <data name="Action.Checking" xml:space="preserve">
     <value>Vérification…</value>
   </data>
+  <data name="Action.Close" xml:space="preserve">
+    <value>Fermer</value>
+  </data>
   <data name="Action.ContinueAnyway" xml:space="preserve">
     <value>Continuer quand même</value>
   </data>
@@ -44,6 +47,9 @@
   </data>
   <data name="Action.Exit" xml:space="preserve">
     <value>Quitter</value>
+  </data>
+  <data name="Action.OK" xml:space="preserve">
+    <value>OK</value>
   </data>
   <data name="Action.Open" xml:space="preserve">
     <value>Ouvrir</value>
@@ -65,6 +71,9 @@
   </data>
   <data name="Action.Saving" xml:space="preserve">
     <value>Enregistrement…</value>
+  </data>
+  <data name="Action.Settings" xml:space="preserve">
+    <value>Paramètres</value>
   </data>
   <data name="Action.Unlock" xml:space="preserve">
     <value>Déverrouiller</value>
@@ -92,6 +101,38 @@
   </data>
   <data name="Card.WriteRefused" xml:space="preserve">
     <value>Impossible d'activer l'écriture : {0}</value>
+  </data>
+  <data name="Consent.Heading" xml:space="preserve">
+    <value>Voulez-vous aider à améliorer {0} ?</value>
+  </data>
+  <data name="Consent.NeverHeading" xml:space="preserve">
+    <value>Jamais envoyé</value>
+  </data>
+  <data name="Consent.NeverList" xml:space="preserve">
+    <value>• Noms de fichiers, de dossiers et de disques, contenu des fichiers
+• Numéros de série, identifiants, tailles exactes
+• Mots de passe, clés, indices de mot de passe
+• Nom de l'ordinateur et nom d'utilisateur ; votre adresse IP n'est pas conservée</value>
+  </data>
+  <data name="Consent.No" xml:space="preserve">
+    <value>Non</value>
+  </data>
+  <data name="Consent.Privacy" xml:space="preserve">
+    <value>Déclaration de confidentialité</value>
+  </data>
+  <data name="Consent.SentHeading" xml:space="preserve">
+    <value>Ce qui est envoyé</value>
+  </data>
+  <data name="Consent.SentList" xml:space="preserve">
+    <value>• Version du programme et de Windows, type de processeur, langue de l'interface
+• L'opération (connexion, déverrouillage, écriture, éjection sans risque), son résultat et son code d'erreur
+• Caractéristiques techniques du disque : type de connexion (USB, NVMe…), plage de taille approximative, nombre de volumes, type de chiffrement, fonctionnalités du format</value>
+  </data>
+  <data name="Consent.Text" xml:space="preserve">
+    <value>{0} peut envoyer automatiquement des rapports anonymes sur les erreurs, les plantages et les opérations réussies. Ils nous montrent quels disques et quelles situations posent problème, notamment avec la fonction d'écriture expérimentale. Vous pouvez voir ce qui a été envoyé ou désactiver cette option à tout moment dans les Paramètres. Les rapports sont supprimés au bout de 18 mois.</value>
+  </data>
+  <data name="Consent.Yes" xml:space="preserve">
+    <value>Oui, envoyer</value>
   </data>
   <data name="Disk.Gone" xml:space="preserve">
     <value>Ce disque n'est plus connecté.</value>
@@ -202,7 +243,7 @@
     <value>Le disque est uniquement lu ; le mot de passe n'est enregistré nulle part.</value>
   </data>
   <data name="Password.Title" xml:space="preserve">
-    <value>APFS for Windows : volume chiffré</value>
+    <value>{0} : volume chiffré</value>
   </data>
   <data name="Release.Changed" xml:space="preserve">
     <value>a été modifié par un autre programme (p. ex. reformaté) ; le lecteur APFS a été retiré</value>
@@ -222,6 +263,42 @@
   <data name="Release.UnsavedNotWrittenChanged" xml:space="preserve">
     <value>Les dernières modifications non enregistrées n'ont pas été écrites, afin de ne pas endommager le nouveau contenu du disque.</value>
   </data>
+  <data name="Sent.Intro" xml:space="preserve">
+    <value>Les derniers rapports envoyés depuis cet ordinateur, du plus récent au plus ancien, tels qu'ils ont été envoyés :</value>
+  </data>
+  <data name="Sent.None" xml:space="preserve">
+    <value>Rien n'a encore été envoyé.</value>
+  </data>
+  <data name="Sent.Title" xml:space="preserve">
+    <value>Rapports envoyés</value>
+  </data>
+  <data name="Settings.Language" xml:space="preserve">
+    <value>Langue</value>
+  </data>
+  <data name="Settings.LanguageNote" xml:space="preserve">
+    <value>La nouvelle langue s'applique au redémarrage du programme.</value>
+  </data>
+  <data name="Settings.Reports" xml:space="preserve">
+    <value>Envoyer des rapports anonymes sur les erreurs, les plantages et les opérations réussies</value>
+  </data>
+  <data name="Settings.ReportsHeading" xml:space="preserve">
+    <value>Rapports automatiques</value>
+  </data>
+  <data name="Settings.ShowSent" xml:space="preserve">
+    <value>Afficher ce qui a été envoyé</value>
+  </data>
+  <data name="Settings.Title" xml:space="preserve">
+    <value>Paramètres de {0}</value>
+  </data>
+  <data name="Settings.UpdateNotify" xml:space="preserve">
+    <value>M'avertir lorsqu'une nouvelle version est publiée</value>
+  </data>
+  <data name="Settings.UpdatesHeading" xml:space="preserve">
+    <value>Mises à jour</value>
+  </data>
+  <data name="Settings.WhatIsSent" xml:space="preserve">
+    <value>Qu'est-ce qui est envoyé ?</value>
+  </data>
   <data name="Tray.MenuEject" xml:space="preserve">
     <value>{0}{1} : éjecter sans risque</value>
   </data>
@@ -235,13 +312,13 @@
     <value>Le programme continue de fonctionner dans la zone de notification. Vous pouvez accéder à vos disques à partir d'ici.</value>
   </data>
   <data name="Tray.TipMounted" xml:space="preserve">
-    <value>APFS for Windows : {0} volume(s) monté(s)</value>
+    <value>{0} : {1} volume(s) monté(s)</value>
   </data>
   <data name="Tray.TipNoVolumes" xml:space="preserve">
-    <value>APFS for Windows : aucun volume monté</value>
+    <value>{0} : aucun volume monté</value>
   </data>
   <data name="Tray.TipServiceDown" xml:space="preserve">
-    <value>APFS for Windows : service arrêté</value>
+    <value>{0} : service arrêté</value>
   </data>
   <data name="Unlock.Failed" xml:space="preserve">
     <value>Impossible de déverrouiller.</value>
@@ -254,6 +331,12 @@
   </data>
   <data name="Unlock.NotWaiting" xml:space="preserve">
     <value>Ce volume n'attend plus de mot de passe.</value>
+  </data>
+  <data name="Update.Available" xml:space="preserve">
+    <value>La version {0} est disponible. Cliquez pour ouvrir la page de téléchargement.</value>
+  </data>
+  <data name="Update.Link" xml:space="preserve">
+    <value>Version {0} disponible</value>
   </data>
   <data name="Volume.DefaultName" xml:space="preserve">
     <value>volume {0}</value>

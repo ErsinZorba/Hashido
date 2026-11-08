@@ -168,7 +168,7 @@ try {
     }
     Log "Bellek: Disk $($s.Number) — $($s.Desc), $($s.Size), birim adı $Ad (APFS bölümü $($s.Part))"
     if ($Adim -ne 'denetle') { Say ("Disk $($s.Number): $($s.Desc), $($s.Size), birim adı '$Ad'.`n" +
-        "Deneme süresince kurulu APFS for Windows birkaç dakikalığına durdurulur (diğer Mac diskleri o sürede görünmez; " +
+        "Deneme süresince kurulu Hashido birkaç dakikalığına durdurulur (diğer Mac diskleri o sürede görünmez; " +
         "üzerlerinde açık dosya varsa önce kapatın) ve sonunda kendiliğinden yeniden başlatılır.`n" +
         "Bu bellekteki her şey deneme amaçlı mı ve kaybolması sorun değil mi? (E/H)") }
     if ($Adim -ne 'denetle') {

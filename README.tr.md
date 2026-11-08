@@ -1,4 +1,6 @@
-# APFS for Windows
+# Hashido
+
+**Windows'ta APFS diskleri okuyun ve yazın** · eski adıyla *APFS for Windows*
 
 [English](README.md) | **Türkçe**
 
@@ -23,11 +25,16 @@ Diski takarsınız, birkaç saniye içinde Dosya Gezgini'nde sürücü harfi ola
 | 10 arayüz dili | Türkçe, English, Deutsch, Français, Español, Português (Brasil), Italiano, 日本語, 简体中文, 한국어 |
 
 ## Kurulum
-`APFS-for-Windows-Setup-1.3.0.exe` dosyasını çalıştırın ve sihirbazı izleyin (İleri › Kur › Son). Windows 10/11 (64 bit) yeter;
+`Hashido-Setup-1.4.0.exe` dosyasını çalıştırın ve sihirbazı izleyin (İleri › Kur › Son). Windows 10/11 (64 bit) yeter;
 başka bir şey kurmanız gerekmez: .NET programla birlikte gelir, [WinFsp](https://winfsp.dev) sürücüsü yoksa sihirbaz onu da kurar.
-Kurulumdan sonra Başlat menüsünde **APFS for Windows** bulunur ve tepsi simgesi her oturumda kendiliğinden açılır.
+Kurulumdan sonra Başlat menüsünde **Hashido** bulunur ve tepsi simgesi her oturumda kendiliğinden açılır.
 
-Kaldırmak için: **Ayarlar › Uygulamalar › Yüklü uygulamalar › APFS for Windows › Kaldır**. Kaldırma disklerinize hiçbir şey yazmaz;
+- **İşlemci:** x64 (Intel/AMD). ARM tabanlı Windows 11'de (ARM64) program Windows'un yerleşik x64 öykünmesiyle çalışır;
+  ayrı bir ARM64 paketi yoktur.
+- **Program klasörü:** yeni kurulumlar `C:\Program Files\Hashido` klasörüne yapılır. 1.3.0 ya da daha eski bir sürümden
+  (o zamanki adıyla APFS for Windows) yükseltirseniz program eski klasöründe, `C:\Program Files\APFS for Windows`'ta kalır.
+
+Kaldırmak için: **Ayarlar › Uygulamalar › Yüklü uygulamalar › Hashido › Kaldır**. Kaldırma disklerinize hiçbir şey yazmaz;
 günlük (`C:\ProgramData\APFS for Windows\log.txt`) incelemeniz için bırakılır, WinFsp kaldırılmaz.
 
 ## Kullanım
@@ -44,7 +51,7 @@ düğmesine tıklayın (geçerli dilin adı yazar) ve listeden seçin; program o
 diline bağlar. Günlük ayrıntıları ve komut satırı yalnızca Türkçe ve İngilizcedir (öbür dillerde İngilizce).
 
 Türkçe ve İngilizce dışındaki çeviriler anadili konuşan biri tarafından gözden geçirilmedi. Yanlış ya da anlaşılmaz bir çeviri
-görürseniz lütfen [Issues](https://github.com/ErsinZorba/APFS-for-Windows/issues) üzerinden bildirin (dil, ekrandaki metin ve
+görürseniz lütfen [Issues](https://github.com/ErsinZorba/Hashido/issues) üzerinden bildirin (dil, ekrandaki metin ve
 doğrusu).
 
 ## Yazma (deneysel)
@@ -113,7 +120,8 @@ apfs dump <kaynak> [yol]               Geliştirme: iç yapı dökümü (yol ver
 apfs mount <kaynak> [X:]               Elle bağlama (Ctrl+C ile ayır); iç birimler için --all
 ```
 `<kaynak>`: disk görüntüsü dosyası veya `\\.\PhysicalDriveN` (yönetici gerekir). Şifreli birimler için `--password-prompt`.
-Kurulumdan sonra araç PATH'e eklenmez; tam yoluyla çalıştırın: `& "C:\Program Files\APFS for Windows\apfs.exe" info \\.\PhysicalDrive2`
+Kurulumdan sonra araç PATH'e eklenmez; tam yoluyla çalıştırın: `& "C:\Program Files\Hashido\apfs.exe" info \\.\PhysicalDrive2`
+(1.3.0 ya da daha eski sürümden yükselttiyseniz: `C:\Program Files\APFS for Windows\apfs.exe`).
 
 ## Dosya adları
 - Türkçe karakterler dahil tüm Unicode adlar desteklenir. Mac'in adları farklı Unicode biçiminde (NFD) saklaması sorun değildir.
@@ -131,11 +139,51 @@ halleriyle gösterilir. Desteklenmeyen bir yöntemle (ör. LZBITMAP) sıkıştı
 Aynı bölümde birden çok birim olan disklere yazma; şifreli birimin parolasını değiştirme, şifreleme/şifre çözme; onarım, biçimlendirme; anlık görüntüler (snapshot) ve Time Machine yapısı;
 Fusion Drive; mühürlü macOS sistem birimi; DMG/sparsebundle dosyaları; HFS+; Apple Silicon/T2 dahili disk donanım şifrelemesi.
 
+## Gizlilik
+Son güncelleme: 2026-11-08. Bağlayıcı olan [İngilizce metindir](README.md#privacy); bu çeviri bilgi amaçlıdır. Aynı metin [worker/PRIVACY.md](worker/PRIVACY.md) dosyasında da var.
+
+**Otomatik raporlar siz "evet" diyene kadar kapalıdır.** Program ilk açılışta bir kez anonim rapor gönderip gönderemeyeceğini
+sorar. "Evet, gönder" demediğiniz sürece hiçbir şey toplanmaz ve gönderilmez. Seçiminizi istediğiniz zaman **Ayarlar**'dan
+değiştirebilirsiniz; raporları kapatmak bilgisayarınızda henüz gönderilmemiş raporları da siler.
+
+**Ne gönderilir, neden.** Raporlar hataları, çökmeleri ve başarılı işlemleri (disk bağlama, kilit açma, yazmaya açma, yazma
+oturumu, güvenle çıkarma) anlatır. Hataları bulmaya ve özellikle deneysel yazma özelliğinde hangi disklerin ve durumların sorun
+çıkardığını görmeye yarar. Bir rapor yalnız şunları içerir: program ve Windows sürümü, işlemci türü, arayüz dili, işlem, sonucu
+ve hata kodu, kaba süre aralığı, gün; diskin teknik özellikleri: bağlantı türü (USB, NVMe…), sektör ve blok boyutu, bölüm
+şeması, APFS bölümü ve birim sayısı, kaba boyut aralığı (2'nin kuvvetleri), APFS biçim özellik bayrakları, birim rolleri,
+şifreleme türü, harf duyarlılığı, anlık görüntü (snapshot) olup olmadığı, birime en son yazan yazılımın adı ve sürümü (ör.
+`apfs_kext (2313.1)`), kaba dosya sayısı aralığı; yazma oturumlarında kaydetme, bayt ve işlem sayılarının kaba aralıkları ve
+oturumun nasıl bittiği; çökmelerde hata türü ve programın kendi işlevlerinden hangisinde olduğu. İzin verilen alanların tam
+listesi [`worker/schema.json`](worker/schema.json); program da sunucu da bu listede olmayan alan taşıyan raporu reddeder.
+
+**Asla gönderilmez:** dosya, klasör, birim ya da disk adları, dosya içerikleri, seri numaraları, UUID ya da başka kimlikler, tam
+boyutlar, parolalar, anahtarlar ya da parola ipuçları, bilgisayar adı, kullanıcı adı, dosya yolları, hata iletileri ya da kalıcı
+bir cihaz kimliği.
+
+**Nereye gider.** Program raporları HTTPS ile geliştiricinin işlettiği bir Cloudflare Worker'a (`hashido-api.zorba.dev`)
+gönderir; raporlar bir Cloudflare D1 veritabanında (Batı Avrupa) saklanır. IP adresiniz saklanmaz ve sunucu istek günlüğü
+tutmaz; Cloudflare, isteği iletmek için IP adresini yalnız kısa süre işler (Cloudflare'in gizlilik politikası). Raporlar
+satılmaz, reklam için kullanılmaz ve kimseyle paylaşılmaz.
+
+**Ne kadar süre.** Raporlar alındıktan 18 ay sonra kendiliğinden silinir.
+
+**Bilgisayarınızda.** Gönderilmeyi bekleyen raporlar `%ProgramData%\APFS for Windows\reports\` klasöründe (en çok 200), tepsi
+programının kendi çökme raporları ise `%LOCALAPPDATA%\APFS for Windows\reports\` klasöründe durur. Gönderilen son 20 rapor, gönderildiği biçimiyle **Ayarlar › Gönderilenleri göster**'de görünür.
+
+**Haklarınız.** Raporlar hiçbir kimlik taşımadığı için hiç kimse (geliştirici dahil) hangi raporun sizden geldiğini bilemez; bu
+yüzden tek tek raporlar istek üzerine bulunamaz ya da silinemez. Raporları kapatmak bundan sonraki bütün raporları durdurur.
+
+**Güncelleme denetimi.** Ayarlar'dan kapatmadığınız sürece program günde bir kez GitHub'a (`api.github.com`) yeni sürüm olup
+olmadığını sorar. Size ya da disklerinize dair hiçbir şey gönderilmez; GitHub isteği kendi gizlilik açıklamasındaki gibi görür.
+
+**İletişim.** Sorular ve istekler: [GitHub Issues](https://github.com/ErsinZorba/Hashido/issues). Bu açıklamadaki
+değişiklikler depo geçmişinde görünür.
+
 ## Geliştirme
 ```
 dotnet build
 dotnet test
-powershell -File tools\build-installer.ps1   # kurulum sihirbazı: publish\APFS-for-Windows-Setup-<sürüm>.exe
+powershell -File tools\build-installer.ps1   # kurulum sihirbazı: publish\Hashido-Setup-<sürüm>.exe
 ```
 `build-installer.ps1` için Inno Setup 6 (`winget install --id JRSoftware.InnoSetup -e`) ve `installer\redist\` altında WinFsp'in
 resmi `winfsp-2.1.25156.msi` paketi gerekir (git'e eklenmez; betik imzasını denetler). Yalnızca program klasörü için
@@ -147,6 +195,12 @@ Test görüntüleri `tests/Apfs.ImageBuilder` ile üretilir ve bağımsız bir o
 linux-apfs-rw sürücüsü) WSL içinde çalışır (`tools/make-linux-fixtures.sh`, `tools/make-linux-populated.sh`); macOS'un kendi
 denetleyicisi için `tools/mac/` (Mac kiti). Gerçek disk yolunu sanal diskte sınamak için `tools/vhd-write-test.ps1` (yönetici).
 Uzun testler: `APFS_LONG=1 dotnet test`.
+
+## Ad
+Hashido (橋戸) Japoncada "köprü kapısı" demektir; gerçek bir soyadı ve yer adıdır: Mac diskinizle Windows arasında bir kapı.
+İçinde "hash" de var: APFS diskteki her yapının bir denetim toplamı vardır; program bu denetim toplamlarını ve ad karmalarını
+doğrular, böylece her bayt bozulmadan ulaşır. Program 1.3.0 sürümüne kadar APFS for Windows adını taşıyordu; yükseltmeler
+sorunsuz olsun diye bazı teknik adlar (hizmet, `C:\ProgramData\APFS for Windows` klasörü, ayar anahtarı) eski adla kalır.
 
 ## Lisans
 Copyright (C) 2026 Ersin Zorba. GNU Genel Kamu Lisansı sürüm 3 (yalnız sürüm 3; `GPL-3.0-only`), metni [LICENSE](LICENSE).

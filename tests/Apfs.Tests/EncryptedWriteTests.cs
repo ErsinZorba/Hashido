@@ -359,6 +359,7 @@ public class EncryptedWriteTests(LinuxFixtures fixtures) : IClassFixture<LinuxFi
 
         var locked = Gate(fixtures.Copy("enc-pop-ci-64m"), withKey: false);
         Assert.False(locked.Allowed);
+        WriteGateTests.AssertReasonKeys(locked);
         Assert.Contains(locked.Reasons, r => r.Contains("önce kilidini açın", StringComparison.Ordinal));
 
         void Rejected(Action<string> corrupt, string expected)
@@ -367,6 +368,7 @@ public class EncryptedWriteTests(LinuxFixtures fixtures) : IClassFixture<LinuxFi
             corrupt(p);
             var g = Gate(p);
             Assert.False(g.Allowed, expected);
+            WriteGateTests.AssertReasonKeys(g);
             Assert.Contains(g.Reasons, r => r.Contains(expected, StringComparison.Ordinal));
         }
         // Dosya başına anahtar (ONEKEY yok)

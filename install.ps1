@@ -1,10 +1,10 @@
 ﻿<#
 .SYNOPSIS
-  APFS for Windows kurulumu (YÖNETİCİ olarak çalıştırın).
+  Hashido kurulumu (YÖNETİCİ olarak çalıştırın).
 .DESCRIPTION
   - WinFsp'i denetler (.NET çalışma zamanı programla birlikte gelir).
-  - Programı "C:\Program Files\APFS for Windows" altına kopyalar.
-  - "APFS for Windows" hizmetini (LocalSystem, otomatik başlangıç) kurar ve başlatır: takılan APFS diskleri kendiliğinden,
+  - Programı "C:\Program Files\Hashido" altına kopyalar (eski sürüm kuruluysa onun klasörüne: "APFS for Windows").
+  - "Hashido" hizmetini (LocalSystem, otomatik başlangıç) kurar ve başlatır: takılan APFS diskleri kendiliğinden,
     salt okunur bağlanır.
   - Tepsi uygulamasını her oturum açılışında başlayacak şekilde kaydeder ve şimdi başlatır.
   Kurulum diskinize hiçbir şey yazmaz. Kaldırmak için: uninstall.ps1
@@ -13,8 +13,20 @@ param([string]$Source)
 $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = [Text.Encoding]::UTF8
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
-$installDir = Join-Path $env:ProgramFiles 'APFS for Windows'
 $serviceName = 'APFSforWindows'
+# Kurulum klasörü: hizmet zaten kuruluysa onun klasörü (1.3.0 ve öncesi "APFS for Windows"; yükseltmede taşınmaz), yoksa
+# yeni ad. Hizmetin yolu Program Files dışındaysa (geliştirme) kullanılmaz.
+function Get-InstallDir {
+    $img = (Get-ItemProperty "HKLM:\SYSTEM\CurrentControlSet\Services\$serviceName" -ErrorAction SilentlyContinue).ImagePath
+    if ($img) {
+        $exe = $img.Trim().Trim('"')
+        if ($exe -match '\\apfs-service\.exe$' -and $exe.StartsWith($env:ProgramFiles + '\', [StringComparison]::OrdinalIgnoreCase)) {
+            return Split-Path -Parent $exe
+        }
+    }
+    return Join-Path $env:ProgramFiles 'Hashido'
+}
+$installDir = Get-InstallDir
 
 function Fail($msg) { Write-Host "Kurulum durdu: $msg" -ForegroundColor Red; exit 1 }
 
@@ -55,10 +67,10 @@ Write-Host "Kopyalandı: $installDir"
 # --- Hizmet ---
 $bin = "`"$installDir\apfs-service.exe`""
 if (-not $svc) {
-    New-Service -Name $serviceName -BinaryPathName $bin -DisplayName 'APFS for Windows' -StartupType Automatic `
+    New-Service -Name $serviceName -BinaryPathName $bin -DisplayName 'Hashido' -StartupType Automatic `
         -Description 'Takılan Mac (APFS) disklerini Windows''ta salt okunur sürücü olarak bağlar.' | Out-Null
 } else {
-    & sc.exe config $serviceName binPath= $bin start= auto | Out-Null
+    & sc.exe config $serviceName binPath= $bin start= auto DisplayName= Hashido | Out-Null
 }
 # Beklenmedik çökmede 5 sn sonra yeniden başlat
 & sc.exe failure $serviceName reset= 86400 actions= restart/5000/restart/5000/restart/30000 | Out-Null
@@ -68,7 +80,7 @@ Write-Host 'Hizmet kuruldu ve başlatıldı.'
 # --- Fiziksel diskleri elle bağlamak için WinFsp Launcher kaydı (isteğe bağlı kullanım) ---
 & (Join-Path $installDir 'apfs.exe') register | Out-Null
 
-# --- Tepsi uygulaması: her oturumda ve şimdi (normal kullanıcı yetkisiyle) ---
+# --- Tepsi uygulaması: her oturumda ve şimdi (normal kullanıcı yetkisiyle); Run değer adı teknik kimlik, değişmez ---
 Set-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Run' -Name 'APFS for Windows' -Value "`"$installDir\apfs-tray.exe`""
 Start-Process explorer.exe "`"$installDir\apfs-tray.exe`""
 

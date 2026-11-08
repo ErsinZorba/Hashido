@@ -94,7 +94,7 @@
     <value>ERROR: {0}</value>
   </data>
   <data name="Cli.Help" xml:space="preserve">
-    <value>APFS for Windows: opens Mac APFS disks read-only on Windows.
+    <value>{0}: opens Mac APFS disks read-only on Windows.
 
 Usage:
   apfs info &lt;source&gt;                         Shows container and volume information
@@ -143,6 +143,9 @@ Encrypted volumes: --password-prompt (asks for the password) or --password-stdin
   </data>
   <data name="Cli.InfoVolumeFailed" xml:space="preserve">
     <value>Volume {0}: could not be opened: {1}</value>
+  </data>
+  <data name="Cli.InstallDirInUse" xml:space="preserve">
+    <value>A program is already installed in {0} (no "apfs register" copy marker); it was not overwritten. Run "apfs register" from that folder instead.</value>
   </data>
   <data name="Cli.InternalVolumeSkipped" xml:space="preserve">
     <value>Volume {0} "{1}" [{2}] was not mounted because it is an internal macOS volume (use --all to show it).</value>
@@ -326,6 +329,15 @@ Encrypted volumes: --password-prompt (asks for the password) or --password-stdin
   </data>
   <data name="Svc.PipeError" xml:space="preserve">
     <value>pipe error: {0}</value>
+  </data>
+  <data name="Svc.ReportDropped" xml:space="preserve">
+    <value>Report event "{0}" was not queued (does not match the schema: {1}).</value>
+  </data>
+  <data name="Svc.ReportsDisabled" xml:space="preserve">
+    <value>Automatic reporting was turned off by the user; the report queue was deleted.</value>
+  </data>
+  <data name="Svc.ReportsEnabled" xml:space="preserve">
+    <value>Automatic reporting was turned on by the user.</value>
   </data>
   <data name="Svc.RequestFailed" xml:space="preserve">
     <value>pipe request could not be processed: {0}: {1}</value>

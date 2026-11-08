@@ -1,4 +1,5 @@
 using Apfs.Tray.Ui;
+using Apfs.Windows;
 
 namespace Apfs.Tray;
 
@@ -10,7 +11,7 @@ internal sealed class PasswordForm : Form
 
     public PasswordForm(string volumeName, string? hint, string? error)
     {
-        Text = WinText.U("Password.Title");
+        Text = WinText.U("Password.Title", Branding.ProductName);
         Icon = Theme.AppIcon(32);
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = MinimizeBox = false;

@@ -1,6 +1,6 @@
 ﻿<#
 .SYNOPSIS
-  Kurulum sihirbazını derler: publish\APFS-for-Windows-Setup-<sürüm>.exe
+  Kurulum sihirbazını derler: publish\Hashido-Setup-<sürüm>.exe
 .DESCRIPTION
   1. tools\build-release.ps1 ile programı derler (self-contained).
   2. Gömülecek WinFsp kurulum paketini (installer\redist\winfsp-2.1.25156.msi) denetler: dosya yoksa indirme adresini söyler;
@@ -32,5 +32,5 @@ if (-not $version) { throw 'Directory.Build.props içinde <Version> yok' }
 
 & $iscc /Q "/DAppVersion=$version" (Join-Path $root 'installer\APFS-for-Windows.iss')
 if ($LASTEXITCODE -ne 0) { throw 'kurulum derlenemedi' }
-$setup = Join-Path $root "publish\APFS-for-Windows-Setup-$version.exe"
+$setup = Join-Path $root "publish\Hashido-Setup-$version.exe"
 "Hazır: $setup ($([math]::Round((Get-Item $setup).Length / 1MB, 1)) MB)"

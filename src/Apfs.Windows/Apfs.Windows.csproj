@@ -9,5 +9,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Apfs.Core\Apfs.Core.csproj" />
     <InternalsVisibleTo Include="Apfs.Tests" />
+    <!-- Raporlama izin listesi: Worker ile ORTAK dosya (worker/schema.json); uygulama her olayı göndermeden önce buna göre denetler. -->
+    <EmbeddedResource Include="..\..\worker\schema.json" LogicalName="report-schema.json" />
   </ItemGroup>
 </Project>

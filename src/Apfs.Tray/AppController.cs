@@ -168,7 +168,7 @@ internal sealed class AppController : IDisposable
                 r = await SendEjectAsync(d.Id, force: true);
             }
             if (r is not { Ok: true })
-                MessageBox.Show(owner, r?.Message ?? WinText.U("Eject.Failed"), "APFS for Windows", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show(owner, r?.Message ?? WinText.U("Eject.Failed"), Branding.ProductName, MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }
         finally
         {
@@ -196,7 +196,7 @@ internal sealed class AppController : IDisposable
         var cancel = new TaskDialogButton(WinText.U("Action.Cancel"));
         var page = new TaskDialogPage
         {
-            Caption = "APFS for Windows",
+            Caption = Branding.ProductName,
             Heading = WinText.U("Eject.BusyHeading"),
             Text = message,
             Icon = TaskDialogIcon.Warning,
@@ -231,7 +231,7 @@ internal sealed class AppController : IDisposable
                 r = await SendSetWritableAsync(d.Id, container, enable, force: true);
             }
             if (r is not { Ok: true })
-                MessageBox.Show(owner, r?.Message ?? WinText.U("Error.OperationFailed"), enable ? WinText.U("Write.EnableFailedTitle") : "APFS for Windows",
+                MessageBox.Show(owner, r?.Message ?? WinText.U("Error.OperationFailed"), enable ? WinText.U("Write.EnableFailedTitle") : Branding.ProductName,
                     MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
         finally
@@ -261,7 +261,7 @@ internal sealed class AppController : IDisposable
         var cancel = new TaskDialogButton(WinText.U("Action.Cancel"));
         var page = new TaskDialogPage
         {
-            Caption = "APFS for Windows",
+            Caption = Branding.ProductName,
             Heading = WinText.U("Write.ConfirmHeading"),
             Text = WinText.U("Write.ConfirmText", disk),
             Icon = TaskDialogIcon.ShieldWarningYellowBar,
@@ -279,7 +279,7 @@ internal sealed class AppController : IDisposable
         var cancel = new TaskDialogButton(WinText.U("Action.Cancel"));
         var page = new TaskDialogPage
         {
-            Caption = "APFS for Windows",
+            Caption = Branding.ProductName,
             Heading = heading,
             Text = message,
             Icon = TaskDialogIcon.Warning,
@@ -315,11 +315,11 @@ internal sealed class AppController : IDisposable
     {
         string path = File.Exists(ServiceLog.PathName) ? ServiceLog.PathName : ServiceLog.FallbackPathName;
         if (File.Exists(path)) Process.Start(new ProcessStartInfo("notepad.exe", $"\"{path}\"") { UseShellExecute = true });
-        else MessageBox.Show(WinText.U("Log.NoneYet"), "APFS for Windows");
+        else MessageBox.Show(WinText.U("Log.NoneYet"), Branding.ProductName);
     }
 
     public static void ShowDetails(IWin32Window? owner, VolumeStatus v) =>
-        MessageBox.Show(owner, v.Message ?? WinText.U("Error.Unknown"), $"APFS for Windows: {v.Name}", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        MessageBox.Show(owner, v.Message ?? WinText.U("Error.Unknown"), $"{Branding.ProductName}: {v.Name}", MessageBoxButtons.OK, MessageBoxIcon.Warning);
 
     public void Dispose()
     {

@@ -30,6 +30,9 @@
   <data name="Action.Checking" xml:space="preserve">
     <value>Verificando…</value>
   </data>
+  <data name="Action.Close" xml:space="preserve">
+    <value>Fechar</value>
+  </data>
   <data name="Action.ContinueAnyway" xml:space="preserve">
     <value>Continuar mesmo assim</value>
   </data>
@@ -44,6 +47,9 @@
   </data>
   <data name="Action.Exit" xml:space="preserve">
     <value>Sair</value>
+  </data>
+  <data name="Action.OK" xml:space="preserve">
+    <value>OK</value>
   </data>
   <data name="Action.Open" xml:space="preserve">
     <value>Abrir</value>
@@ -65,6 +71,9 @@
   </data>
   <data name="Action.Saving" xml:space="preserve">
     <value>Salvando…</value>
+  </data>
+  <data name="Action.Settings" xml:space="preserve">
+    <value>Configurações</value>
   </data>
   <data name="Action.Unlock" xml:space="preserve">
     <value>Desbloquear</value>
@@ -92,6 +101,38 @@
   </data>
   <data name="Card.WriteRefused" xml:space="preserve">
     <value>Não foi possível ativar a gravação: {0}</value>
+  </data>
+  <data name="Consent.Heading" xml:space="preserve">
+    <value>Quer ajudar a melhorar o {0}?</value>
+  </data>
+  <data name="Consent.NeverHeading" xml:space="preserve">
+    <value>Nunca é enviado</value>
+  </data>
+  <data name="Consent.NeverList" xml:space="preserve">
+    <value>• Nomes de arquivos, pastas e discos, conteúdo dos arquivos
+• Números de série, identificadores, tamanhos exatos
+• Senhas, chaves, dicas de senha
+• Nome do computador e nome de usuário; seu endereço IP não é armazenado</value>
+  </data>
+  <data name="Consent.No" xml:space="preserve">
+    <value>Não</value>
+  </data>
+  <data name="Consent.Privacy" xml:space="preserve">
+    <value>Declaração de privacidade</value>
+  </data>
+  <data name="Consent.SentHeading" xml:space="preserve">
+    <value>O que é enviado</value>
+  </data>
+  <data name="Consent.SentList" xml:space="preserve">
+    <value>• Versão do programa e do Windows, tipo de processador, idioma da interface
+• A operação (conectar, desbloquear, gravar, ejetar com segurança), seu resultado e código de erro
+• Dados técnicos do disco: tipo de conexão (USB, NVMe…), faixa aproximada de tamanho, número de volumes, tipo de criptografia, recursos do formato</value>
+  </data>
+  <data name="Consent.Text" xml:space="preserve">
+    <value>O {0} pode enviar automaticamente relatórios anônimos sobre erros, falhas e operações bem-sucedidas. Eles nos mostram quais discos e situações causam problemas, principalmente com o recurso experimental de gravação. Você pode ver o que foi enviado ou desativar isso a qualquer momento em Configurações. Os relatórios são excluídos após 18 meses.</value>
+  </data>
+  <data name="Consent.Yes" xml:space="preserve">
+    <value>Sim, enviar</value>
   </data>
   <data name="Disk.Gone" xml:space="preserve">
     <value>Este disco não está mais conectado.</value>
@@ -202,7 +243,7 @@
     <value>O disco é apenas lido; a senha não é salva em nenhum lugar.</value>
   </data>
   <data name="Password.Title" xml:space="preserve">
-    <value>APFS for Windows: volume criptografado</value>
+    <value>{0}: volume criptografado</value>
   </data>
   <data name="Release.Changed" xml:space="preserve">
     <value>foi alterado por outro programa (por exemplo, reformatado); a unidade APFS foi removida</value>
@@ -222,6 +263,42 @@
   <data name="Release.UnsavedNotWrittenChanged" xml:space="preserve">
     <value>As alterações recentes não salvas não foram gravadas, para não danificar o novo conteúdo do disco.</value>
   </data>
+  <data name="Sent.Intro" xml:space="preserve">
+    <value>Os últimos relatórios enviados deste computador, do mais recente para o mais antigo, exatamente como foram enviados:</value>
+  </data>
+  <data name="Sent.None" xml:space="preserve">
+    <value>Nada foi enviado ainda.</value>
+  </data>
+  <data name="Sent.Title" xml:space="preserve">
+    <value>Relatórios enviados</value>
+  </data>
+  <data name="Settings.Language" xml:space="preserve">
+    <value>Idioma</value>
+  </data>
+  <data name="Settings.LanguageNote" xml:space="preserve">
+    <value>O novo idioma passa a valer depois que o programa for reiniciado.</value>
+  </data>
+  <data name="Settings.Reports" xml:space="preserve">
+    <value>Enviar relatórios anônimos sobre erros, falhas e operações bem-sucedidas</value>
+  </data>
+  <data name="Settings.ReportsHeading" xml:space="preserve">
+    <value>Relatórios automáticos</value>
+  </data>
+  <data name="Settings.ShowSent" xml:space="preserve">
+    <value>Mostrar o que foi enviado</value>
+  </data>
+  <data name="Settings.Title" xml:space="preserve">
+    <value>Configurações do {0}</value>
+  </data>
+  <data name="Settings.UpdateNotify" xml:space="preserve">
+    <value>Avisar quando uma nova versão for lançada</value>
+  </data>
+  <data name="Settings.UpdatesHeading" xml:space="preserve">
+    <value>Atualizações</value>
+  </data>
+  <data name="Settings.WhatIsSent" xml:space="preserve">
+    <value>O que é enviado?</value>
+  </data>
   <data name="Tray.MenuEject" xml:space="preserve">
     <value>{0}{1}: ejetar com segurança</value>
   </data>
@@ -235,13 +312,13 @@
     <value>O programa continua em execução na área de notificação. Você pode acessar seus discos por aqui.</value>
   </data>
   <data name="Tray.TipMounted" xml:space="preserve">
-    <value>APFS for Windows: {0} volume(s) montado(s)</value>
+    <value>{0}: {1} volume(s) montado(s)</value>
   </data>
   <data name="Tray.TipNoVolumes" xml:space="preserve">
-    <value>APFS for Windows: nenhum volume montado</value>
+    <value>{0}: nenhum volume montado</value>
   </data>
   <data name="Tray.TipServiceDown" xml:space="preserve">
-    <value>APFS for Windows: serviço não está em execução</value>
+    <value>{0}: serviço não está em execução</value>
   </data>
   <data name="Unlock.Failed" xml:space="preserve">
     <value>Não foi possível desbloquear.</value>
@@ -254,6 +331,12 @@
   </data>
   <data name="Unlock.NotWaiting" xml:space="preserve">
     <value>Este volume não está mais aguardando uma senha.</value>
+  </data>
+  <data name="Update.Available" xml:space="preserve">
+    <value>A versão {0} está disponível. Clique para abrir a página de download.</value>
+  </data>
+  <data name="Update.Link" xml:space="preserve">
+    <value>Versão {0} disponível</value>
   </data>
   <data name="Volume.DefaultName" xml:space="preserve">
     <value>volume {0}</value>

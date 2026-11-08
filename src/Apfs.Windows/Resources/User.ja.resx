@@ -30,6 +30,9 @@
   <data name="Action.Checking" xml:space="preserve">
     <value>確認中…</value>
   </data>
+  <data name="Action.Close" xml:space="preserve">
+    <value>閉じる</value>
+  </data>
   <data name="Action.ContinueAnyway" xml:space="preserve">
     <value>このまま続行</value>
   </data>
@@ -44,6 +47,9 @@
   </data>
   <data name="Action.Exit" xml:space="preserve">
     <value>終了</value>
+  </data>
+  <data name="Action.OK" xml:space="preserve">
+    <value>OK</value>
   </data>
   <data name="Action.Open" xml:space="preserve">
     <value>開く</value>
@@ -65,6 +71,9 @@
   </data>
   <data name="Action.Saving" xml:space="preserve">
     <value>保存中…</value>
+  </data>
+  <data name="Action.Settings" xml:space="preserve">
+    <value>設定</value>
   </data>
   <data name="Action.Unlock" xml:space="preserve">
     <value>ロック解除</value>
@@ -92,6 +101,38 @@
   </data>
   <data name="Card.WriteRefused" xml:space="preserve">
     <value>書き込みを有効にできませんでした：{0}</value>
+  </data>
+  <data name="Consent.Heading" xml:space="preserve">
+    <value>{0} の改善にご協力いただけますか？</value>
+  </data>
+  <data name="Consent.NeverHeading" xml:space="preserve">
+    <value>送信されない情報</value>
+  </data>
+  <data name="Consent.NeverList" xml:space="preserve">
+    <value>• ファイル、フォルダー、ディスクの名前、ファイルの内容
+• シリアル番号、識別子、正確なサイズ
+• パスワード、キー、パスワードのヒント
+• コンピューター名とユーザー名（IP アドレスは保存されません）</value>
+  </data>
+  <data name="Consent.No" xml:space="preserve">
+    <value>いいえ</value>
+  </data>
+  <data name="Consent.Privacy" xml:space="preserve">
+    <value>プライバシーに関する声明</value>
+  </data>
+  <data name="Consent.SentHeading" xml:space="preserve">
+    <value>送信される情報</value>
+  </data>
+  <data name="Consent.SentList" xml:space="preserve">
+    <value>• プログラムと Windows のバージョン、プロセッサの種類、表示言語
+• 操作（接続、ロック解除、書き込み、安全な取り出し）、その結果とエラー コード
+• ディスクの技術情報: 接続の種類（USB、NVMe など）、おおよそのサイズの範囲、ボリューム数、暗号化の種類、フォーマットの機能</value>
+  </data>
+  <data name="Consent.Text" xml:space="preserve">
+    <value>{0} は、エラー、クラッシュ、成功した操作について匿名のレポートを自動的に送信できます。レポートから、特に試験的な書き込み機能で、どのディスクや状況で問題が起きるかがわかります。送信した内容の確認や送信の停止は、いつでも設定から行えます。レポートは 18 か月後に削除されます。</value>
+  </data>
+  <data name="Consent.Yes" xml:space="preserve">
+    <value>はい、送信する</value>
   </data>
   <data name="Disk.Gone" xml:space="preserve">
     <value>このディスクはもう接続されていません。</value>
@@ -202,7 +243,7 @@
     <value>ディスクは読み取られるだけです。パスワードはどこにも保存されません。</value>
   </data>
   <data name="Password.Title" xml:space="preserve">
-    <value>APFS for Windows：暗号化されたボリューム</value>
+    <value>{0}：暗号化されたボリューム</value>
   </data>
   <data name="Release.Changed" xml:space="preserve">
     <value>は別のプログラムによって変更された（再フォーマットなど）ため、APFS ドライブを取り外しました</value>
@@ -222,6 +263,42 @@
   <data name="Release.UnsavedNotWrittenChanged" xml:space="preserve">
     <value>ディスク上の新しい内容を損なわないよう、保存されていない最新の変更は書き込みませんでした。</value>
   </data>
+  <data name="Sent.Intro" xml:space="preserve">
+    <value>このコンピューターから最近送信したレポートです（新しい順、送信したとおりの形式）：</value>
+  </data>
+  <data name="Sent.None" xml:space="preserve">
+    <value>まだ何も送信していません。</value>
+  </data>
+  <data name="Sent.Title" xml:space="preserve">
+    <value>送信したレポート</value>
+  </data>
+  <data name="Settings.Language" xml:space="preserve">
+    <value>言語</value>
+  </data>
+  <data name="Settings.LanguageNote" xml:space="preserve">
+    <value>新しい言語は、プログラムを再起動すると反映されます。</value>
+  </data>
+  <data name="Settings.Reports" xml:space="preserve">
+    <value>エラー、クラッシュ、成功した操作について匿名のレポートを送信する</value>
+  </data>
+  <data name="Settings.ReportsHeading" xml:space="preserve">
+    <value>自動レポート</value>
+  </data>
+  <data name="Settings.ShowSent" xml:space="preserve">
+    <value>送信した内容を表示</value>
+  </data>
+  <data name="Settings.Title" xml:space="preserve">
+    <value>{0} の設定</value>
+  </data>
+  <data name="Settings.UpdateNotify" xml:space="preserve">
+    <value>新しいバージョンが公開されたら知らせる</value>
+  </data>
+  <data name="Settings.UpdatesHeading" xml:space="preserve">
+    <value>更新</value>
+  </data>
+  <data name="Settings.WhatIsSent" xml:space="preserve">
+    <value>何が送信されますか？</value>
+  </data>
   <data name="Tray.MenuEject" xml:space="preserve">
     <value>{0}{1}：安全に取り出す</value>
   </data>
@@ -235,13 +312,13 @@
     <value>プログラムは通知領域で引き続き実行されています。ディスクにはここからアクセスできます。</value>
   </data>
   <data name="Tray.TipMounted" xml:space="preserve">
-    <value>APFS for Windows：{0} 個のボリュームがマウントされています</value>
+    <value>{0}：{1} 個のボリュームがマウントされています</value>
   </data>
   <data name="Tray.TipNoVolumes" xml:space="preserve">
-    <value>APFS for Windows：マウントされたボリュームはありません</value>
+    <value>{0}：マウントされたボリュームはありません</value>
   </data>
   <data name="Tray.TipServiceDown" xml:space="preserve">
-    <value>APFS for Windows：サービスが実行されていません</value>
+    <value>{0}：サービスが実行されていません</value>
   </data>
   <data name="Unlock.Failed" xml:space="preserve">
     <value>ロックを解除できませんでした。</value>
@@ -254,6 +331,12 @@
   </data>
   <data name="Unlock.NotWaiting" xml:space="preserve">
     <value>このボリュームはもうパスワードの入力を待っていません。</value>
+  </data>
+  <data name="Update.Available" xml:space="preserve">
+    <value>バージョン {0} が公開されました。クリックするとダウンロード ページが開きます。</value>
+  </data>
+  <data name="Update.Link" xml:space="preserve">
+    <value>バージョン {0} が公開されました</value>
   </data>
   <data name="Volume.DefaultName" xml:space="preserve">
     <value>ボリューム {0}</value>

@@ -94,7 +94,7 @@
     <value>HATA: {0}</value>
   </data>
   <data name="Cli.Help" xml:space="preserve">
-    <value>APFS for Windows: Mac APFS disklerini Windows'ta salt okunur açar.
+    <value>{0}: Mac APFS disklerini Windows'ta salt okunur açar.
 
 Kullanım:
   apfs info &lt;kaynak&gt;                         Kapsayıcı ve birim bilgilerini gösterir
@@ -143,6 +143,9 @@ Seçenekler: --volume N (birim sırası, varsayılan 0), --partition N (APFS bö
   </data>
   <data name="Cli.InfoVolumeFailed" xml:space="preserve">
     <value>Birim {0}: açılamadı: {1}</value>
+  </data>
+  <data name="Cli.InstallDirInUse" xml:space="preserve">
+    <value>{0} klasöründe kurulu bir program var ("apfs register" kopyası işareti yok); üzerine yazılmadı. "apfs register"ı o klasördeki apfs.exe ile çalıştırın.</value>
   </data>
   <data name="Cli.InternalVolumeSkipped" xml:space="preserve">
     <value>Birim {0} "{1}" [{2}] macOS'un iç birimi olduğu için bağlanmadı (göstermek için --all).</value>
@@ -326,6 +329,15 @@ Seçenekler: --volume N (birim sırası, varsayılan 0), --partition N (APFS bö
   </data>
   <data name="Svc.PipeError" xml:space="preserve">
     <value>kanal hatası: {0}</value>
+  </data>
+  <data name="Svc.ReportDropped" xml:space="preserve">
+    <value>"{0}" rapor olayı kuyruğa alınmadı (şemaya uymuyor: {1}).</value>
+  </data>
+  <data name="Svc.ReportsDisabled" xml:space="preserve">
+    <value>Otomatik raporlama kullanıcı tarafından kapatıldı; rapor kuyruğu silindi.</value>
+  </data>
+  <data name="Svc.ReportsEnabled" xml:space="preserve">
+    <value>Otomatik raporlama kullanıcı tarafından açıldı.</value>
   </data>
   <data name="Svc.RequestFailed" xml:space="preserve">
     <value>kanal isteği işlenemedi: {0}: {1}</value>

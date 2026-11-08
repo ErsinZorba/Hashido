@@ -1,0 +1,67 @@
+# Derleme + testler (Windows, .NET 10, gerçek WinFsp 2.1 sürücüsüyle).
+# İş yalnız herkese açık depoda (push / PR) ya da elle başlatılınca (workflow_dispatch) çalışır; gizli çalışma deposunda
+# push'lar dakika harcamaz. Koşul depo adına bağlı değil (ad değişse de geçerli).
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-test:
+    if: ${{ !github.event.repository.private || github.event_name == 'workflow_dispatch' }}
+    runs-on: windows-latest
+    timeout-minutes: 45
+    env:
+      DOTNET_NOLOGO: "1"
+      DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+      WINFSP_URL: https://github.com/winfsp/winfsp/releases/download/v2.1/winfsp-2.1.25156.msi
+      WINFSP_SHA256: 073A70E00F77423E34BED98B86E600DEF93393BA5822204FAC57A29324DB9F7A
+    steps:
+      # Windows koşucusunda core.autocrlf=true: metin sanılan test verileri (ör. data/compression/*.bin) CRLF'e çevrilip
+      # bayt bayt karşılaştırmaları bozuyor. Açık klon ve yayın derlemesi de autocrlf false ile çalışır.
+      - name: Keep line endings as committed
+        run: git config --global core.autocrlf false
+
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: "10.0.x"
+
+      # winfsp.net 2.1.25156 kurulu sürücüyle eşleşmeli (2.2 paketi 2.1'i reddediyor): sabit sürüm, parmak izi denetimli.
+      - name: Install WinFsp 2.1
+        shell: pwsh
+        run: |
+          $msi = Join-Path $env:RUNNER_TEMP 'winfsp-2.1.25156.msi'
+          Invoke-WebRequest -Uri $env:WINFSP_URL -OutFile $msi
+          $hash = (Get-FileHash $msi -Algorithm SHA256).Hash
+          if ($hash -ne $env:WINFSP_SHA256) { throw "WinFsp MSI SHA-256 does not match: $hash" }
+          $p = Start-Process msiexec.exe -ArgumentList @('/i', "`"$msi`"", '/qn', '/norestart') -Wait -PassThru
+          if ($p.ExitCode -notin 0, 3010) { throw "msiexec exit code $($p.ExitCode)" }
+          $dir = (Get-ItemProperty 'HKLM:\SOFTWARE\WOW6432Node\WinFsp').InstallDir
+          Write-Host "WinFsp: $dir (msiexec $($p.ExitCode))"
+          Get-Service WinFsp.Launcher | Format-Table -AutoSize Name, Status
+
+      - name: Build
+        run: dotnet build -c Debug
+
+      - name: Test
+        run: dotnet test --no-build -c Debug --logger "trx;LogFileName=results.trx" --results-directory TestResults
+
+      - name: Upload test results
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-results
+          path: TestResults
+          if-no-files-found: ignore
