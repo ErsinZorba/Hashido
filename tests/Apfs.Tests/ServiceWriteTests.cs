@@ -227,4 +227,24 @@ public class ServiceWriteTests(LinuxFixtures fixtures, TestImages images) : ICla
         Assert.DoesNotContain(Convert.ToBase64String(vek.AsSpan(0, 9)), output, StringComparison.Ordinal);
         DevOutput.Save(path, "hizmet-yazma-sifreli");
     }
+
+    /// <summary>
+    /// 1.4.0 P4.7 bulgusu (ARM sanal makinesi): "Yeniden tara" zamanlanmış taramayla aynı anda çalışınca ikisi de diski henüz
+    /// listede görmüyor ve birimleri iki kez bağlıyordu (aynı birim iki sürücü harfi). Bağlama penceresi geliştirme kancasıyla
+    /// 3 sn'ye açılır, o sırada birkaç "rescan" gönderilir: her birim yalnız bir kez bağlanmalı.
+    /// </summary>
+    [Fact]
+    public async Task ConcurrentRescansMountEachVolumeOnce()
+    {
+        string path = fixtures.Copy("pop-ci-64m");
+        using var svc = new DevService(path, new Dictionary<string, string> { ["APFS_DEV_ATTACH_DELAY_MS"] = "3000" });
+        var scans = Enumerable.Range(0, 3).Select(_ => svc.Send<UnlockResponse>(new Request("rescan"))).ToArray();
+        foreach (var s in scans) Assert.True((await s).Ok);
+        var d = await svc.WaitDisk(x => x.Volumes.Any(v => v.State == VolumeStatus.Mounted));
+        await svc.Send<UnlockResponse>(new Request("rescan"));
+
+        int mounts = System.Text.RegularExpressions.Regex.Matches(svc.Output, @": ""[^""]+"" [A-Z]: olarak bağlandı\.").Count;
+        Assert.True(mounts == d.Volumes.Count(v => v.State == VolumeStatus.Mounted), $"birim bağlama sayısı {mounts}:\n{svc.Output}");
+        Assert.True((await svc.Send<UnlockResponse>(new Request("eject", Disk: d.Id, Force: true))).Ok);
+    }
 }

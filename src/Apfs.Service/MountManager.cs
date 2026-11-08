@@ -106,8 +106,20 @@ internal sealed class MountManager : IDisposable
 
     // ---------------- Tarama ----------------
 
+    /// <summary>
+    /// Taramalar tek tek çalışır: disk ancak bütün birimleri bağlandıktan sonra <see cref="_disks"/>'e girer; aynı anda iki tarama
+    /// (zamanlanmış + "Yeniden tara", ya da hata yollarındaki yeniden tarama) onu ikisi de yeni sanıp birimleri iki kez bağlıyordu.
+    /// Bekleyen ikinci tarama ilki bitince diski listede görür.
+    /// </summary>
+    private readonly Lock _scanLock = new();
+
     /// <summary>Yeni diskleri bağlar, kaybolanları temizler.</summary>
     public void Rescan()
+    {
+        lock (_scanLock) RescanCore();
+    }
+
+    private void RescanCore()
     {
         foreach (var (key, open) in EnumerateSources())
         {
@@ -166,6 +178,9 @@ internal sealed class MountManager : IDisposable
         disk.Facts = new DiskFacts(device is RawDiskDevice r ? ReportEvents.BusToken(r.QueryBusType() ?? -1) : "image", device.SectorSize,
             PartitionLocator.LooksLikeContainer(device, 0) ? "none" : "gpt", count);
         for (int p = 0; p < count; p++) MountContainer(disk, p, report: true);
+        // Yalnız geliştirme modu (testler): bağlama ile diskin listeye girmesi arasındaki pencereyi genişletir
+        if (_imageSources is not null && int.TryParse(Environment.GetEnvironmentVariable("APFS_DEV_ATTACH_DELAY_MS"), out int delay))
+            Thread.Sleep(delay);
 
         if (device is RawDiskDevice raw)
             disk.RemovalWatch = DeviceNotifications.WatchHandle(raw.Handle, a => OnHandleEvent(key, a));
