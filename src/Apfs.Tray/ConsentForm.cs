@@ -28,8 +28,10 @@ internal sealed class ConsentForm : Form
         AutoScaleMode = AutoScaleMode.None;
         AutoSize = true;
         AutoSizeMode = AutoSizeMode.GrowAndShrink;
-        BackColor = Theme.Background;
+        BackColor = Theme.Paper;
+        ForeColor = Theme.Ink;
         Font = Theme.Body;
+        Theme.ApplyFrame(this);
         KeyPreview = true;
         int width = this.S(440);
 
@@ -42,20 +44,20 @@ internal sealed class ConsentForm : Form
         var layout = new FlowLayoutPanel
         {
             FlowDirection = FlowDirection.TopDown, AutoSize = true, WrapContents = false,
-            Padding = new Padding(this.S(22), this.S(18), this.S(22), this.S(16)),
+            Padding = new Padding(this.S(26), this.S(22), this.S(26), this.S(18)),
         };
-        layout.Controls.Add(Line(WinText.U("Consent.Heading", Branding.ProductName), Theme.Font(12f, FontStyle.Bold), Theme.Text));
-        layout.Controls.Add(Line(WinText.U("Consent.Text", Branding.ProductName), Theme.Body, Theme.Text, 8));
-        layout.Controls.Add(Line(WinText.U("Consent.SentHeading"), Theme.Bold, Theme.Text, 12));
-        layout.Controls.Add(Line(WinText.U("Consent.SentList"), Theme.Body, Theme.Muted, 4));
-        layout.Controls.Add(Line(WinText.U("Consent.NeverHeading"), Theme.Bold, Theme.Text, 10));
-        layout.Controls.Add(Line(WinText.U("Consent.NeverList"), Theme.Body, Theme.Muted, 4));
+        layout.Controls.Add(Line(WinText.U("Consent.Heading", Branding.ProductName), Theme.Heading(15.75f), Theme.Ink));
+        layout.Controls.Add(Line(WinText.U("Consent.Text", Branding.ProductName), Theme.Body, Theme.Ink, 8));
+        layout.Controls.Add(Line(WinText.U("Consent.SentHeading"), Theme.Bold, Theme.Ink, 14));
+        layout.Controls.Add(Line(WinText.U("Consent.SentList"), Theme.Body, Theme.InkSoft, 4));
+        layout.Controls.Add(Line(WinText.U("Consent.NeverHeading"), Theme.Bold, Theme.Ink, 10));
+        layout.Controls.Add(Line(WinText.U("Consent.NeverList"), Theme.Body, Theme.InkSoft, 4));
         layout.Controls.Add(PrivacyLink(this, width));
 
         // İki düğme eşit genişlikte iki sütunda
         var buttons = new TableLayoutPanel
         {
-            ColumnCount = 2, RowCount = 1, AutoSize = true, Width = width, Margin = new Padding(0, this.S(16), 0, 0),
+            ColumnCount = 2, RowCount = 1, AutoSize = true, Width = width, Margin = new Padding(0, this.S(18), 0, 0),
             MinimumSize = new Size(width, 0),
         };
         buttons.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
@@ -80,7 +82,7 @@ internal sealed class ConsentForm : Form
         var link = new LinkLabel
         {
             Text = text, AutoSize = true, MaximumSize = new Size(width, 0), Margin = new Padding(0, owner.S(10), 0, 0),
-            LinkColor = Theme.Accent, ActiveLinkColor = Theme.AccentPressed, UseMnemonic = false,
+            LinkColor = Theme.Ink, ActiveLinkColor = Theme.Ink, VisitedLinkColor = Theme.Ink, UseMnemonic = false,
         };
         link.LinkClicked += (_, _) => Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
         return link;

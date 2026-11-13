@@ -2,6 +2,7 @@ using Apfs.Tray.Ui;
 using Apfs.Windows;
 using Apfs.Windows.Ipc;
 using Apfs.Windows.Reporting;
+using Microsoft.Win32;
 
 namespace Apfs.Tray;
 
@@ -24,7 +25,7 @@ internal sealed class TrayApp : ApplicationContext
     /// <param name="localReports">Tepsinin kendi rapor kuyruğu (çökme kancası da buna yazar).</param>
     public TrayApp(EventWaitHandle showEvent, bool showMain, ReportRecorder localReports)
     {
-        _icon = new NotifyIcon { Icon = Theme.AppIcon(SystemInformation.SmallIconSize.Width), Text = Branding.ProductName, Visible = true, ContextMenuStrip = new ContextMenuStrip() };
+        _icon = new NotifyIcon { Icon = Theme.AppIcon(SystemInformation.SmallIconSize.Width), Text = Branding.ProductName, Visible = true, ContextMenuStrip = new ContextMenuStrip { Renderer = Theme.MenuRenderer } };
         _icon.ContextMenuStrip.Opening += (_, _) => BuildMenu();
         _icon.MouseClick += (_, e) => { if (e.Button == MouseButtons.Left) _flyout!.Toggle(); };
         _icon.BalloonTipClicked += (_, _) =>
@@ -44,6 +45,11 @@ internal sealed class TrayApp : ApplicationContext
             _balloonLink = page;
             _icon.ShowBalloonTip(8000, Branding.ProductName, text, ToolTipIcon.Info);
         };
+        // Windows teması değişince (açık ↔ koyu) yeniden başla; renkler süreç başında seçilir
+        SystemEvents.UserPreferenceChanged += OnUserPreferenceChanged;
+        // Kuyruğa atılarak: Changed'in öbür aboneleri (ana pencere, panel) çalışırken süreç kapanıp onları elden çıkarmasın
+        _app.Changed += () => _ui.Post(_ => TryThemeRestart(), null);
+        _themeRetry.Tick += (_, _) => TryThemeRestart();
         _app.Start();
         _features.Start();
         if (showMain) ShowMain();
@@ -64,7 +70,7 @@ internal sealed class TrayApp : ApplicationContext
         {
             using var form = new ConsentForm();
             var owner = _main is { Visible: true } m ? m : null;
-            if (owner is null) form.ShowDialog(); else form.ShowDialog(owner);
+            AppController.Modal(() => owner is null ? form.ShowDialog() : form.ShowDialog(owner));
             if (form.Answer is not { } answer) return; // kapatıldı: bir sonraki açılışta yine sorulur
             UserSettings.ReportsConsent = answer;
             _features.ConsentChanged();
@@ -79,7 +85,7 @@ internal sealed class TrayApp : ApplicationContext
             _main = new MainForm(_app, _features);
             _main.HiddenToTray += () => _icon.ShowBalloonTip(4000, Branding.ProductName,
                 WinText.U("Tray.StillRunning"), ToolTipIcon.Info);
-            _main.RestartRequested += Restart;
+            _main.RestartRequested += () => Restart();
         }
         _main.ShowAndActivate();
     }
@@ -121,15 +127,46 @@ internal sealed class TrayApp : ApplicationContext
         m.Items.Add(WinText.U("Action.Exit"), null, (_, _) => ExitThread());
     }
 
+    // ---------------- Tema değişimi (1.5.0 P3) ----------------
+
+    private readonly System.Windows.Forms.Timer _themeRetry = new() { Interval = 1000 };
+
+    /// <summary>Ayar yayını (WM_SETTINGCHANGE; tema "ImmersiveColorSet" ile gelir): tema gerçekten değiştiyse yeniden başlamaya çalış.</summary>
+    private void OnUserPreferenceChanged(object? sender, UserPreferenceChangedEventArgs e) => _ui.Post(_ => TryThemeRestart(), null);
+
     /// <summary>
-    /// Dil değişti: yeni örneği başlat ve kapan. Yeni örnek bu süreç tek örnek kilidini bırakana kadar bekler (`--restart`).
+    /// Windows'un teması bu sürecin renklerinden farklıysa ve tepsi boştaysa (<see cref="AppController.Idle"/>: açık pencere,
+    /// çıkarma, yazma değişimi, kilit açma, tarama yok) yeniden başlar; değilse her <see cref="AppController.Changed"/>'de ve
+    /// saniyede bir yeniden denenir. Ana pencere açıksa yeni örnekte de açılır. Tema eski hâline dönerse bekleyen istek düşer.
+    /// </summary>
+    private void TryThemeRestart()
+    {
+        if (_exiting || Theme.SystemPalette() == Theme.Colors)
+        {
+            _themeRetry.Stop();
+            return;
+        }
+        if (!_app.Idle)
+        {
+            _themeRetry.Start();
+            return;
+        }
+        _themeRetry.Stop();
+        Restart(show: _main is { IsDisposed: false, Visible: true });
+    }
+
+    private bool _exiting;
+
+    /// <summary>
+    /// Dil ya da tema değişti: yeni örneği başlat ve kapan. Yeni örnek bu süreç tek örnek kilidini bırakana kadar bekler (`--restart`).
     /// Yol derlemenin yanındaki exe'dir (geliştirme düzeneğinde de doğru exe başlasın). Başlatılamazsa (ör. Uygulama Denetimi
     /// engelledi) bu örnek açık kalır; seçim kaydedildiği için yeni dil bir sonraki açılışta geçerli olur.
     /// </summary>
-    private void Restart()
+    /// <param name="show">Yeni örnek ana pencereyi açsın (dil seçimi ana pencereden yapılır; tema değişiminde yalnız açıksa).</param>
+    private void Restart(bool show = true)
     {
         string exe = Path.ChangeExtension(typeof(TrayApp).Assembly.Location, ".exe");
-        string args = "--restart --show" + (PipeProtocol.PipeName == "APFSforWindows" ? "" : $" --pipe \"{PipeProtocol.PipeName}\"");
+        string args = "--restart" + (show ? " --show" : "") + (PipeProtocol.PipeName == "APFSforWindows" ? "" : $" --pipe \"{PipeProtocol.PipeName}\"");
         try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(exe, args) { UseShellExecute = false }); }
         catch (Exception e) when (e is System.ComponentModel.Win32Exception or IOException) { return; }
         ExitThread();
@@ -137,6 +174,9 @@ internal sealed class TrayApp : ApplicationContext
 
     protected override void ExitThreadCore()
     {
+        _exiting = true;
+        SystemEvents.UserPreferenceChanged -= OnUserPreferenceChanged; // statik olay: abonelik süreci tutmasın
+        _themeRetry.Dispose();
         _showWait.Unregister(null);
         _app.Dispose();
         _features.Dispose();

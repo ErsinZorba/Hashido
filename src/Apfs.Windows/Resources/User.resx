@@ -81,11 +81,11 @@
   <data name="Card.Checking" xml:space="preserve">
     <value>Checking the disk…</value>
   </data>
-  <data name="Card.DriveState" xml:space="preserve">
-    <value>Drive {0} · {1}</value>
-  </data>
   <data name="Card.Failed" xml:space="preserve">
     <value>Could not be opened</value>
+  </data>
+  <data name="Card.Free" xml:space="preserve">
+    <value>{0} free</value>
   </data>
   <data name="Card.NeedsPassword" xml:space="preserve">
     <value>Encrypted · password needed</value>
@@ -95,6 +95,12 @@
   </data>
   <data name="Card.ReadOnly" xml:space="preserve">
     <value>read-only</value>
+  </data>
+  <data name="Card.Space" xml:space="preserve">
+    <value>{1} free of {0}</value>
+  </data>
+  <data name="Card.Units" xml:space="preserve">
+    <value>bytes|KB|MB|GB|TB</value>
   </data>
   <data name="Card.Writable" xml:space="preserve">
     <value>writable (experimental)</value>
@@ -188,8 +194,8 @@
   <data name="Log.NoneYet" xml:space="preserve">
     <value>There is no log yet.</value>
   </data>
-  <data name="Main.Subtitle" xml:space="preserve">
-    <value>Your Mac disks are safe: read-only first, writable if you choose.</value>
+  <data name="Main.Disks" xml:space="preserve">
+    <value>Disks</value>
   </data>
   <data name="Main.Version" xml:space="preserve">
     <value>Version {0}</value>
@@ -230,6 +236,9 @@
   <data name="Notice.WriteRefused" xml:space="preserve">
     <value>Writing was not enabled on {0}. {1}</value>
   </data>
+  <data name="Password.Hide" xml:space="preserve">
+    <value>Hide password</value>
+  </data>
   <data name="Password.Hint" xml:space="preserve">
     <value>Hint: {0}</value>
   </data>
@@ -241,6 +250,9 @@
   </data>
   <data name="Password.Reassurance" xml:space="preserve">
     <value>The disk is only read; the password is not saved anywhere.</value>
+  </data>
+  <data name="Password.Show" xml:space="preserve">
+    <value>Show password</value>
   </data>
   <data name="Password.Title" xml:space="preserve">
     <value>{0}: encrypted volume</value>

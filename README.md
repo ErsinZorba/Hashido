@@ -25,7 +25,7 @@ Plug the disk in and within a few seconds it shows up in File Explorer with a dr
 | 10 interface languages | English, Türkçe, Deutsch, Français, Español, Português (Brasil), Italiano, 日本語, 简体中文, 한국어 |
 
 ## Installation
-Run `Hashido-Setup-1.4.1.exe` and follow the wizard (Next › Install › Finish). Windows 10/11 (64-bit) is all you need;
+Run `Hashido-Setup-1.5.0.exe` and follow the wizard (Next › Install › Finish). Windows 10/11 (64-bit) is all you need;
 nothing else has to be installed: .NET comes with the program, and if the [WinFsp](https://winfsp.dev) driver is missing the wizard
 installs it too. After installation, **Hashido** is in the Start menu and the tray icon starts automatically at every sign-in.
 

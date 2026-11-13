@@ -81,11 +81,11 @@
   <data name="Card.Checking" xml:space="preserve">
     <value>Datenträger wird geprüft…</value>
   </data>
-  <data name="Card.DriveState" xml:space="preserve">
-    <value>Laufwerk {0} · {1}</value>
-  </data>
   <data name="Card.Failed" xml:space="preserve">
     <value>Konnte nicht geöffnet werden</value>
+  </data>
+  <data name="Card.Free" xml:space="preserve">
+    <value>{0} frei</value>
   </data>
   <data name="Card.NeedsPassword" xml:space="preserve">
     <value>Verschlüsselt · Passwort erforderlich</value>
@@ -95,6 +95,12 @@
   </data>
   <data name="Card.ReadOnly" xml:space="preserve">
     <value>schreibgeschützt</value>
+  </data>
+  <data name="Card.Space" xml:space="preserve">
+    <value>{1} frei von {0}</value>
+  </data>
+  <data name="Card.Units" xml:space="preserve">
+    <value>Bytes|KB|MB|GB|TB</value>
   </data>
   <data name="Card.Writable" xml:space="preserve">
     <value>beschreibbar (experimentell)</value>
@@ -188,8 +194,8 @@
   <data name="Log.NoneYet" xml:space="preserve">
     <value>Es gibt noch kein Protokoll.</value>
   </data>
-  <data name="Main.Subtitle" xml:space="preserve">
-    <value>Ihre Mac-Datenträger sind sicher: zuerst schreibgeschützt, beschreibbar, wenn Sie es wünschen.</value>
+  <data name="Main.Disks" xml:space="preserve">
+    <value>Datenträger</value>
   </data>
   <data name="Main.Version" xml:space="preserve">
     <value>Version {0}</value>
@@ -230,6 +236,9 @@
   <data name="Notice.WriteRefused" xml:space="preserve">
     <value>Das Schreiben auf {0} wurde nicht aktiviert. {1}</value>
   </data>
+  <data name="Password.Hide" xml:space="preserve">
+    <value>Passwort ausblenden</value>
+  </data>
   <data name="Password.Hint" xml:space="preserve">
     <value>Hinweis: {0}</value>
   </data>
@@ -241,6 +250,9 @@
   </data>
   <data name="Password.Reassurance" xml:space="preserve">
     <value>Der Datenträger wird nur gelesen; das Passwort wird nirgends gespeichert.</value>
+  </data>
+  <data name="Password.Show" xml:space="preserve">
+    <value>Passwort anzeigen</value>
   </data>
   <data name="Password.Title" xml:space="preserve">
     <value>{0}: verschlüsseltes Volume</value>

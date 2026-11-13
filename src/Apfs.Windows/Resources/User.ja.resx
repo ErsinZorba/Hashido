@@ -81,11 +81,11 @@
   <data name="Card.Checking" xml:space="preserve">
     <value>ディスクを確認しています…</value>
   </data>
-  <data name="Card.DriveState" xml:space="preserve">
-    <value>ドライブ {0} · {1}</value>
-  </data>
   <data name="Card.Failed" xml:space="preserve">
     <value>開けませんでした</value>
+  </data>
+  <data name="Card.Free" xml:space="preserve">
+    <value>空き領域 {0}</value>
   </data>
   <data name="Card.NeedsPassword" xml:space="preserve">
     <value>暗号化 · パスワードが必要</value>
@@ -95,6 +95,12 @@
   </data>
   <data name="Card.ReadOnly" xml:space="preserve">
     <value>読み取り専用</value>
+  </data>
+  <data name="Card.Space" xml:space="preserve">
+    <value>空き領域 {1}/{0}</value>
+  </data>
+  <data name="Card.Units" xml:space="preserve">
+    <value>バイト|KB|MB|GB|TB</value>
   </data>
   <data name="Card.Writable" xml:space="preserve">
     <value>書き込み可能（試験的）</value>
@@ -188,8 +194,8 @@
   <data name="Log.NoneYet" xml:space="preserve">
     <value>ログはまだありません。</value>
   </data>
-  <data name="Main.Subtitle" xml:space="preserve">
-    <value>Mac のディスクは安全です。まずは読み取り専用で、必要なら書き込みもできます。</value>
+  <data name="Main.Disks" xml:space="preserve">
+    <value>ディスク</value>
   </data>
   <data name="Main.Version" xml:space="preserve">
     <value>バージョン {0}</value>
@@ -230,6 +236,9 @@
   <data name="Notice.WriteRefused" xml:space="preserve">
     <value>{0} では書き込みが有効になりませんでした。{1}</value>
   </data>
+  <data name="Password.Hide" xml:space="preserve">
+    <value>パスワードを隠す</value>
+  </data>
   <data name="Password.Hint" xml:space="preserve">
     <value>ヒント：{0}</value>
   </data>
@@ -241,6 +250,9 @@
   </data>
   <data name="Password.Reassurance" xml:space="preserve">
     <value>ディスクは読み取られるだけです。パスワードはどこにも保存されません。</value>
+  </data>
+  <data name="Password.Show" xml:space="preserve">
+    <value>パスワードを表示</value>
   </data>
   <data name="Password.Title" xml:space="preserve">
     <value>{0}：暗号化されたボリューム</value>

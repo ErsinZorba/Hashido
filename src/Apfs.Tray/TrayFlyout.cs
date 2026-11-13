@@ -5,8 +5,8 @@ using Apfs.Windows;
 namespace Apfs.Tray;
 
 /// <summary>
-/// Tepsi simgesine sol tıklayınca saatin üstünde açılan küçük panel: diskler, "Aç" / "Kilidi aç" / "Güvenle çıkar" ve
-/// "Ana pencereyi aç". Başka bir yere tıklanınca kapanır.
+/// Tepsi simgesine sol tıklayınca saatin üstünde açılan küçük panel: başlıkta mühür, "Yeniden tara" ve "Ana pencereyi aç";
+/// diskler, "Aç" / "Kilidi aç" / "Güvenle çıkar". Başka bir yere tıklanınca kapanır.
 /// </summary>
 internal sealed class TrayFlyout : Form
 {
@@ -24,47 +24,48 @@ internal sealed class TrayFlyout : Form
         StartPosition = FormStartPosition.Manual;
         TopMost = true;
         AutoScaleMode = AutoScaleMode.None;
-        BackColor = Theme.Background;
+        BackColor = Theme.Paper;
+        ForeColor = Theme.Ink;
         Font = Theme.Body;
+        Theme.ApplyFrame(this); // Windows 11'in yuvarlak köşe kenarlığı da koyu olsun
         Width = this.S(360);
         Padding = new Padding(1); // ince kenarlık (Windows 10'da köşe yuvarlatma yok)
 
+        // Başlık: mühür, "Hashido", sağda yeniden tara ve ana pencere (simge düğmeleri; metinleri araç ipucu)
         var header = new TableLayoutPanel
         {
-            Dock = DockStyle.Top, AutoSize = true, ColumnCount = 2, BackColor = Theme.Background,
-            Padding = new Padding(this.S(14), this.S(12), this.S(14), this.S(6)),
+            Dock = DockStyle.Top, AutoSize = true, ColumnCount = 4, BackColor = Theme.Paper,
+            Padding = new Padding(this.S(16), this.S(10), this.S(8), this.S(4)),
         };
         header.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         header.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        header.Controls.Add(new PictureBox
-        {
-            Image = Theme.AppIcon(32).ToBitmap(), SizeMode = PictureBoxSizeMode.Zoom, Size = new Size(this.S(22), this.S(22)),
-            Margin = new Padding(0, 0, this.S(8), 0),
-        }, 0, 0);
+        header.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        header.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        header.Controls.Add(new MarkView(seal: true, this.S(20)) { Anchor = AnchorStyles.Left, Margin = new Padding(0, 0, this.S(10), 0) }, 0, 0);
         header.Controls.Add(new Label
         {
-            Text = Branding.ProductName, Font = Theme.Bold, ForeColor = Theme.Text, AutoSize = true, Anchor = AnchorStyles.Left,
+            Text = Branding.ProductName, Font = Theme.Heading(12f), ForeColor = Theme.Ink, AutoSize = true, UseMnemonic = false,
+            Anchor = AnchorStyles.Left, Margin = Padding.Empty,
         }, 1, 0);
+        var rescan = new FriendlyButton(WinText.U("Action.Rescan"), FriendlyButton.Kind.Icon, Glyphs.Icon.Refresh)
+        {
+            BusyText = WinText.U("Action.Rescanning"), Anchor = AnchorStyles.Right, Margin = Padding.Empty,
+        };
+        rescan.Click += async (_, _) => await _app.RescanAsync();
+        var main = new FriendlyButton(WinText.U("Action.OpenMain"), FriendlyButton.Kind.Icon, Glyphs.Icon.Out)
+        {
+            Anchor = AnchorStyles.Right, Margin = Padding.Empty,
+        };
+        main.Click += (_, _) => { Hide(); openMain(); };
+        header.Controls.Add(rescan, 2, 0);
+        header.Controls.Add(main, 3, 0);
 
         _list = new DiskListView(app, compact: true)
         {
-            Dock = DockStyle.Fill, Padding = new Padding(this.S(12), this.S(2), this.S(12), 0),
+            Dock = DockStyle.Fill, Padding = new Padding(this.S(16), this.S(4), this.S(16), this.S(6)),
         };
-
-        var footer = new FlowLayoutPanel
-        {
-            Dock = DockStyle.Bottom, AutoSize = true, BackColor = Theme.Background, FlowDirection = FlowDirection.LeftToRight,
-            Padding = new Padding(this.S(8), this.S(2), this.S(8), this.S(8)),
-        };
-        var main = new FriendlyButton(WinText.U("Action.OpenMain"), FriendlyButton.Kind.Quiet);
-        main.Click += (_, _) => { Hide(); openMain(); };
-        var rescan = new FriendlyButton(WinText.U("Action.Rescan"), FriendlyButton.Kind.Quiet) { BusyText = WinText.U("Action.Rescanning") };
-        rescan.Click += async (_, _) => await _app.RescanAsync();
-        footer.Controls.Add(main);
-        footer.Controls.Add(rescan);
 
         Controls.Add(_list);
-        Controls.Add(footer);
         Controls.Add(header);
 
         _app.Changed += () =>
@@ -73,6 +74,8 @@ internal sealed class TrayFlyout : Form
             _list.Rebuild();
             if (Visible) FitHeight();
         };
+        // Doluluk satırı gelince/gidince satır boyu değişir (liste kendini yerinde günceller; bu abonelik ondan sonra çalışır)
+        _app.SpaceChanged += () => { if (Visible) FitHeight(); };
         _fade.Tick += (_, _) => FadeStep();
     }
 
@@ -99,7 +102,7 @@ internal sealed class TrayFlyout : Form
     protected override void OnPaintBackground(PaintEventArgs e)
     {
         base.OnPaintBackground(e);
-        using var pen = new Pen(Theme.CardBorder);
+        using var pen = new Pen(Theme.Hair);
         e.Graphics.DrawRectangle(pen, 0, 0, Width - 1, Height - 1);
     }
 
@@ -151,6 +154,7 @@ internal sealed class TrayFlyout : Form
     protected override void OnVisibleChanged(EventArgs e)
     {
         base.OnVisibleChanged(e);
+        _app.WatchSpace(this, Visible); // boş alan yalnız panel (ya da ana pencere) açıkken sorulur
         if (!Visible)
         {
             _hiddenAt = Environment.TickCount64;

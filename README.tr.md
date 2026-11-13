@@ -25,7 +25,7 @@ Diski takarsınız, birkaç saniye içinde Dosya Gezgini'nde sürücü harfi ola
 | 10 arayüz dili | Türkçe, English, Deutsch, Français, Español, Português (Brasil), Italiano, 日本語, 简体中文, 한국어 |
 
 ## Kurulum
-`Hashido-Setup-1.4.1.exe` dosyasını çalıştırın ve sihirbazı izleyin (İleri › Kur › Son). Windows 10/11 (64 bit) yeter;
+`Hashido-Setup-1.5.0.exe` dosyasını çalıştırın ve sihirbazı izleyin (İleri › Kur › Son). Windows 10/11 (64 bit) yeter;
 başka bir şey kurmanız gerekmez: .NET programla birlikte gelir, [WinFsp](https://winfsp.dev) sürücüsü yoksa sihirbaz onu da kurar.
 Kurulumdan sonra Başlat menüsünde **Hashido** bulunur ve tepsi simgesi her oturumda kendiliğinden açılır.
 

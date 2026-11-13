@@ -8,7 +8,8 @@ using Apfs.Windows.Localization;
 namespace Apfs.Tray;
 
 /// <summary>
-/// Ana pencere: bağlı Mac diskleri kart olarak, altta "Yeniden tara" ve "Günlüğü aç". Kapatınca tepsiye gizlenir;
+/// Ana pencere: üstte "Diskler" + yeniden tara / ayarlar, bağlı Mac diskleri defter düzeninde, altta günlük, dil, sürüm ve
+/// 橋戸 imzası. Kapatınca tepsiye gizlenir;
 /// programdan çıkış tepsi menüsündendir (diskler arka planda bağlı kalır, bunu hizmet yapar).
 /// </summary>
 internal sealed class MainForm : Form
@@ -35,73 +36,84 @@ internal sealed class MainForm : Form
         Text = Branding.ProductName;
         Icon = Theme.AppIcon(32);
         AutoScaleMode = AutoScaleMode.None;
-        BackColor = Theme.Background;
+        BackColor = Theme.Paper;
+        ForeColor = Theme.Ink;
         Font = Theme.Body;
+        Theme.ApplyFrame(this);
+        _languageMenu.Renderer = Theme.MenuRenderer;
         StartPosition = FormStartPosition.CenterScreen;
-        ClientSize = new Size(this.S(480), this.S(600));
+        ClientSize = new Size(this.S(500), this.S(600));
         MinimumSize = new Size(this.S(380), this.S(360));
 
-        // Üst: simge, ad, tek cümlelik açıklama
+        // Üst: "Diskler" başlığı, sağda yeniden tara ve ayarlar (simge düğmeleri; metinleri araç ipucu)
         var header = new TableLayoutPanel
         {
-            Dock = DockStyle.Top, AutoSize = true, ColumnCount = 2, BackColor = Theme.Background,
-            Padding = new Padding(this.S(20), this.S(20), this.S(20), this.S(12)),
+            Dock = DockStyle.Top, AutoSize = true, ColumnCount = 3, BackColor = Theme.Paper,
+            Padding = new Padding(this.S(24), this.S(18), this.S(18), this.S(14)),
         };
-        header.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         header.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        var logo = new PictureBox
-        {
-            Image = Theme.AppIcon(256).ToBitmap(), SizeMode = PictureBoxSizeMode.Zoom, Size = new Size(this.S(44), this.S(44)),
-            Margin = new Padding(0, 0, this.S(14), 0),
-        };
-        header.Controls.Add(logo, 0, 0);
-        header.SetRowSpan(logo, 2);
-        header.Controls.Add(new Label { Text = Branding.ProductName, Font = Theme.Title, ForeColor = Theme.Text, AutoSize = true, Margin = Padding.Empty }, 1, 0);
+        header.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        header.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         header.Controls.Add(new Label
         {
-            Text = WinText.U("Main.Subtitle"), ForeColor = Theme.Muted, AutoSize = true, Margin = new Padding(0, this.S(2), 0, 0),
-        }, 1, 1);
+            Text = WinText.U("Main.Disks"), Font = Theme.Heading(18f), ForeColor = Theme.Ink, AutoSize = true, UseMnemonic = false,
+            Anchor = AnchorStyles.Left, Margin = Padding.Empty,
+        }, 0, 0);
+        _rescan = new FriendlyButton(WinText.U("Action.Rescan"), FriendlyButton.Kind.Icon, Glyphs.Icon.Refresh)
+        {
+            BusyText = WinText.U("Action.Rescanning"), Anchor = AnchorStyles.Right, Margin = Padding.Empty,
+        };
+        _rescan.Click += async (_, _) => await _app.RescanAsync();
+        var settings = new FriendlyButton(WinText.U("Action.Settings"), FriendlyButton.Kind.Icon, Glyphs.Icon.Settings)
+        {
+            Anchor = AnchorStyles.Right, Margin = Padding.Empty,
+        };
+        settings.Click += (_, _) => ShowSettings();
+        header.Controls.Add(_rescan, 1, 0);
+        header.Controls.Add(settings, 2, 0);
 
         _list = new DiskListView(app, compact: false)
         {
-            Dock = DockStyle.Fill, Padding = new Padding(this.S(20), this.S(4), this.S(20), this.S(4)), DialogOwner = this,
+            Dock = DockStyle.Fill, Padding = new Padding(this.S(24), this.S(4), this.S(24), this.S(4)), DialogOwner = this,
         };
 
-        // Alt: işlemler ve sürüm
-        var footer = new TableLayoutPanel
+        // Alt: günlük, dil, sürüm (Hakkında), sağda küçük 橋戸 imzası; üstünde ince çizgi
+        var footer = new FooterPanel
         {
-            Dock = DockStyle.Bottom, AutoSize = true, ColumnCount = 5, BackColor = Theme.Background,
-            Padding = new Padding(this.S(16), this.S(8), this.S(20), this.S(14)),
+            Dock = DockStyle.Bottom, AutoSize = true, ColumnCount = 5, BackColor = Theme.Paper,
+            Padding = new Padding(this.S(18), this.S(8), this.S(24), this.S(10)),
         };
         footer.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         footer.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         footer.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         footer.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        _rescan = new FriendlyButton(WinText.U("Action.Rescan"), FriendlyButton.Kind.Secondary) { BusyText = WinText.U("Action.Rescanning") };
-        _rescan.Click += async (_, _) => await _app.RescanAsync();
-        var log = new FriendlyButton(WinText.U("Action.OpenLog"), FriendlyButton.Kind.Quiet);
+        var log = new FriendlyButton(WinText.U("Action.OpenLog"), FriendlyButton.Kind.Quiet) { Font = Theme.Small };
         log.Click += (_, _) => AppController.OpenLog();
         string version = Application.ProductVersion.Split('+')[0];
-        var settings = new FriendlyButton(WinText.U("Action.Settings"), FriendlyButton.Kind.Quiet);
-        settings.Click += (_, _) => ShowSettings();
-        footer.Controls.Add(_rescan, 0, 0);
-        footer.Controls.Add(log, 1, 0);
-        footer.Controls.Add(settings, 2, 0);
-        var about = new FriendlyButton(WinText.U("Main.Version", version), FriendlyButton.Kind.Quiet) { Anchor = AnchorStyles.Right, Font = Theme.Small };
+        var about = new FriendlyButton(WinText.U("Main.Version", version), FriendlyButton.Kind.Quiet) { Font = Theme.Small };
         about.Click += (_, _) => ShowAbout(version);
         // Dil: geçerli dilin kendi dilindeki adı; tıklayınca seçim menüsü (sade, göze batmayan)
         string current = Languages.Supported.FirstOrDefault(l => l.Name == CultureInfo.CurrentUICulture.Name).NativeName ?? "English";
-        var language = new FriendlyButton(current, FriendlyButton.Kind.Quiet) { Anchor = AnchorStyles.Right, Font = Theme.Small };
+        var language = new FriendlyButton(current, FriendlyButton.Kind.Quiet) { Font = Theme.Small };
         language.Click += (_, _) => ShowLanguageMenu(language);
-        footer.Controls.Add(language, 3, 0);
-        footer.Controls.Add(about, 4, 0);
+        var signature = new Label
+        {
+            Text = "橋戸", Font = Theme.Signature, ForeColor = Theme.InkSoft, AutoSize = true, UseMnemonic = false,
+            Anchor = AnchorStyles.Right, Margin = new Padding(this.S(8), 0, 0, 0), AccessibleRole = AccessibleRole.StaticText,
+        };
+        footer.Controls.Add(log, 0, 0);
+        footer.Controls.Add(language, 1, 0);
+        footer.Controls.Add(about, 2, 0);
+        footer.Controls.Add(signature, 4, 0);
 
-        // Yeni sürüm bağlantısı (yalnız bilinen daha yeni bir sürüm varken ve bildirim açıkken)
+        // Yeni sürüm: sakin bilgi satırı (yalnız bilinen daha yeni bir sürüm varken ve bildirim açıkken)
         _update = new LinkLabel
         {
-            Dock = DockStyle.Bottom, AutoSize = true, Visible = false, UseMnemonic = false, BackColor = Theme.Background,
-            LinkColor = Theme.Accent, ActiveLinkColor = Theme.AccentPressed, Padding = new Padding(this.S(24), this.S(4), this.S(20), 0),
+            Dock = DockStyle.Bottom, AutoSize = true, Visible = false, UseMnemonic = false, BackColor = Theme.Paper,
+            ForeColor = Theme.InkSoft, LinkColor = Theme.Ink, ActiveLinkColor = Theme.Ink, VisitedLinkColor = Theme.Ink,
+            LinkBehavior = LinkBehavior.HoverUnderline, Font = Theme.Small,
+            Padding = new Padding(this.S(24), this.S(6), this.S(24), this.S(4)),
         };
         _update.LinkClicked += (_, _) =>
         {
@@ -138,7 +150,7 @@ internal sealed class MainForm : Form
     {
         using var f = new SettingsForm(_features?.Sent ?? new Apfs.Windows.Reporting.SentLog(
             Path.Combine(Apfs.Windows.Reporting.ReportRecorder.DefaultUserDirectory, "sent.jsonl")));
-        if (f.ShowDialog(this) != DialogResult.OK) return;
+        if (AppController.Modal(() => f.ShowDialog(this)) != DialogResult.OK) return;
         if (UserSettings.ReportsConsent != f.Reports)
         {
             UserSettings.ReportsConsent = f.Reports;
@@ -196,7 +208,7 @@ internal sealed class MainForm : Form
             Buttons = { TaskDialogButton.OK },
         };
         page.LinkClicked += (_, e) => Process.Start(new ProcessStartInfo(e.LinkHref) { UseShellExecute = true });
-        TaskDialog.ShowDialog(this, page);
+        AppController.Modal(() => TaskDialog.ShowDialog(this, page));
     }
 
     /// <summary>Gizliyse gösterir, simge durumundaysa geri getirir ve öne alır.</summary>
@@ -206,6 +218,12 @@ internal sealed class MainForm : Form
         if (WindowState == FormWindowState.Minimized) WindowState = FormWindowState.Normal;
         Activate();
         BringToFront();
+    }
+
+    protected override void OnVisibleChanged(EventArgs e)
+    {
+        base.OnVisibleChanged(e);
+        _app.WatchSpace(this, Visible); // boş alan yalnız pencere (ya da panel) açıkken sorulur
     }
 
     protected override void OnFormClosing(FormClosingEventArgs e)
@@ -229,9 +247,23 @@ internal sealed class MainForm : Form
         if (disposing)
         {
             _app.Changed -= OnChanged;
+            _app.WatchSpace(this, false);
             if (_features is not null) _features.UpdateChanged -= RefreshUpdateLink;
             _languageMenu.Dispose();
         }
         base.Dispose(disposing);
+    }
+
+    /// <summary>Alt çubuk: üstünde dolgunun içinde ince çizgi.</summary>
+    private sealed class FooterPanel : TableLayoutPanel
+    {
+        public FooterPanel() => DoubleBuffered = true;
+
+        protected override void OnPaint(PaintEventArgs e)
+        {
+            base.OnPaint(e);
+            using var pen = new Pen(Theme.Hair, 1);
+            e.Graphics.DrawLine(pen, Padding.Left + this.S(6), 0, Width - Padding.Right, 0);
+        }
     }
 }

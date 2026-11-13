@@ -30,8 +30,10 @@ internal sealed class SettingsForm : Form
         AutoScaleMode = AutoScaleMode.None;
         AutoSize = true;
         AutoSizeMode = AutoSizeMode.GrowAndShrink;
-        BackColor = Theme.Background;
+        BackColor = Theme.Paper;
+        ForeColor = Theme.Ink;
         Font = Theme.Body;
+        Theme.ApplyFrame(this);
         int width = this.S(400);
 
         Label Line(string t, Font f, Color c, int top = 0) => new()
@@ -43,23 +45,26 @@ internal sealed class SettingsForm : Form
         CheckBox Check(string t, bool value)
         {
             var text = TextRenderer.MeasureText(t, Theme.Body, new Size(width - this.S(24), 0), TextFormatFlags.WordBreak);
-            return new CheckBox
+            var check = new CheckBox
             {
                 Text = t, Checked = value, AutoSize = false, Width = width, Height = Math.Max(this.S(24), text.Height + this.S(6)),
                 CheckAlign = ContentAlignment.TopLeft, TextAlign = ContentAlignment.TopLeft, UseMnemonic = false, Font = Theme.Body,
-                Margin = new Padding(0, this.S(6), 0, 0), ForeColor = Theme.Text,
+                Margin = new Padding(0, this.S(6), 0, 0), ForeColor = Theme.Ink,
             };
+            Theme.Style(check);
+            return check;
         }
 
         var layout = new FlowLayoutPanel
         {
             FlowDirection = FlowDirection.TopDown, AutoSize = true, WrapContents = false,
-            Padding = new Padding(this.S(20), this.S(16), this.S(20), this.S(14)),
+            Padding = new Padding(this.S(26), this.S(20), this.S(26), this.S(18)),
         };
 
         // Dil
-        layout.Controls.Add(Line(WinText.U("Settings.Language"), Theme.Bold, Theme.Text));
+        layout.Controls.Add(Line(WinText.U("Settings.Language"), Theme.Heading(12f), Theme.Ink));
         _language = new ComboBox { DropDownStyle = ComboBoxStyle.DropDownList, Width = this.S(240), Margin = new Padding(0, this.S(6), 0, 0) };
+        Theme.Style(_language);
         var saved = LanguageSetting.Load();
         _cultures.Add(null);
         _language.Items.Add(WinText.U("Language.Windows"));
@@ -70,10 +75,10 @@ internal sealed class SettingsForm : Form
         }
         _language.SelectedIndex = Math.Max(0, _cultures.FindIndex(c => c?.Name == saved?.Name));
         layout.Controls.Add(_language);
-        layout.Controls.Add(Line(WinText.U("Settings.LanguageNote"), Theme.Small, Theme.Muted, 4));
+        layout.Controls.Add(Line(WinText.U("Settings.LanguageNote"), Theme.Small, Theme.InkSoft, 4));
 
         // Raporlar
-        layout.Controls.Add(Line(WinText.U("Settings.ReportsHeading"), Theme.Bold, Theme.Text, 16));
+        layout.Controls.Add(Line(WinText.U("Settings.ReportsHeading"), Theme.Heading(12f), Theme.Ink, 20));
         _reports = Check(WinText.U("Settings.Reports"), UserSettings.ReportsConsent == true);
         layout.Controls.Add(_reports);
         var row = new FlowLayoutPanel { FlowDirection = FlowDirection.LeftToRight, AutoSize = true, WrapContents = true, MaximumSize = new Size(width, 0), Margin = Padding.Empty };
@@ -87,7 +92,7 @@ internal sealed class SettingsForm : Form
         layout.Controls.Add(row);
 
         // Güncellemeler
-        layout.Controls.Add(Line(WinText.U("Settings.UpdatesHeading"), Theme.Bold, Theme.Text, 16));
+        layout.Controls.Add(Line(WinText.U("Settings.UpdatesHeading"), Theme.Heading(12f), Theme.Ink, 20));
         _updates = Check(WinText.U("Settings.UpdateNotify"), UserSettings.UpdateNotify);
         layout.Controls.Add(_updates);
 
@@ -97,7 +102,7 @@ internal sealed class SettingsForm : Form
             Margin = new Padding(0, this.S(18), 0, 0),
         };
         var ok = new FriendlyButton(WinText.U("Action.OK")) { DialogResult = DialogResult.OK };
-        var cancel = new FriendlyButton(WinText.U("Action.CancelDialog"), FriendlyButton.Kind.Secondary) { DialogResult = DialogResult.Cancel };
+        var cancel = new FriendlyButton(WinText.U("Action.CancelDialog"), FriendlyButton.Kind.Quiet) { DialogResult = DialogResult.Cancel };
         ok.Click += (_, _) => { DialogResult = DialogResult.OK; Close(); };
         cancel.Click += (_, _) => { DialogResult = DialogResult.Cancel; Close(); };
         buttons.Controls.Add(ok);
@@ -125,8 +130,10 @@ internal sealed class SentReportsForm : Form
         Icon = Theme.AppIcon(32);
         StartPosition = FormStartPosition.CenterParent;
         AutoScaleMode = AutoScaleMode.None;
-        BackColor = Theme.Background;
+        BackColor = Theme.Paper;
+        ForeColor = Theme.Ink;
         Font = Theme.Body;
+        Theme.ApplyFrame(this);
         MinimizeBox = false;
         ClientSize = new Size(this.S(560), this.S(480));
 
@@ -134,7 +141,7 @@ internal sealed class SentReportsForm : Form
         var intro = new Label
         {
             Text = lines.Count == 0 ? WinText.U("Sent.None") : WinText.U("Sent.Intro"), Dock = DockStyle.Top, AutoSize = true, UseMnemonic = false,
-            Padding = new Padding(this.S(16), this.S(14), this.S(16), this.S(8)), ForeColor = Theme.Text,
+            Padding = new Padding(this.S(16), this.S(14), this.S(16), this.S(8)), ForeColor = Theme.Ink,
             MaximumSize = new Size(this.S(560), 0),
         };
         var pretty = new JsonSerializerOptions
@@ -144,13 +151,14 @@ internal sealed class SentReportsForm : Form
         var text = new TextBox
         {
             Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.Both, WordWrap = false, Dock = DockStyle.Fill,
-            Font = new Font("Consolas", 9f), BackColor = Color.White, BorderStyle = BorderStyle.None,
+            Font = new Font("Consolas", 9f), BackColor = Theme.Washi, ForeColor = Theme.Ink, BorderStyle = BorderStyle.None,
             Text = string.Join("\r\n\r\n", Enumerable.Reverse(lines).Select(l =>
             {
                 try { return JsonNode.Parse(l)!.ToJsonString(pretty).Replace("\n", "\r\n"); } catch (JsonException) { return l; }
             })),
         };
-        var holder = new Panel { Dock = DockStyle.Fill, Padding = new Padding(this.S(16), 0, this.S(16), 0), BackColor = Theme.Background };
+        Theme.DarkScrollbars(text);
+        var holder = new Panel { Dock = DockStyle.Fill, Padding = new Padding(this.S(16), 0, this.S(16), 0), BackColor = Theme.Paper };
         holder.Controls.Add(text);
         var footer = new FlowLayoutPanel
         {

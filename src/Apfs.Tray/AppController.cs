@@ -23,6 +23,7 @@ internal sealed class AppController : IDisposable
     public AppController()
     {
         _timer.Tick += async (_, _) => await PollAsync();
+        _spaceTimer.Tick += (_, _) => RefreshSpace();
     }
 
     public StatusResponse? Status { get; private set; }
@@ -42,6 +43,22 @@ internal sealed class AppController : IDisposable
     /// <summary>Diskin yazma durumu değişen bölümleri.</summary>
     public IEnumerable<int> SwitchingContainers(string diskId) =>
         _switching.Where(k => k.StartsWith(diskId + "#", StringComparison.Ordinal)).Select(k => int.Parse(k.AsSpan(diskId.Length + 1)));
+
+    // ---------------- Boşta mı (1.5.0 P3) ----------------
+    // Windows teması değişince tepsi yeniden başlar; açık bir pencereyi ya da süren bir işi kesmesin diye yalnız boştayken.
+
+    private static int _openDialogs; // yalnız arayüz iş parçacığında değişir
+
+    /// <summary>Kalıcı (modal) pencere gösterir (ShowDialog, TaskDialog, MessageBox); açıkken tepsi yeniden başlamaz.</summary>
+    public static T Modal<T>(Func<T> show)
+    {
+        _openDialogs++;
+        try { return show(); }
+        finally { _openDialogs--; }
+    }
+
+    /// <summary>Açık kalıcı pencere yok; çıkarma, yazma durumu değişimi, kilit açma, yeniden tarama sürmüyor.</summary>
+    public bool Idle => _openDialogs == 0 && _ejecting.Count == 0 && _switching.Count == 0 && _unlocking.Count == 0 && !Rescanning;
 
     public IEnumerable<VolumeStatus> MountedVolumes =>
         Status?.Disks.SelectMany(d => d.Volumes).Where(v => v.State == VolumeStatus.Mounted) ?? [];
@@ -83,7 +100,88 @@ internal sealed class AppController : IDisposable
         string sig = JsonSerializer.Serialize(new { ServiceDown, Rescanning, Disks = ServiceDown ? null : Status?.Disks, Ejecting = _ejecting.Order(), Switching = _switching.Order() });
         if (sig == _signature) return;
         _signature = sig;
+        // Artık bağlı olmayan harflerin alanını unut (aynı harfe başka birim bağlanırsa eski değer görünmesin)
+        var mounted = MountedVolumes.Select(v => v.MountPoint).OfType<string>().ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var gone in _space.Keys.Where(k => !mounted.Contains(k)).ToList()) _space.Remove(gone);
         Changed?.Invoke();
+        RefreshSpace(); // yeni bağlanan birimin alanı 10 sn beklemeden gelsin
+    }
+
+    // ---------------- Boş alan (1.5.0) ----------------
+    // Hizmet ve protokol değişmez: bağlı birimin sürücü harfi tepsinin kendi sürecinde DriveInfo ile okunur. Alan durum imzasına
+    // girmez (her kopyalamada liste yeniden kurulmasın); değişince ayrı SpaceChanged olayı çubuğu ve yazıyı yerinde günceller.
+
+    private static readonly TimeSpan SpaceTimeout = TimeSpan.FromSeconds(2);
+    private readonly System.Windows.Forms.Timer _spaceTimer = new() { Interval = 10000 };
+    private readonly Dictionary<string, DriveSpace> _space = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> _spaceQuerying = new(StringComparer.OrdinalIgnoreCase); // sorgusu dönmemiş harfler
+    private readonly HashSet<object> _spaceWatchers = [];
+
+    /// <summary>Bir birimin alanı değişti, geldi ya da (hata, zaman aşımı) gitti.</summary>
+    public event Action? SpaceChanged;
+
+    /// <summary>Sürücü harfinin bilinen son alanı; bilinmiyorsa (henüz sorulmadı, hata, zaman aşımı) null.</summary>
+    public DriveSpace? Space(string? mountPoint) =>
+        mountPoint is not null && _space.TryGetValue(mountPoint, out var s) ? s : null;
+
+    /// <summary>
+    /// Alanı gösteren pencere görünür oldu / gizlendi. Sorgu yalnız en az biri (ana pencere ya da panel) açıkken 10 sn'de bir
+    /// yapılır; açılınca hemen.
+    /// </summary>
+    public void WatchSpace(object watcher, bool visible)
+    {
+        if (_disposed || (visible ? !_spaceWatchers.Add(watcher) : !_spaceWatchers.Remove(watcher))) return;
+        _spaceTimer.Enabled = _spaceWatchers.Count > 0;
+        if (visible) RefreshSpace();
+    }
+
+    private void RefreshSpace()
+    {
+        if (_spaceWatchers.Count == 0 || ServiceDown) return;
+        foreach (var v in MountedVolumes)
+            if (v.MountPoint is { Length: > 0 } mp) _ = QuerySpaceAsync(mp);
+    }
+
+    /// <summary>
+    /// Harfin alanını arka planda okur, en çok 2 sn bekler. Önceki sorgu dönmeden aynı harf için yenisi başlamaz: asılı bir
+    /// sürücüde (ör. WinFsp yanıt vermiyor) en çok bir iş parçacığı takılır, arayüz hiç beklemez. Bayrak ve sözlük yalnız
+    /// arayüz iş parçacığında değişir (await arayüz bağlamına döner).
+    /// </summary>
+    private async Task QuerySpaceAsync(string mountPoint)
+    {
+        if (!_spaceQuerying.Add(mountPoint)) return;
+        try
+        {
+            var query = Task.Run(() => ReadSpace(mountPoint));
+            var value = await Task.WhenAny(query, Task.Delay(SpaceTimeout)) == query ? query.Result : null;
+            StoreSpace(mountPoint, value);
+            await query; // zaman aşımında da: iş parçacığı dönene kadar bu harf yeniden sorulmaz
+        }
+        finally { _spaceQuerying.Remove(mountPoint); }
+    }
+
+    private static DriveSpace? ReadSpace(string mountPoint)
+    {
+        try
+        {
+            var d = new DriveInfo(mountPoint);
+            long total = d.TotalSize;
+            return total > 0 ? new DriveSpace(total, Math.Clamp(d.AvailableFreeSpace, 0, total)) : null;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException or System.Security.SecurityException)
+        {
+            return null;
+        }
+    }
+
+    private void StoreSpace(string mountPoint, DriveSpace? value)
+    {
+        // Sorgu sürerken birim ayrıldıysa yazma
+        if (value is not null && !MountedVolumes.Any(m => string.Equals(m.MountPoint, mountPoint, StringComparison.OrdinalIgnoreCase))) return;
+        if (Space(mountPoint) == value) return;
+        if (value is { } s) _space[mountPoint] = s;
+        else _space.Remove(mountPoint);
+        SpaceChanged?.Invoke();
     }
 
     private void ShowNotices(List<Notice> notices)
@@ -128,7 +226,7 @@ internal sealed class AppController : IDisposable
         while (true)
         {
             using var form = new PasswordForm(v.Name, v.Hint, error);
-            if (form.ShowDialog() != DialogResult.OK) return;
+            if (Modal(form.ShowDialog) != DialogResult.OK) return;
             UnlockResponse? r;
             try
             {
@@ -168,7 +266,7 @@ internal sealed class AppController : IDisposable
                 r = await SendEjectAsync(d.Id, force: true);
             }
             if (r is not { Ok: true })
-                MessageBox.Show(owner, r?.Message ?? WinText.U("Eject.Failed"), Branding.ProductName, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                Modal(() => MessageBox.Show(owner, r?.Message ?? WinText.U("Eject.Failed"), Branding.ProductName, MessageBoxButtons.OK, MessageBoxIcon.Warning));
         }
         finally
         {
@@ -204,7 +302,7 @@ internal sealed class AppController : IDisposable
             DefaultButton = cancel,
             AllowCancel = true,
         };
-        var result = owner is null ? TaskDialog.ShowDialog(page, TaskDialogStartupLocation.CenterScreen) : TaskDialog.ShowDialog(owner, page);
+        var result = Modal(() => owner is null ? TaskDialog.ShowDialog(page, TaskDialogStartupLocation.CenterScreen) : TaskDialog.ShowDialog(owner, page));
         return result == eject;
     }
 
@@ -231,8 +329,8 @@ internal sealed class AppController : IDisposable
                 r = await SendSetWritableAsync(d.Id, container, enable, force: true);
             }
             if (r is not { Ok: true })
-                MessageBox.Show(owner, r?.Message ?? WinText.U("Error.OperationFailed"), enable ? WinText.U("Write.EnableFailedTitle") : Branding.ProductName,
-                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                Modal(() => MessageBox.Show(owner, r?.Message ?? WinText.U("Error.OperationFailed"), enable ? WinText.U("Write.EnableFailedTitle") : Branding.ProductName,
+                    MessageBoxButtons.OK, MessageBoxIcon.Information));
         }
         finally
         {
@@ -269,7 +367,7 @@ internal sealed class AppController : IDisposable
             DefaultButton = cancel,
             AllowCancel = true,
         };
-        var result = owner is null ? TaskDialog.ShowDialog(page, TaskDialogStartupLocation.CenterScreen) : TaskDialog.ShowDialog(owner, page);
+        var result = Modal(() => owner is null ? TaskDialog.ShowDialog(page, TaskDialogStartupLocation.CenterScreen) : TaskDialog.ShowDialog(owner, page));
         return result == allow;
     }
 
@@ -287,7 +385,7 @@ internal sealed class AppController : IDisposable
             DefaultButton = cancel,
             AllowCancel = true,
         };
-        var result = owner is null ? TaskDialog.ShowDialog(page, TaskDialogStartupLocation.CenterScreen) : TaskDialog.ShowDialog(owner, page);
+        var result = Modal(() => owner is null ? TaskDialog.ShowDialog(page, TaskDialogStartupLocation.CenterScreen) : TaskDialog.ShowDialog(owner, page));
         return result == go;
     }
 
@@ -315,15 +413,30 @@ internal sealed class AppController : IDisposable
     {
         string path = File.Exists(ServiceLog.PathName) ? ServiceLog.PathName : ServiceLog.FallbackPathName;
         if (File.Exists(path)) Process.Start(new ProcessStartInfo("notepad.exe", $"\"{path}\"") { UseShellExecute = true });
-        else MessageBox.Show(WinText.U("Log.NoneYet"), Branding.ProductName);
+        else Modal(() => MessageBox.Show(WinText.U("Log.NoneYet"), Branding.ProductName));
     }
 
     public static void ShowDetails(IWin32Window? owner, VolumeStatus v) =>
-        MessageBox.Show(owner, v.Message ?? WinText.U("Error.Unknown"), $"{Branding.ProductName}: {v.Name}", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        Modal(() => MessageBox.Show(owner, v.Message ?? WinText.U("Error.Unknown"), $"{Branding.ProductName}: {v.Name}", MessageBoxButtons.OK, MessageBoxIcon.Warning));
+
+    private bool _disposed;
 
     public void Dispose()
     {
+        _disposed = true;
         _timer.Stop();
         _timer.Dispose();
+        _spaceTimer.Stop();
+        _spaceTimer.Dispose();
     }
+}
+
+/// <summary>Birimin toplam ve (bu kullanıcı için) boş alanı, bayt.</summary>
+internal readonly record struct DriveSpace(long Total, long Free)
+{
+    /// <summary>Kullanılan oran (0–1).</summary>
+    public double Used => Total <= 0 ? 0 : (double)(Total - Free) / Total;
+
+    /// <summary>Boş alan %10'dan az: zinober (dikkat).</summary>
+    public bool Low => Free < Total / 10;
 }

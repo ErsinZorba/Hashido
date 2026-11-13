@@ -81,11 +81,11 @@
   <data name="Card.Checking" xml:space="preserve">
     <value>Comprobando el disco…</value>
   </data>
-  <data name="Card.DriveState" xml:space="preserve">
-    <value>Unidad {0} · {1}</value>
-  </data>
   <data name="Card.Failed" xml:space="preserve">
     <value>No se pudo abrir</value>
+  </data>
+  <data name="Card.Free" xml:space="preserve">
+    <value>{0} disponibles</value>
   </data>
   <data name="Card.NeedsPassword" xml:space="preserve">
     <value>Cifrado · se necesita contraseña</value>
@@ -95,6 +95,12 @@
   </data>
   <data name="Card.ReadOnly" xml:space="preserve">
     <value>solo lectura</value>
+  </data>
+  <data name="Card.Space" xml:space="preserve">
+    <value>{1} disponibles de {0}</value>
+  </data>
+  <data name="Card.Units" xml:space="preserve">
+    <value>bytes|KB|MB|GB|TB</value>
   </data>
   <data name="Card.Writable" xml:space="preserve">
     <value>con escritura (experimental)</value>
@@ -188,8 +194,8 @@
   <data name="Log.NoneYet" xml:space="preserve">
     <value>Todavía no hay ningún registro.</value>
   </data>
-  <data name="Main.Subtitle" xml:space="preserve">
-    <value>Sus discos de Mac están seguros: primero de solo lectura, con escritura si usted lo decide.</value>
+  <data name="Main.Disks" xml:space="preserve">
+    <value>Discos</value>
   </data>
   <data name="Main.Version" xml:space="preserve">
     <value>Versión {0}</value>
@@ -230,6 +236,9 @@
   <data name="Notice.WriteRefused" xml:space="preserve">
     <value>No se habilitó la escritura en {0}. {1}</value>
   </data>
+  <data name="Password.Hide" xml:space="preserve">
+    <value>Ocultar la contraseña</value>
+  </data>
   <data name="Password.Hint" xml:space="preserve">
     <value>Indicio: {0}</value>
   </data>
@@ -241,6 +250,9 @@
   </data>
   <data name="Password.Reassurance" xml:space="preserve">
     <value>El disco solo se lee; la contraseña no se guarda en ningún sitio.</value>
+  </data>
+  <data name="Password.Show" xml:space="preserve">
+    <value>Mostrar la contraseña</value>
   </data>
   <data name="Password.Title" xml:space="preserve">
     <value>{0}: volumen cifrado</value>
