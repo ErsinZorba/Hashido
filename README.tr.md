@@ -8,7 +8,7 @@ Mac'te biçimlendirilmiş **APFS** diskleri Windows 11'de normal bir sürücü g
 Diski takarsınız, birkaç saniye içinde Dosya Gezgini'nde sürücü harfi olarak belirir; dosyaları açar, kopyalarsınız.
 
 > **Önce salt okunur.** Diskler her zaman salt okunur bağlanır; program kendiliğinden diske hiçbir şey yazmaz. Bir diske yazmak
-> isterseniz kartındaki **Yazmaya izin ver** düğmesiyle o disk için ayrıca izin verirsiniz (deneysel; bkz. "Yazma"). Verilerinizin
+> isterseniz o diskin **Yazmaya izin ver** düğmesiyle ayrıca izin verirsiniz (deneysel; bkz. "Yazma"). Verilerinizin
 > güvenliği her şeyden önce gelir.
 
 ## Neler destekleniyor
@@ -40,11 +40,15 @@ raporlar ile gönderilenlerin listesi (`C:\ProgramData\APFS for Windows\reports`
 sorusuna verdiğiniz cevap silinir, yeniden kurulumda yeniden sorulur; dil ve güncelleme bildirimi ayarlarınız kalır.
 
 ## Kullanım
-- **Ana pencere** (Başlat menüsü veya tepsi menüsünden "Ana pencereyi aç"): takılı Mac diskleri kart olarak görünür. Her birimin
-  yanında **Aç** (Gezgin'de açar), şifreliyse **Kilidi aç**, açılamadıysa **Ayrıntı**; kartın altında **Güvenle çıkar**.
-  Pencereyi kapatmak programı kapatmaz; diskler bağlı kalır ve program tepside çalışmaya devam eder.
-- **Tepsi paneli**: saatin yanındaki APFS simgesine sol tıklayın; aynı işlemler küçük bir panelde. Sağ tık menüsünde
-  "Ana pencereyi aç", disk başına "güvenle çıkar", "Yeniden tara", "Günlüğü aç" ve "Çıkış" bulunur.
+- **Ana pencere** (Başlat menüsü veya tepsi menüsünden "Ana pencereyi aç"): takılı her Mac diski adıyla ve yanında **Güvenle
+  çıkar** ile listelenir; altında her birim için bir satır: sürücü harfi, boş alanı gösteren ince çubuk ("465 GB içinde 153 GB boş";
+  %10'dan az boşsa kırmızı) ve tek düğme: **Aç** (Gezgin'de açar), şifreliyse **Kilidi aç**, açılamadıysa **Ayrıntı**. "Yeniden tara"
+  ve "Ayarlar" üstteki simge düğmeleridir. Pencereyi kapatmak programı kapatmaz; diskler bağlı kalır ve program tepside çalışmaya
+  devam eder.
+- **Tepsi paneli**: saatin yanındaki Hashido simgesine (kırmızı mühür) sol tıklayın; aynı işlemler küçük bir panelde. Sağ tık
+  menüsünde "Ana pencereyi aç", disk başına "güvenle çıkar", "Yeniden tara", "Günlüğü aç" ve "Çıkış" bulunur.
+- **Açık ve koyu:** program Windows'un uygulama modunu izler (Ayarlar › Kişiselleştirme › Renkler). Modu değiştirdiğinizde program,
+  süren bir şey kalmayınca kendini yeni modda yeniden başlatır.
 
 ## Dil
 Program Windows'un görüntü dilinde açılır (Türkçe, İngilizce, Almanca, Fransızca, İspanyolca, Brezilya Portekizcesi, İtalyanca,
@@ -57,8 +61,8 @@ görürseniz lütfen [Issues](https://github.com/ErsinZorba/Hashido/issues) üze
 doğrusu).
 
 ## Yazma (deneysel)
-Diskin kartındaki **Yazmaya izin ver**'e tıklayın ve uyarıyı onaylayın. Program diski önce baştan sona denetler; her şey yolundaysa
-sürücü **yazılabilir** olarak yeniden bağlanır (kartta turuncu nokta, "yazılabilir (deneysel)"). Artık Gezgin'de dosya kopyalayabilir,
+Diskin **Yazmaya izin ver** düğmesine tıklayın ve uyarıyı onaylayın. Program diski önce baştan sona denetler; her şey yolundaysa
+sürücü **yazılabilir** olarak yeniden bağlanır (birimin altında kırmızı "Yazılabilir (deneysel)"). Artık Gezgin'de dosya kopyalayabilir,
 klasör açabilir, adlandırabilir, silebilir ve dosyaları düzenleyip kaydedebilirsiniz. **Salt okunura dön** değişiklikleri kaydedip
 diski yeniden salt okunur bağlar.
 
@@ -74,7 +78,7 @@ diski yeniden salt okunur bağlar.
   ya da hizmet durunca silinir, hiçbir yere kaydedilmez).
 - Birden çok APFS bölümü olan bir diskte (ör. Mac'te bölümlenmiş bir bellek) her bölümün kendi **«ad»: Yazmaya izin ver**
   düğmesi vardır; bir bölümü yazmaya açmak öbürlerine dokunmaz.
-- Şunlar salt okunur kalır ve nedeni kartta yazar: macOS'un şifreleme işlemi bitmemiş ya da şifrelemesi sonradan değiştirilmiş
+- Şunlar salt okunur kalır ve nedeni birimin altında yazar: macOS'un şifreleme işlemi bitmemiş ya da şifrelemesi sonradan değiştirilmiş
   birimler, donanımla (T2/Apple Silicon) veya dosya başına anahtarla şifrelenmiş birimler, anlık görüntüsü olan (ör. Time Machine)
   diskler, macOS sistem/yedek birimleri, Fusion Drive, aynı bölümde birden çok birim ve iç yapısında tutarsızlık görülen diskler.
 - Bu sürümde içeriği değiştirilemeyenler: Mac'te "Çoğalt" ile oluşturulmuş (klon) dosyalar ve macOS'un sıkıştırarak sakladığı
@@ -85,7 +89,7 @@ diski yeniden salt okunur bağlar.
   Windows erişim listeleri (ACL) ve ek veri akışları saklanmaz.
 
 ## Diski çıkarma
-Ana pencerede veya tepsi panelinde diskin kartındaki **Güvenle çıkar**'a tıklayın. Birimler ayrılır, Windows diski çıkarır ve
+Ana pencerede diskin adının yanındaki **Güvenle çıkar**'a tıklayın (tepsi panelinde: çıkarma simgesi). Birimler ayrılır, Windows diski çıkarır ve
 "Kabloyu şimdi çekebilirsiniz" bildirimi gelir. O anda diskten bir dosya açıksa veya kopyalanıyorsa program önce sorar:
 "Kopyalama sürüyor gibi görünüyor" → **Vazgeç** (kopyalama sürer) veya **Yine de çıkar** (kopyalama yarıda kalır).
 Gezgin'de sürücünün sağ tık menüsünde "Çıkar" görünmez (WinFsp sürücüleri Windows'a sanal sürücü olarak görünür). Salt okunur

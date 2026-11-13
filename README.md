@@ -8,7 +8,7 @@ A lightweight, open-source tool that lets you open Mac-formatted **APFS** disks 
 Plug the disk in and within a few seconds it shows up in File Explorer with a drive letter; open and copy your files.
 
 > **Read-only first.** Disks are always mounted read-only; the program never writes to a disk on its own. If you want to write to
-> a disk, you allow it separately for that disk with the **Allow writing** button on its card (experimental; see "Writing").
+> a disk, you allow it separately for that disk with its **Allow writing** button (experimental; see "Writing").
 > The safety of your data comes first.
 
 ## What is supported
@@ -40,12 +40,15 @@ the list of sent ones (`C:\ProgramData\APFS for Windows\reports`, `%LOCALAPPDATA
 automatic-reports question are deleted, so a reinstall asks again; your language and update-notification settings are kept.
 
 ## Usage
-- **Main window** (Start menu, or "Open main window" in the tray menu): attached Mac disks appear as cards. Next to each volume:
-  **Open** (opens it in File Explorer), **Unlock** if it is encrypted, **Details** if it could not be opened; **Safely eject** at the
-  bottom of the card. Closing the window does not close the program; the disks stay mounted and the program keeps running in the
-  notification area.
-- **Tray panel**: left-click the APFS icon next to the clock; the same actions in a small panel. The right-click menu has
-  "Open main window", "safely eject" for each disk, "Scan again", "Open log" and "Exit".
+- **Main window** (Start menu, or "Open main window" in the tray menu): each attached Mac disk is listed with its name and
+  **Safely eject** next to it; below it, one row per volume with its drive letter, a thin bar with the free space ("153 GB free of
+  465 GB"; red when less than 10% is free) and one button: **Open** (opens it in File Explorer), **Unlock** if it is encrypted,
+  **Details** if it could not be opened. "Scan again" and "Settings" are the icon buttons at the top. Closing the window does not
+  close the program; the disks stay mounted and the program keeps running in the notification area.
+- **Tray panel**: left-click the Hashido icon (the red seal) next to the clock; the same actions in a small panel. The right-click
+  menu has "Open main window", "safely eject" for each disk, "Scan again", "Open log" and "Exit".
+- **Light and dark:** the program follows Windows' app mode (Settings › Personalization › Colors). When you switch it, the program
+  restarts itself in the new mode as soon as nothing is in progress.
 
 ## Language
 The program starts in the Windows display language (English, Turkish, German, French, Spanish, Brazilian Portuguese, Italian,
@@ -59,8 +62,8 @@ translation, please report it in [Issues](https://github.com/ErsinZorba/Hashido/
 the correct wording).
 
 ## Writing (experimental)
-Click **Allow writing** on the disk's card and confirm the warning. The program first checks the whole disk; if everything is in
-order, the drive is mounted again as **writable** (orange dot on the card, "writable (experimental)"). You can now copy files, create
+Click the disk's **Allow writing** button and confirm the warning. The program first checks the whole disk; if everything is in
+order, the drive is mounted again as **writable** ("Writable (experimental)" in red under the volume). You can now copy files, create
 folders, rename, delete, and edit and save files in File Explorer. **Back to read-only** saves the changes and mounts the disk
 read-only again.
 
@@ -76,7 +79,7 @@ read-only again.
   memory; it is erased when the disk is removed or the service stops, and is never saved anywhere).
 - On a disk with more than one APFS partition (e.g. a USB stick partitioned on a Mac) each partition has its own
   **«name»: Allow writing** button; allowing writing on one partition does not touch the others.
-- These stay read-only, and the card says why: volumes whose macOS encryption has not finished or was changed later, volumes encrypted
+- These stay read-only, and the reason is shown under the volume: volumes whose macOS encryption has not finished or was changed later, volumes encrypted
   by hardware (T2/Apple Silicon) or with per-file keys, disks with snapshots (e.g. Time Machine), macOS system/backup volumes, Fusion
   Drive, several volumes in the same partition, and disks whose internal structure shows an inconsistency.
 - Files whose content cannot be changed in this version: files created with "Duplicate" on the Mac (clones) and files macOS stores
@@ -87,7 +90,7 @@ read-only again.
   Windows access lists (ACLs) and alternate data streams are not stored.
 
 ## Ejecting a disk
-Click **Safely eject** on the disk's card in the main window or the tray panel. The volumes are unmounted, Windows ejects the disk and
+Click **Safely eject** next to the disk's name in the main window (in the tray panel: the eject icon). The volumes are unmounted, Windows ejects the disk and
 the notification "You can unplug the cable now" appears. If a file on the disk is open or being copied at that moment, the program asks
 first: "A copy seems to be in progress" → **Cancel** (the copy goes on) or **Eject anyway** (the copy is cut short).
 File Explorer does not show "Eject" in the drive's right-click menu (WinFsp drives appear to Windows as virtual drives). Unplugging a
