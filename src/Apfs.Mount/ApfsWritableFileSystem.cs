@@ -35,8 +35,8 @@ public sealed class ApfsWritableFileSystem : FileSystemBase, IDisposable
     private const uint FileAttributeHidden = 0x2, FileAttributeDirectory = 0x10, FileAttributeNormal = 0x80;
 
 
-    /// <summary>Herkese tam erişim (yazılabilir birim); sahibi Yöneticiler.</summary>
-    private const string SecurityDescriptorSddl = "O:BAG:BAD:P(A;;FA;;;WD)";
+    /// <summary>SYSTEM, Yöneticiler ve etkileşimli kullanıcılar tam erişime sahip; sahibi Yöneticiler.</summary>
+    private const string SecurityDescriptorSddl = "O:BAG:BAD:P(A;;FA;;;SY)(A;;FA;;;BA)(A;;FA;;;IU)";
 
     private readonly WriteSession _session;
     private readonly VolumeWriter _vol;
