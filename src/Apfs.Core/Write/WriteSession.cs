@@ -31,6 +31,7 @@ public sealed class WriteSession : IDisposable
     private ulong _txXid;                 // açık işlemin xid'i
     private readonly List<(ulong Paddr, byte[] Block)> _pendingWrites = [];
     private bool _closed;
+    private bool _faulted;
 
     // Kapsayıcı nesne haritası (birim süper bloklarının yerleri)
     private readonly MutableBTree _cOmap;
@@ -167,6 +168,7 @@ public sealed class WriteSession : IDisposable
     public ApfsContainer Container { get; }
 
     public ulong CommittedXid => _sb.Xid;
+    public bool IsFaulted => _faulted;
     internal ulong TotalBlocks => _sb.BlockCount;
     /// <summary>Kullanılabilir boş blok sayısı (bu işlemde bırakılanlar hariç).</summary>
     public ulong FreeBlocks => _spaceman.FreeBlocks;
@@ -217,6 +219,17 @@ public sealed class WriteSession : IDisposable
     public void Commit()
     {
         ObjectDisposedException.ThrowIf(_closed, this);
+        if (_faulted) throw new ApfsException(ApfsErrorCode.IoError);
+        try { CommitCore(); }
+        catch
+        {
+            _faulted = true;
+            throw;
+        }
+    }
+
+    private void CommitCore()
+    {
         ulong xid = _txXid;
         uint bs = _reader.BlockSize;
 

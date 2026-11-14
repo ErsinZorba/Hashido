@@ -86,13 +86,23 @@ public sealed class ApfsWritableFileSystem : FileSystemBase, IDisposable
     public WriteStats Stats { get { lock (_gate) return new WriteStats(_commits, _bytesWritten, _operations); } }
 
     /// <summary>Bekleyen değişiklikleri kalıcı yapar (zamanlayıcı, Flush, ayırma).</summary>
-    public void CommitIfDirty()
+    public int CommitIfDirty()
     {
         lock (_gate)
         {
-            if (_disposed || !_vol.IsDirty) return;
-            try { _session.Commit(); _commits++; }
-            catch (Exception e) { ChangeLost?.Invoke(CoreText.T("Fs.WriteBackFailed", e.Message)); }
+            if (_session.IsFaulted) return ApfsFileSystem.StatusDeviceNotConnected;
+            if (_disposed || !_vol.IsDirty) return ApfsFileSystem.StatusSuccess;
+            try
+            {
+                _session.Commit();
+                _commits++;
+                return ApfsFileSystem.StatusSuccess;
+            }
+            catch (Exception e)
+            {
+                ChangeLost?.Invoke(CoreText.T("Fs.WriteBackFailed", e.Message));
+                return e is ApfsException ae ? ToNtStatus(ae.Code) : ApfsFileSystem.StatusUnexpectedIoError;
+            }
         }
     }
 
@@ -247,6 +257,13 @@ public sealed class ApfsWritableFileSystem : FileSystemBase, IDisposable
     {
         lock (_gate)
         {
+            if (_session.IsFaulted)
+            {
+                fileNode = fileDesc = null!;
+                fileInfo = default;
+                normalizedName = null!;
+                return ApfsFileSystem.StatusDeviceNotConnected;
+            }
             var (parent, name) = ResolveParent(fileName);
             bool dir = (createOptions & FileDirectoryFile) != 0;
             ulong id = dir ? _vol.CreateDirectory(parent.Id, name) : _vol.CreateFile(parent.Id, name);
@@ -267,6 +284,7 @@ public sealed class ApfsWritableFileSystem : FileSystemBase, IDisposable
         if (fileDesc is OpenHandle { ContentReadOnly: true }) { fileInfo = default; return ApfsFileSystem.StatusAccessDenied; }
         lock (_gate)
         {
+            if (_session.IsFaulted) { fileInfo = default; return ApfsFileSystem.StatusDeviceNotConnected; }
             ulong id = ((Node)fileNode).Id;
             // macOS'un sıkıştırdığı dosya bu sürümde salt okunur (kullanıcı kararı 2026-10-05: gerçek Mac dosyasında sınanmadı);
             // SetSize bunu RequireWritableFile'da reddeder → "erişim engellendi"
@@ -288,6 +306,11 @@ public sealed class ApfsWritableFileSystem : FileSystemBase, IDisposable
         if ((flags & CleanupDelete) == 0 || fileName is null) return;
         lock (_gate)
         {
+            if (_session.IsFaulted)
+            {
+                Error?.Invoke(CoreText.T("Fs.WriteBackFailed", CoreText.U("Error.IoError")));
+                return;
+            }
             try
             {
                 var (parent, name) = ResolveParent(fileName);
@@ -412,6 +435,7 @@ public sealed class ApfsWritableFileSystem : FileSystemBase, IDisposable
         if (fileDesc is OpenHandle { ContentReadOnly: true }) { bytesTransferred = 0; fileInfo = default; return ApfsFileSystem.StatusAccessDenied; }
         lock (_gate)
         {
+            if (_session.IsFaulted) { bytesTransferred = 0; fileInfo = default; return ApfsFileSystem.StatusDeviceNotConnected; }
             ulong id = ((Node)fileNode).Id;
             ulong size = _vol.GetSize(id);
             if (constrainedIo)
@@ -435,6 +459,7 @@ public sealed class ApfsWritableFileSystem : FileSystemBase, IDisposable
         if (fileDesc is OpenHandle { ContentReadOnly: true }) { fileInfo = default; return ApfsFileSystem.StatusAccessDenied; }
         lock (_gate)
         {
+            if (_session.IsFaulted) { fileInfo = default; return ApfsFileSystem.StatusDeviceNotConnected; }
             ulong id = ((Node)fileNode).Id;
             // Ayırma boyutu yalnızca bir ipucu; dosyadan küçükse dosya kısalır (WinFsp sözleşmesi)
             if (!setAllocationSize || newSize < _vol.GetSize(id)) { _vol.SetSize(id, newSize); _operations++; }
@@ -449,6 +474,7 @@ public sealed class ApfsWritableFileSystem : FileSystemBase, IDisposable
     {
         lock (_gate)
         {
+            if (_session.IsFaulted) { fileInfo = default; return ApfsFileSystem.StatusDeviceNotConnected; }
             ulong id = ((Node)fileNode).Id;
             if (fileAttributes != uint.MaxValue) _vol.SetHidden(id, (fileAttributes & FileAttributeHidden) != 0);
             if (creationTime != 0 || lastAccessTime != 0 || lastWriteTime != 0 || changeTime != 0)
@@ -472,6 +498,7 @@ public sealed class ApfsWritableFileSystem : FileSystemBase, IDisposable
     {
         lock (_gate)
         {
+            if (_session.IsFaulted) return ApfsFileSystem.StatusDeviceNotConnected;
             var (srcParent, srcName) = ResolveParent(fileName);
             var (dstParent, dstName) = ResolveParent(newFileName);
             _vol.Rename(srcParent.Id, srcName, dstParent.Id, dstName, replaceIfExists);
@@ -483,9 +510,9 @@ public sealed class ApfsWritableFileSystem : FileSystemBase, IDisposable
 
     public override int Flush(object fileNode, object fileDesc, out FileInfo fileInfo)
     {
-        CommitIfDirty();
+        int status = CommitIfDirty();
         lock (_gate) fileInfo = fileNode is Node n ? InfoOf(n.Id) : default;
-        return ApfsFileSystem.StatusSuccess;
+        return status;
     }
 
     public override int SetVolumeLabel(string volumeLabel, out VolumeInfo volumeInfo)
