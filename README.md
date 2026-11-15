@@ -11,6 +11,8 @@ Plug the disk in and within a few seconds it shows up in File Explorer with a dr
 > a disk, you allow it separately for that disk with its **Allow writing** button (experimental; see "Writing").
 > The safety of your data comes first.
 
+<p align="center"><img src="docs/images/en/main.png" width="440" alt="Hashido main window with three Mac disks: Photos (read-only), Archive (encrypted, locked) and Projects (writable)"></p>
+
 ## What is supported
 | | |
 |---|---|
@@ -25,7 +27,7 @@ Plug the disk in and within a few seconds it shows up in File Explorer with a dr
 | 10 interface languages | English, Türkçe, Deutsch, Français, Español, Português (Brasil), Italiano, 日本語, 简体中文, 한국어 |
 
 ## Installation
-Run `Hashido-Setup-1.6.1.exe` and follow the wizard (Next › Install › Finish). Windows 10/11 (64-bit) is all you need;
+Run `Hashido-Setup-1.6.2.exe` and follow the wizard (Next › Install › Finish). Windows 10/11 (64-bit) is all you need;
 nothing else has to be installed: .NET comes with the program, and if the [WinFsp](https://winfsp.dev) driver is missing the wizard
 installs it too. After installation, **Hashido** is in the Start menu and the tray icon starts automatically at every sign-in.
 
@@ -47,10 +49,15 @@ automatic-reports question are deleted, so a reinstall asks again; your language
   close the program; the disks stay mounted and the program keeps running in the notification area.
 - **Tray panel**: left-click the Hashido icon (the red seal) next to the clock; the same actions in a small panel. The right-click
   menu has "Open main window", "safely eject" for each disk, "Scan again", "Open log" and "Exit".
-- **Appearance:** two designs, Hashido (paper and ink) and Windows 11 (Windows' own look and accent color), each light or dark.
-  Choose them under Settings (the gear icon) › Appearance; the program restarts to apply them. With the theme set to "Match
+- **Appearance:** two designs, Windows 11 (Windows' own look and accent color; the default) and Hashido (paper and ink), each light
+  or dark. Choose them under Settings (the gear icon) › Appearance; the program restarts to apply them. With the theme set to "Match
   Windows" (the default), the program follows Windows' app mode (Settings › Personalization › Colors) and, when you switch it,
   restarts itself in the new mode as soon as nothing is in progress.
+- **Encrypted volumes:** **Unlock** asks for the password you use on the Mac, with its hint. The password is sent only to the
+  local service and is never saved; it is asked again after a restart.
+
+<p align="center"><img src="docs/images/en/designs.png" width="720" alt="The main window in the Windows 11 design (top) and the Hashido design (bottom), light and dark"></p>
+<p align="center"><img src="docs/images/en/password.png" width="400" alt="Password window for the encrypted volume Archive, with its hint"></p>
 
 ## Language
 The program starts in the Windows display language (English, Turkish, German, French, Spanish, Brazilian Portuguese, Italian,
@@ -68,6 +75,8 @@ Click the disk's **Allow writing** button and confirm the warning. The program f
 order, the drive is mounted again as **writable** ("Writable (experimental)" in red under the volume). You can now copy files, create
 folders, rename, delete, and edit and save files in File Explorer. **Back to read-only** saves the changes and mounts the disk
 read-only again.
+
+<p align="center"><img src="docs/images/en/write.png" width="440" alt="Allow writing to this disk? confirmation with the experimental-feature warnings"></p>
 
 - **Make a backup first.** Writing is new; keep a copy of your important files.
 - **Always use "Safely eject" before unplugging the disk or connecting it to a Mac.** Changes are saved every few seconds;

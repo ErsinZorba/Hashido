@@ -11,6 +11,8 @@ Diski takarsınız, birkaç saniye içinde Dosya Gezgini'nde sürücü harfi ola
 > isterseniz o diskin **Yazmaya izin ver** düğmesiyle ayrıca izin verirsiniz (deneysel; bkz. "Yazma"). Verilerinizin
 > güvenliği her şeyden önce gelir.
 
+<p align="center"><img src="docs/images/tr/main.png" width="440" alt="Üç Mac diskiyle Hashido ana penceresi: Fotoğraflar (salt okunur), Arşiv (şifreli, kilitli) ve Projeler (yazılabilir)"></p>
+
 ## Neler destekleniyor
 | | |
 |---|---|
@@ -25,7 +27,7 @@ Diski takarsınız, birkaç saniye içinde Dosya Gezgini'nde sürücü harfi ola
 | 10 arayüz dili | Türkçe, English, Deutsch, Français, Español, Português (Brasil), Italiano, 日本語, 简体中文, 한국어 |
 
 ## Kurulum
-`Hashido-Setup-1.6.1.exe` dosyasını çalıştırın ve sihirbazı izleyin (İleri › Kur › Son). Windows 10/11 (64 bit) yeter;
+`Hashido-Setup-1.6.2.exe` dosyasını çalıştırın ve sihirbazı izleyin (İleri › Kur › Son). Windows 10/11 (64 bit) yeter;
 başka bir şey kurmanız gerekmez: .NET programla birlikte gelir, [WinFsp](https://winfsp.dev) sürücüsü yoksa sihirbaz onu da kurar.
 Kurulumdan sonra Başlat menüsünde **Hashido** bulunur ve tepsi simgesi her oturumda kendiliğinden açılır.
 
@@ -47,10 +49,15 @@ sorusuna verdiğiniz cevap silinir, yeniden kurulumda yeniden sorulur; dil, gör
   devam eder.
 - **Tepsi paneli**: saatin yanındaki Hashido simgesine (kırmızı mühür) sol tıklayın; aynı işlemler küçük bir panelde. Sağ tık
   menüsünde "Ana pencereyi aç", disk başına "güvenle çıkar", "Yeniden tara", "Günlüğü aç" ve "Çıkış" bulunur.
-- **Görünüm:** iki tasarım, Hashido (kâğıt ve mürekkep) ve Windows 11 (Windows'un kendi görünümü ve vurgu rengi); ikisi de açık ya
-  da koyu. Ayarlar (çark simgesi) › Görünüm'den seçilir; program yeni görünüm için yeniden açılır. Tema "Windows'a uy" iken
+- **Görünüm:** iki tasarım, Windows 11 (Windows'un kendi görünümü ve vurgu rengi; varsayılan) ve Hashido (kâğıt ve mürekkep);
+  ikisi de açık ya da koyu. Ayarlar (çark simgesi) › Görünüm'den seçilir; program yeni görünüm için yeniden açılır. Tema "Windows'a uy" iken
   (varsayılan) program Windows'un uygulama modunu izler (Ayarlar › Kişiselleştirme › Renkler) ve modu değiştirdiğinizde, süren
   bir şey kalmayınca kendini yeni modda yeniden başlatır.
+- **Şifreli birimler:** **Kilidi aç**, Mac'te kullandığınız parolayı ipucuyla birlikte sorar. Parola yalnız bilgisayardaki hizmete
+  gönderilir ve hiçbir yere kaydedilmez; yeniden başlatmadan sonra yeniden sorulur.
+
+<p align="center"><img src="docs/images/tr/designs.png" width="720" alt="Ana pencere Windows 11 tasarımında (üstte) ve Hashido tasarımında (altta), açık ve koyu"></p>
+<p align="center"><img src="docs/images/tr/password.png" width="400" alt="Şifreli Arşiv birimi için ipuçlu parola penceresi"></p>
 
 ## Dil
 Program Windows'un görüntü dilinde açılır (Türkçe, İngilizce, Almanca, Fransızca, İspanyolca, Brezilya Portekizcesi, İtalyanca,
@@ -67,6 +74,8 @@ Diskin **Yazmaya izin ver** düğmesine tıklayın ve uyarıyı onaylayın. Prog
 sürücü **yazılabilir** olarak yeniden bağlanır (birimin altında kırmızı "Yazılabilir (deneysel)"). Artık Gezgin'de dosya kopyalayabilir,
 klasör açabilir, adlandırabilir, silebilir ve dosyaları düzenleyip kaydedebilirsiniz. **Salt okunura dön** değişiklikleri kaydedip
 diski yeniden salt okunur bağlar.
+
+<p align="center"><img src="docs/images/tr/write.png" width="440" alt="Bu diske yazmaya izin verilsin mi? onayı ve deneysel özellik uyarıları"></p>
 
 - **Önce yedek alın.** Yazma özelliği yenidir; önemli dosyalarınızın bir kopyası olsun.
 - **Diski çıkarmadan veya Mac'e takmadan önce mutlaka "Güvenle çıkar"ı kullanın.** Değişiklikler birkaç saniyede bir kaydedilir;

@@ -96,7 +96,7 @@ internal static class Theme
         {
             "windows" => AppDesign.Windows,
             "brand" => AppDesign.Brand,
-            _ => i.Design ?? current?.Design ?? AppDesign.Brand,
+            _ => i.Design ?? current?.Design ?? AppDesign.Windows, // varsayılan Windows 11 (kullanıcı kararı 2026-11-15)
         };
         bool dark = i.DevTheme?.Trim().ToLowerInvariant() switch
         {

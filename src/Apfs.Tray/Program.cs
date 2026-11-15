@@ -1,5 +1,6 @@
 using System.Globalization;
 using Apfs.Tray;
+using Apfs.Windows;
 using Apfs.Windows.Ipc;
 using Apfs.Windows.Localization;
 using Apfs.Windows.Reporting;
@@ -32,6 +33,9 @@ if (!first)
     if (show) showEvent.Set();
     return;
 }
+
+// 1.6.2: varsayılan tasarım Windows 11; eski sürümün yazdığı "brand" bir kez Windows 11'e çevrilir (palet okunmadan önce)
+UserSettings.MigrateDesignDefault();
 
 // Çökme raporu (yalnız onay verildiyse; tepsinin kendi kuyruğuna, eşzamanlı). İstisna YUTULMAZ: arayüz iş parçacığındaki
 // istisna da işlenmeyen istisnaya dönüşür ve süreç çöker (WinForms'un "devam et" penceresi bozuk durumda sürdürürdü).

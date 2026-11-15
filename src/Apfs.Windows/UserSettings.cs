@@ -48,7 +48,10 @@ public static class UserSettings
         set => Write(UpdateUrlValue, value);
     }
 
-    /// <summary>Tepsinin tasarımı (1.6.0): 橋戸 marka (varsayılan) ya da sade Windows 11. Bilinmeyen değer → marka.</summary>
+    /// <summary>
+    /// Tepsinin tasarımı (1.6.0): sade Windows 11 (varsayılan, kullanıcı kararı 2026-11-15; 1.6.x'te marka) ya da 橋戸 marka.
+    /// Yalnız "brand" markadır; değer yoksa ya da bilinmiyorsa → Windows 11.
+    /// </summary>
     public static AppDesign Design
     {
         get => ParseDesign(ReadString(DesignValue));
@@ -82,10 +85,25 @@ public static class UserSettings
     }
 
     private const string DesignValue = "Design"; // metin: "brand" | "windows"
+    private const string DesignDefaultValue = "DesignDefault"; // DWORD 2 = 1.6.2 varsayılan tasarım geçişi yapıldı
+
+    /// <summary>
+    /// 1.6.2 geçişi (kullanıcı kararı 2026-11-15), kullanıcı başına BİR KEZ: 1.6.0/1.6.1 Ayarlar'da tasarım ya da tema
+    /// değişince ikisini birlikte yazıyordu, kayıtlı "brand" bilinçli seçimden ayırt edilemiyor → bir kez Windows 11 yapılır ve
+    /// işaretlenir. Sonra Hashido'yu seçen markada kalır. Kayıt okunamazsa hiçbir şey yapılmaz (sonraki açılışta yeniden denenir).
+    /// Tepsi paleti ilk kez okumadan önce çağrılmalı.
+    /// </summary>
+    public static void MigrateDesignDefault()
+    {
+        if (!TryRead(DesignDefaultValue, out var done) || done is int) return;
+        if (!TryRead(DesignValue, out var design)) return;
+        if (design is string s && string.Equals(s.Trim(), "brand", StringComparison.OrdinalIgnoreCase)) Write(DesignValue, "windows");
+        Write(DesignDefaultValue, 2);
+    }
     private const string ThemeValue = "Theme";   // metin: "system" | "light" | "dark"
 
     private static AppDesign ParseDesign(string? s) =>
-        string.Equals(s?.Trim(), "windows", StringComparison.OrdinalIgnoreCase) ? AppDesign.Windows : AppDesign.Brand;
+        string.Equals(s?.Trim(), "brand", StringComparison.OrdinalIgnoreCase) ? AppDesign.Brand : AppDesign.Windows;
 
     private static ThemeMode ParseTheme(string? s) => s?.Trim().ToLowerInvariant() switch
     {
