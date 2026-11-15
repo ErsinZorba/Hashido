@@ -386,11 +386,12 @@ internal sealed class DiskListView : Panel
         public SpaceView(DiskListView owner)
         {
             _compact = owner.Compact;
-            // Sol boşluk: etiket metni kenardan birkaç piksel içeride başlar; çubuk metinle hizalı dursun
+            // Sol boşluk: etiket metni kenardan birkaç piksel içeride başlar; çubuk metinle hizalı dursun.
+            // Kalınlık (1.6.0, kullanıcı: "daha belirgin ama çok büyük olmasın"): ana pencerede 6, panelde 5 px.
             Bar = new SpaceBar
             {
-                Height = owner.S(2), Width = owner.S(40), Visible = false,
-                Margin = new Padding(owner.S(2), owner.S(_compact ? 6 : 8), 0, owner.S(3)),
+                Height = owner.S(_compact ? 5 : 6), Width = owner.S(40), Visible = false,
+                Margin = new Padding(owner.S(2), owner.S(_compact ? 5 : 7), 0, owner.S(4)),
             };
             Group = new FlowLayoutPanel
             {
@@ -448,7 +449,10 @@ internal sealed class DiskListView : Panel
         private static int Width(Control c) => c.PreferredSize.Width + c.Margin.Horizontal;
     }
 
-    /// <summary>2 px doluluk çubuğu: yol Track, dolu kısım Bar (boş alan %10'dan azsa zinober).</summary>
+    /// <summary>
+    /// Doluluk çubuğu (5–6 px): dolu kısım Bar (boş alan %10'dan azsa Alert), boş kısım (yol) zemin ile InkSoft karışımı —
+    /// Track zemine çok yakın, kalın çubukta boş kısım seçilmiyordu (Track düğme/menüde de kullanıldığı için değişmedi).
+    /// </summary>
     private sealed class SpaceBar : Control
     {
         private double _used;
@@ -477,15 +481,17 @@ internal sealed class DiskListView : Panel
             int filled = (int)Math.Round(Width * _used);
             if (_used > 0 && filled == 0) filled = 1; // birazcık dolu disk boş görünmesin
             using var brush = new SolidBrush(_low ? Theme.Alert : Theme.Bar);
+            var background = BackgroundColor();
+            var trackColor = Theme.Lerp(background, Theme.InkSoft, TrackMix);
             if (Theme.IsWindows)
             {
                 // Windows 11 (Fluent ProgressBar): yuvarlak uçlu yol ve dolgu, vurgu renginde
                 var g = e.Graphics;
-                g.Clear(BackgroundColor());
+                g.Clear(background);
                 g.SmoothingMode = SmoothingMode.AntiAlias;
                 float r = Height / 2f;
                 using (var track = Theme.RoundedRect(new RectangleF(0, 0, Width, Height), r))
-                using (var trackBrush = new SolidBrush(Theme.Track))
+                using (var trackBrush = new SolidBrush(trackColor))
                     g.FillPath(trackBrush, track);
                 if (filled > 0)
                 {
@@ -494,9 +500,12 @@ internal sealed class DiskListView : Panel
                 }
                 return;
             }
-            e.Graphics.Clear(Theme.Track);
+            e.Graphics.Clear(trackColor);
             e.Graphics.FillRectangle(brush, 0, 0, filled, Height);
         }
+
+        /// <summary>Boş kısmın zeminden InkSoft'a doğru karışım oranı (açıkta ~#D5, koyuda ~#41 tonu).</summary>
+        internal const float TrackMix = 0.2f;
 
         private Color BackgroundColor()
         {
