@@ -1,11 +1,13 @@
 using System.Drawing.Drawing2D;
+using System.Drawing.Imaging;
+using System.Runtime.InteropServices;
 
 namespace Apfs.Tray.Ui;
 
 /// <summary>
 /// Kendi çizen onay kutusu (橋戸 marka; iki temada aynı): yuvarlak köşeli kutu mürekkep çizgi, işaretliyken mürekkep dolgu
 /// ve ortasında kâğıt renginde işaret; üzerine gelince ve işaretlenince renk yumuşakça değişir; odakta 2 px zinober halka.
-/// Metin kaydırılır, kutu ilk satıra ortalanır. <see cref="CheckBox"/>'tan türer: klavye (Boşluk), erişilebilirlik
+/// Metin kaydırılır, kutu görünen yazının dikey ortasında (bkz. <see cref="Arrange"/>). <see cref="CheckBox"/>'tan türer: klavye (Boşluk), erişilebilirlik
 /// (CheckButton + durum), <see cref="CheckBox.Checked"/> aynen; yalnız çizim bizim.
 /// </summary>
 internal sealed class FriendlyCheck : CheckBox
@@ -42,13 +44,65 @@ internal sealed class FriendlyCheck : CheckBox
     private int Ring => this.S(3);
     private int TextLeft => Ring * 2 + Box + this.S(8);
 
-    /// <summary>Tek satırın yüksekliği (kutu bu satıra ortalanır).</summary>
-    private int LineHeight => TextRenderer.MeasureText("Ag", Font, Size.Empty, Flags).Height;
+    /// <summary>Metin bloğu, verilen kontrol genişliğinde (çizimle aynı bayraklar ve aynı genişlik).</summary>
+    private Size MeasureText(int width) => TextRenderer.MeasureText(Text, Font, new Size(Math.Max(1, width - TextLeft), 0), Flags);
 
-    /// <summary>Kutunun dikey merkezi: kutu (halkasıyla) ya da ilk satır, hangisi yüksekse.</summary>
-    private float BoxCenter => Math.Max(Ring + Box / 2f, LineHeight / 2f);
+    /// <summary>
+    /// Yerleşim (verilen genişlikte): kutunun dikey merkezi metnin GÖRÜNEN mürekkebinin ortasında — tek satırda o satırın,
+    /// iki satırda iki satırın ortasında. Satır kutusunun ortası yetmiyor: yazı tipinin üstteki iç boşluğu ve alt uzantılar
+    /// (ç, ş, g) yüzünden görünen yazı 2–3 px aşağıdadır, kutu yukarıda kalmış görünüyordu (kullanıcı 1.5.1 denemesi).
+    /// </summary>
+    private (Size Text, int TextTop, float BoxCenter, int Height) Arrange(int width)
+    {
+        var text = MeasureText(width);
+        float center = text.Height / 2f + InkOffset(width, text); // metin üstü 0'dayken mürekkep merkezi
+        float boxTop = center - Box / 2f - Ring, boxBottom = center + Box / 2f + Ring;
+        int shift = (int)Math.Ceiling(Math.Max(0, -boxTop)); // kutu üstten taşarsa her şey aşağı
+        int height = (int)Math.Ceiling(Math.Max(text.Height, boxBottom) + shift);
+        return (text, shift, center + shift, height);
+    }
 
-    private int TextTop => (int)Math.Round(BoxCenter - LineHeight / 2f);
+    private float BoxCenter => Arrange(Width).BoxCenter;
+    private int TextTop => Arrange(Width).TextTop;
+
+    private (string Text, int Width, Font Font, float Offset)? _ink;
+
+    /// <summary>
+    /// Metnin mürekkep (görünen piksel) merkezinin, metin bloğunun geometrik merkezinden ne kadar aşağıda olduğu. Metin bir
+    /// kez beyaz bitmap'e çizilip mürekkepli ilk ve son satır bulunur (Asya yazı tipleri dahil her yazı tipinde doğru);
+    /// sonuç metin, genişlik ve yazı tipine göre saklanır.
+    /// </summary>
+    private float InkOffset(int width, Size text)
+    {
+        if (_ink is { } c && c.Text == Text && c.Width == width && ReferenceEquals(c.Font, Font)) return c.Offset;
+        float offset = 0;
+        if (text.Width > 0 && text.Height > 0)
+        {
+            using var bmp = new Bitmap(text.Width, text.Height, PixelFormat.Format32bppRgb);
+            using (var g = Graphics.FromImage(bmp))
+            {
+                g.Clear(Color.White);
+                TextRenderer.DrawText(g, Text, Font, new Rectangle(Point.Empty, text), Color.Black, Color.White, Flags);
+            }
+            var data = bmp.LockBits(new Rectangle(Point.Empty, text), ImageLockMode.ReadOnly, PixelFormat.Format32bppRgb);
+            try
+            {
+                var row = new int[text.Width];
+                int top = -1, bottom = -1;
+                for (int y = 0; y < text.Height; y++)
+                {
+                    Marshal.Copy(data.Scan0 + y * data.Stride, row, 0, text.Width);
+                    if (!row.Any(p => (p & 0xFF) < 128)) continue; // mavi kanal: siyah mürekkep (ClearType kenarları hariç)
+                    if (top < 0) top = y;
+                    bottom = y;
+                }
+                if (top >= 0) offset = (top + bottom + 1) / 2f - text.Height / 2f;
+            }
+            finally { bmp.UnlockBits(data); }
+        }
+        _ink = (Text, width, Font, offset);
+        return offset;
+    }
 
     /// <summary>
     /// Verilen genişlikte (0 = sınırsız) gereken boyut; metin çizimle aynı bayraklarla, aynı genişlikte ölçülür (çizim ile
@@ -56,10 +110,9 @@ internal sealed class FriendlyCheck : CheckBox
     /// </summary>
     public override Size GetPreferredSize(Size proposedSize)
     {
-        int width = proposedSize.Width > 0 ? proposedSize.Width : int.MaxValue;
-        var t = TextRenderer.MeasureText(Text, Font, new Size(Math.Max(1, width - TextLeft), 0), Flags);
-        int height = Math.Max((int)Math.Ceiling(BoxCenter + Box / 2f + Ring), TextTop + t.Height + this.S(2));
-        return new Size(proposedSize.Width > 0 ? proposedSize.Width : TextLeft + t.Width, height);
+        int width = proposedSize.Width > 0 ? proposedSize.Width : int.MaxValue / 2;
+        var layout = Arrange(width);
+        return new Size(proposedSize.Width > 0 ? proposedSize.Width : TextLeft + layout.Text.Width, layout.Height + this.S(2));
     }
 
     // ---- Animasyon ----
@@ -110,7 +163,8 @@ internal sealed class FriendlyCheck : CheckBox
 
         float scale = DeviceDpi / 96f;
         float line = Math.Max(1f, 1.25f * scale);
-        var box = new RectangleF(Ring, BoxCenter - Box / 2f, Box, Box);
+        var layout = Arrange(Width);
+        var box = new RectangleF(Ring, MathF.Round(layout.BoxCenter - Box / 2f), Box, Box); // tam piksel: çerçeve keskin
         float radius = this.S(4);
 
         Color off = Theme.Lerp(bg, Theme.Track, 0.7f * _hover);
@@ -155,7 +209,7 @@ internal sealed class FriendlyCheck : CheckBox
             g.DrawPath(pen, path);
         }
 
-        TextRenderer.DrawText(g, Text, Font, new Rectangle(TextLeft, TextTop, Math.Max(1, Width - TextLeft), Height - TextTop),
+        TextRenderer.DrawText(g, Text, Font, new Rectangle(TextLeft, layout.TextTop, Math.Max(1, Width - TextLeft), Height - layout.TextTop),
             text, bg, Flags);
     }
 
