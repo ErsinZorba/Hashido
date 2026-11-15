@@ -284,6 +284,9 @@
   <data name="Sent.Title" xml:space="preserve">
     <value>已发送的报告</value>
   </data>
+  <data name="Settings.AboutHeading" xml:space="preserve">
+    <value>关于</value>
+  </data>
   <data name="Settings.Language" xml:space="preserve">
     <value>语言</value>
   </data>

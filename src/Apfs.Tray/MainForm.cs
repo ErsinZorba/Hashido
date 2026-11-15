@@ -8,8 +8,8 @@ using Apfs.Windows.Localization;
 namespace Apfs.Tray;
 
 /// <summary>
-/// Ana pencere: üstte "Diskler" + yeniden tara / ayarlar, bağlı Mac diskleri defter düzeninde, altta günlük, dil, sürüm ve
-/// 橋戸 imzası. Kapatınca tepsiye gizlenir;
+/// Ana pencere: üstte "Diskler" + yeniden tara / ayarlar, bağlı Mac diskleri defter düzeninde, altta dil ve 橋戸 imzası
+/// (günlük ve sürüm Ayarlar'da). Kapatınca tepsiye gizlenir;
 /// programdan çıkış tepsi menüsündendir (diskler arka planda bağlı kalır, bunu hizmet yapar).
 /// </summary>
 internal sealed class MainForm : Form
@@ -77,22 +77,15 @@ internal sealed class MainForm : Form
             Dock = DockStyle.Fill, Padding = new Padding(this.S(24), this.S(4), this.S(24), this.S(4)), DialogOwner = this,
         };
 
-        // Alt: günlük, dil, sürüm (Hakkında), sağda küçük 橋戸 imzası; üstünde ince çizgi
+        // Alt: dil, sağda küçük 橋戸 imzası; üstünde ince çizgi. Günlük ve sürüm (Hakkında) 1.5.1'den beri Ayarlar'da.
         var footer = new FooterPanel
         {
-            Dock = DockStyle.Bottom, AutoSize = true, ColumnCount = 5, BackColor = Theme.Paper,
+            Dock = DockStyle.Bottom, AutoSize = true, ColumnCount = 3, BackColor = Theme.Paper,
             Padding = new Padding(this.S(18), this.S(8), this.S(24), this.S(10)),
         };
         footer.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        footer.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        footer.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         footer.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        var log = new FriendlyButton(WinText.U("Action.OpenLog"), FriendlyButton.Kind.Quiet) { Font = Theme.Small };
-        log.Click += (_, _) => AppController.OpenLog();
-        string version = Application.ProductVersion.Split('+')[0];
-        var about = new FriendlyButton(WinText.U("Main.Version", version), FriendlyButton.Kind.Quiet) { Font = Theme.Small };
-        about.Click += (_, _) => ShowAbout(version);
         // Dil: geçerli dilin kendi dilindeki adı; tıklayınca seçim menüsü (sade, göze batmayan)
         string current = Languages.Supported.FirstOrDefault(l => l.Name == CultureInfo.CurrentUICulture.Name).NativeName ?? "English";
         var language = new FriendlyButton(current, FriendlyButton.Kind.Quiet) { Font = Theme.Small };
@@ -102,10 +95,8 @@ internal sealed class MainForm : Form
             Text = "橋戸", Font = Theme.Signature, ForeColor = Theme.InkSoft, AutoSize = true, UseMnemonic = false,
             Anchor = AnchorStyles.Right, Margin = new Padding(this.S(8), 0, 0, 0), AccessibleRole = AccessibleRole.StaticText,
         };
-        footer.Controls.Add(log, 0, 0);
-        footer.Controls.Add(language, 1, 0);
-        footer.Controls.Add(about, 2, 0);
-        footer.Controls.Add(signature, 4, 0);
+        footer.Controls.Add(language, 0, 0);
+        footer.Controls.Add(signature, 2, 0);
 
         // Yeni sürüm: sakin bilgi satırı (yalnız bilinen daha yeni bir sürüm varken ve bildirim açıkken)
         _update = new LinkLabel
@@ -187,28 +178,6 @@ internal sealed class MainForm : Form
         if (LanguageSetting.Load()?.Name == language?.Name) return;
         LanguageSetting.Save(language);
         RestartRequested?.Invoke();
-    }
-
-    /// <summary>
-    /// Hakkında penceresi. WinFsp lisansı (FLOSS istisnası) WinFsp telif notunun ve depo bağlantısının arayüzde bulunmasını
-    /// şart koşar; not burada durur.
-    /// </summary>
-    private void ShowAbout(string version)
-    {
-        var page = new TaskDialogPage
-        {
-            Caption = Branding.ProductName,
-            Heading = $"{Branding.ProductName} {version}",
-            Text = WinText.U("About.Text") + "\n" +
-                   "<a href=\"https://github.com/ErsinZorba/Hashido\">github.com/ErsinZorba/Hashido</a>",
-            Footnote = new TaskDialogFootnote(
-                "WinFsp - Windows File System Proxy, Copyright (C) Bill Zissimopoulos\n" +
-                "<a href=\"https://github.com/winfsp/winfsp\">github.com/winfsp/winfsp</a>"),
-            EnableLinks = true,
-            Buttons = { TaskDialogButton.OK },
-        };
-        page.LinkClicked += (_, e) => Process.Start(new ProcessStartInfo(e.LinkHref) { UseShellExecute = true });
-        AppController.Modal(() => TaskDialog.ShowDialog(this, page));
     }
 
     /// <summary>Gizliyse gösterir, simge durumundaysa geri getirir ve öne alır.</summary>

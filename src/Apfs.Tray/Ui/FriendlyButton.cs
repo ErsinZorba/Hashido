@@ -7,8 +7,8 @@ namespace Apfs.Tray.Ui;
 /// Kendi çizen düğme (橋戸 marka). Türler: <see cref="Kind.Primary"/> mürekkep dolgu (yalnız iletişim kutularının ana eylemi),
 /// <see cref="Kind.Secondary"/> mürekkep çizgi (üzerine gelince dolar), <see cref="Kind.Quiet"/> yalnız metin (isteğe bağlı
 /// ikonla), <see cref="Kind.Icon"/> yalnız ikon (metin araç ipucu ve erişilebilir ad olur). Üzerine gelince renk yumuşakça
-/// değişir, basınca hafifçe içe çöker; odakta 2 px zinober halka. "Meşgul" durumunda dönen bir halka ve
-/// <see cref="BusyText"/> gösterir, tıklanamaz.
+/// değişir; basınca her türde gövde ortasından yumuşakça küçülür (Quiet'te soluk bir zemin belirir), yazı yerinden
+/// oynamaz; odakta 2 px zinober halka. "Meşgul" durumunda dönen bir halka ve <see cref="BusyText"/> gösterir, tıklanamaz.
 /// </summary>
 internal sealed class FriendlyButton : Control, IButtonControl
 {
@@ -18,8 +18,10 @@ internal sealed class FriendlyButton : Control, IButtonControl
     private static readonly HashSet<FriendlyButton> Animating = [];
 
     private float _hover;          // 0 → 1 (üzerine gelme geçişi)
+    private float _press;          // 0 → 1 (basma geçişi)
     private bool _mouseOver;
-    private bool _pressed;
+    private bool _pressed;         // fare/Boşluk basılı
+    private bool _pressPeak;       // kısa tıkta da basma tepeye ulaşıp sonra geri dönsün
     private bool _busy;
     private float _spin;
     private readonly Kind _kind;
@@ -124,22 +126,32 @@ internal sealed class FriendlyButton : Control, IButtonControl
     // ---- Fare ve klavye ----
 
     protected override void OnMouseEnter(EventArgs e) { base.OnMouseEnter(e); _mouseOver = true; StartAnimation(); }
-    protected override void OnMouseLeave(EventArgs e) { base.OnMouseLeave(e); _mouseOver = false; _pressed = false; StartAnimation(); }
+    protected override void OnMouseLeave(EventArgs e) { base.OnMouseLeave(e); _mouseOver = false; Release(); }
 
     protected override void OnMouseDown(MouseEventArgs e)
     {
         base.OnMouseDown(e);
         if (e.Button != MouseButtons.Left || !CanClick) return;
-        _pressed = true;
+        Press();
         Focus();
-        Invalidate();
     }
 
     protected override void OnMouseUp(MouseEventArgs e)
     {
         base.OnMouseUp(e);
+        Release();
+    }
+
+    private void Press()
+    {
+        _pressed = _pressPeak = true;
+        StartAnimation();
+    }
+
+    private void Release()
+    {
         _pressed = false;
-        Invalidate();
+        StartAnimation();
     }
 
     protected override void OnClick(EventArgs e)
@@ -152,9 +164,8 @@ internal sealed class FriendlyButton : Control, IButtonControl
         base.OnKeyDown(e);
         if (e.KeyCode is Keys.Space or Keys.Enter && CanClick)
         {
-            _pressed = true;
-            Invalidate();
-            if (e.KeyCode == Keys.Enter) { _pressed = false; PerformClick(); }
+            Press();
+            if (e.KeyCode == Keys.Enter) { Release(); PerformClick(); } // basma tepeye ulaşıp geri döner
             e.Handled = true;
         }
     }
@@ -164,14 +175,13 @@ internal sealed class FriendlyButton : Control, IButtonControl
         base.OnKeyUp(e);
         if (e.KeyCode == Keys.Space && _pressed)
         {
-            _pressed = false;
-            Invalidate();
+            Release();
             PerformClick();
         }
     }
 
     protected override void OnGotFocus(EventArgs e) { base.OnGotFocus(e); Invalidate(); }
-    protected override void OnLostFocus(EventArgs e) { base.OnLostFocus(e); _pressed = false; Invalidate(); }
+    protected override void OnLostFocus(EventArgs e) { base.OnLostFocus(e); Release(); }
     protected override void OnEnabledChanged(EventArgs e) { base.OnEnabledChanged(e); Invalidate(); }
 
     // ---- Animasyon ----
@@ -187,11 +197,25 @@ internal sealed class FriendlyButton : Control, IButtonControl
     {
         if (IsDisposed) { Animating.Remove(this); return; }
         float target = _mouseOver && CanClick ? 1 : 0;
-        _hover += Math.Sign(target - _hover) * 0.12f; // ~120 ms
-        if (Math.Abs(target - _hover) < 0.12f) _hover = target;
+        _hover = Approach(_hover, target, 0.12f); // ~120 ms
+        // Basma: ~60 ms'de tepeye, bırakınca ~120 ms'de geri; kısa tıkta önce tepeye ulaşır (yoksa hareket görünmezdi)
+        if (_pressed || _pressPeak)
+        {
+            _press = Approach(_press, 1, 0.25f);
+            if (_press == 1) _pressPeak = false;
+        }
+        else _press = Approach(_press, 0, 0.125f);
         if (_busy) _spin = (_spin + 9) % 360;
-        if (_hover == target && !_busy) Animating.Remove(this);
+        // Durgun: hover hedefte, basma ya bırakılmış ve sıfırda ya da basılı ve tepede, meşgul değil
+        bool pressSettled = _pressed ? _press == 1 : _press == 0 && !_pressPeak;
+        if (_hover == target && pressSettled && !_busy) Animating.Remove(this);
         Invalidate();
+    }
+
+    private static float Approach(float value, float target, float step)
+    {
+        value += Math.Sign(target - value) * step;
+        return Math.Abs(target - value) < step ? target : value;
     }
 
     protected override void Dispose(bool disposing)
@@ -211,13 +235,13 @@ internal sealed class FriendlyButton : Control, IButtonControl
         g.SmoothingMode = SmoothingMode.AntiAlias;
 
         bool off = !Enabled || _busy;
-        float h = _pressed ? 1 : _hover;
+        float h = Math.Max(_hover, _press);
         // Zemin (bg ile karışık, opak) ve metin rengi
         Color fill, fore, border = Color.Empty;
         switch (_kind)
         {
             case Kind.Primary:
-                fill = Theme.Lerp(Theme.Ink, bg, 0.12f * h + (_pressed ? 0.08f : 0));
+                fill = Theme.Lerp(Theme.Ink, bg, 0.12f * h + 0.08f * _press);
                 fore = Theme.OnInk;
                 break;
             case Kind.Secondary:
@@ -229,8 +253,8 @@ internal sealed class FriendlyButton : Control, IButtonControl
                 fill = Theme.Lerp(bg, Theme.Track, h);
                 fore = Theme.Ink;
                 break;
-            default: // Quiet
-                fill = bg;
+            default: // Quiet: zemin yalnız basınca (öbür türler gibi ortasından küçüldüğü görünsün)
+                fill = Theme.Lerp(bg, Theme.Track, _press);
                 fore = Theme.Lerp(Theme.InkSoft, Theme.Ink, h);
                 break;
         }
@@ -241,7 +265,9 @@ internal sealed class FriendlyButton : Control, IButtonControl
             border = border.IsEmpty ? border : Theme.Lerp(Theme.Ink, bg, 0.6f);
         }
 
-        float inset = Ring + (_pressed ? this.S(1) : 0) + 0.5f; // basınca içe çökme
+        // Basınca gövde dört yandan eşit içe çekilir (ortasından küçülür); yazı ve ikon sabit dikdörtgende kalır
+        float rest = Ring + 0.5f;
+        float inset = rest + _press * 1.5f * DeviceDpi / 96f;
         var body = new RectangleF(inset, inset, Width - 1 - inset * 2, Height - 1 - inset * 2);
         float radius = this.S(4);
         if (fill != bg)
@@ -265,8 +291,7 @@ internal sealed class FriendlyButton : Control, IButtonControl
             g.DrawPath(pen, path);
         }
 
-        var textRect = Rectangle.Round(body);
-        if (_pressed) textRect.Offset(0, 1);
+        var textRect = Rectangle.Round(new RectangleF(rest, rest, Width - 1 - rest * 2, Height - 1 - rest * 2));
         if (_busy)
         {
             int d = this.S(12);
@@ -284,8 +309,8 @@ internal sealed class FriendlyButton : Control, IButtonControl
         }
         if (_kind == Kind.Icon)
         {
-            int s = this.S(16);
-            Glyphs.DrawIcon(g, new RectangleF((Width - s) / 2f, (Height - s) / 2f + (_pressed ? 1 : 0), s, s), _icon, fore);
+            float s = this.S(16) * (1 - 0.08f * _press); // ikon da ortasından küçülür
+            Glyphs.DrawIcon(g, new RectangleF((Width - s) / 2f, (Height - s) / 2f, s, s), _icon, fore);
             return;
         }
         if (HasLeadingIcon)

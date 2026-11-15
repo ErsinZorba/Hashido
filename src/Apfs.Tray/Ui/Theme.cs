@@ -188,19 +188,6 @@ internal static class Theme
         });
     }
 
-    /// <summary>Onay kutusu: koyu temada düz çizim (kutu mürekkep çizgi, işaret mürekkep); Windows'un açık kutusu koyu zeminde parlıyordu.</summary>
-    public static void Style(CheckBox check)
-    {
-        if (!IsDark) return;
-        check.FlatStyle = FlatStyle.Flat;
-        check.FlatAppearance.BorderColor = InkSoft;
-        check.FlatAppearance.CheckedBackColor = Paper;
-        check.FlatAppearance.MouseOverBackColor = Track;
-        check.FlatAppearance.MouseDownBackColor = Track;
-        check.BackColor = Paper;
-        check.ForeColor = Ink;
-    }
-
     /// <summary>Sağ tık ve dil menüleri: kâğıt zemin, mürekkep yazı, seçili satır Track (iki temada da).</summary>
     public static ToolStripRenderer MenuRenderer => new PaletteMenuRenderer();
 

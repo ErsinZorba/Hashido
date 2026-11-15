@@ -284,6 +284,9 @@
   <data name="Sent.Title" xml:space="preserve">
     <value>Relatórios enviados</value>
   </data>
+  <data name="Settings.AboutHeading" xml:space="preserve">
+    <value>Sobre</value>
+  </data>
   <data name="Settings.Language" xml:space="preserve">
     <value>Idioma</value>
   </data>
