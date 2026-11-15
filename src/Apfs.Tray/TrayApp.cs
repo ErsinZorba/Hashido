@@ -167,8 +167,9 @@ internal sealed class TrayApp : ApplicationContext
     /// </summary>
     private void TryThemeRestart()
     {
-        // Okunamayan girdi geçerli paletin değerini korur: geçici bir kayıt hatası yeniden başlatmasın (Theme.Resolve)
-        if (_exiting || Theme.EffectivePalette(Theme.Colors) == Theme.Colors)
+        // Okunamayan girdi geçerli paletin değerini korur: geçici bir kayıt hatası yeniden başlatmasın (Theme.Resolve).
+        // Yalnız vurgu rengi değiştiyse yeniden başlamaz (Theme.NeedsRestart).
+        if (_exiting || !Theme.NeedsRestart(Theme.EffectivePalette(Theme.Colors), Theme.Colors))
         {
             _themeRetry.Stop();
             return;

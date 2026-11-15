@@ -107,7 +107,8 @@ internal static class Theme
                 ThemeMode.Light => false,
                 ThemeMode.Dark => true,
                 ThemeMode.System => i.SystemDark ?? current?.IsDark ?? false,
-                _ => current?.IsDark ?? false,
+                // Tema ayarı okunamadı: çalışırken geçerli palet; açılışta varsayılan "Windows'a uy" (1.6.1: önceden açık)
+                _ => current?.IsDark ?? i.SystemDark ?? false,
             },
         };
         if (design == AppDesign.Brand) return dark ? Palette.Dark : Palette.Light;
@@ -116,6 +117,13 @@ internal static class Theme
             : AccentColors.Default);
         return Palette.Windows(dark, accent);
     }
+
+    /// <summary>
+    /// Çalışan tepsi yeni palet için yeniden başlamalı mı: yalnız tasarım ya da açık/koyu değiştiyse. Yalnız Windows'un vurgu
+    /// rengi değiştiyse HAYIR (1.6.1, kullanıcı kararı): "vurguyu arka plandan seç" + duvar kâğıdı slayt gösterisi her kâğıt
+    /// değişiminde tepsiyi yeniden başlatıyordu; yeni vurgu program bir sonraki açılışında gelir.
+    /// </summary>
+    internal static bool NeedsRestart(Palette next, Palette current) => next.Design != current.Design || next.IsDark != current.IsDark;
 
     /// <summary>Girdileri okuyup paleti seçer (<see cref="Resolve"/>). <paramref name="current"/>: çalışırken geçerli palet.</summary>
     public static Palette EffectivePalette(Palette? current = null) => Resolve(ReadInputs(), current);

@@ -124,7 +124,9 @@ internal sealed class HeadingLabel : Label
             return;
         }
         // Graphics'in ötelemesi (saydam üst denetim çizimi, DrawToBitmap) HDC'ye taşınır
-        var offset = e.Graphics.Transform.Elements is [_, _, _, _, var dx, var dy] ? (X: (int)dx, Y: (int)dy) : (X: 0, Y: 0);
+        (int X, int Y) offset;
+        using (var transform = e.Graphics.Transform) // her okumada yeni Matrix (GDI+ nesnesi) döner
+            offset = transform.Elements is [_, _, _, _, var dx, var dy] ? ((int)dx, (int)dy) : (0, 0);
         IntPtr hdc = e.Graphics.GetHdc(), font = Font.ToHfont(), old = IntPtr.Zero;
         try
         {
