@@ -35,11 +35,13 @@ internal sealed class ConsentForm : Form
         KeyPreview = true;
         int width = this.S(440);
 
-        Label Line(string t, Font f, Color c, int top = 0) => new()
+        Label Line(string t, Font f, Color c, int top = 0)
         {
-            Text = t, Font = f, ForeColor = c, AutoSize = true, MaximumSize = new Size(width, 0), UseMnemonic = false,
-            Margin = new Padding(0, this.S(top), 0, 0),
-        };
+            var l = HeadingLabel.For(f); // başlıkta rakamlar düz (1.6.0)
+            l.Text = t; l.Font = f; l.ForeColor = c; l.AutoSize = true; l.MaximumSize = new Size(width, 0); l.UseMnemonic = false;
+            l.Margin = new Padding(0, this.S(top), 0, 0);
+            return l;
+        }
 
         var layout = new FlowLayoutPanel
         {
@@ -82,7 +84,10 @@ internal sealed class ConsentForm : Form
         var link = new LinkLabel
         {
             Text = text, AutoSize = true, MaximumSize = new Size(width, 0), Margin = new Padding(0, owner.S(10), 0, 0),
-            LinkColor = Theme.Ink, ActiveLinkColor = Theme.Ink, VisitedLinkColor = Theme.Ink, UseMnemonic = false,
+            LinkColor = Theme.Link, ActiveLinkColor = Theme.Link, VisitedLinkColor = Theme.Link, UseMnemonic = false,
+            // Windows 11 (Fluent köprü metni): vurgu renginde, altı çizgi yalnız üzerine gelince
+            LinkBehavior = Theme.IsWindows ? LinkBehavior.HoverUnderline : LinkBehavior.SystemDefault,
+            Tag = url, // düzenekler hedefi buradan okur
         };
         link.LinkClicked += (_, _) => Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
         return link;

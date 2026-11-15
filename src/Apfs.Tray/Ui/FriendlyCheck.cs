@@ -168,9 +168,10 @@ internal sealed class FriendlyCheck : CheckBox
         float radius = this.S(4);
 
         Color off = Theme.Lerp(bg, Theme.Track, 0.7f * _hover);
-        Color on = Theme.Lerp(Theme.Ink, bg, 0.12f * _hover);
+        Color on = Theme.Lerp(Theme.Accent, bg, 0.12f * _hover);
         Color fill = Theme.Lerp(off, on, _on);
-        Color border = Theme.Lerp(Theme.Lerp(Theme.InkSoft, Theme.Ink, _hover), on, _on);
+        // Windows 11: işaretsiz çerçeve sabit InkSoft (Fluent ControlStrongStroke); markada üzerine gelince mürekkebe koyulaşır
+        Color border = Theme.Lerp(Theme.IsWindows ? Theme.InkSoft : Theme.Lerp(Theme.InkSoft, Theme.Ink, _hover), on, _on);
         Color text = Theme.Ink;
         if (!Enabled)
         {
@@ -193,7 +194,7 @@ internal sealed class FriendlyCheck : CheckBox
             // İşaret (16'lık ızgara; x 4–12 ortada, y 4,875–10,625: alttaki dönüm noktası üstteki yuvarlak uçtan dolgun görünür, 0,25 yukarı alınınca göze ortalı)
             float k = Box / 16f;
             PointF P(float x, float y) => new(box.X + x * k, box.Y + y * k);
-            using var pen = new Pen(Theme.Lerp(fill, Theme.OnInk, _on), 2f * k)
+            using var pen = new Pen(Theme.Lerp(fill, Theme.OnAccent, _on), 2f * k)
             {
                 StartCap = LineCap.Round, EndCap = LineCap.Round, LineJoin = LineJoin.Round,
             };
@@ -205,7 +206,7 @@ internal sealed class FriendlyCheck : CheckBox
             float w = this.S(2);
             var ring = RectangleF.Inflate(box, Ring - w / 2, Ring - w / 2);
             using var path = Theme.RoundedRect(ring, radius + Ring - w / 2);
-            using var pen = new Pen(Theme.Shu, w);
+            using var pen = new Pen(Theme.Focus, w);
             g.DrawPath(pen, path);
         }
 

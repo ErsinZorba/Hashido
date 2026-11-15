@@ -48,14 +48,68 @@ public static class UserSettings
         set => Write(UpdateUrlValue, value);
     }
 
-    private static object? Read(string name)
+    /// <summary>Tepsinin tasarımı (1.6.0): 橋戸 marka (varsayılan) ya da sade Windows 11. Bilinmeyen değer → marka.</summary>
+    public static AppDesign Design
+    {
+        get => ParseDesign(ReadString(DesignValue));
+        set => Write(DesignValue, value == AppDesign.Windows ? "windows" : "brand");
+    }
+
+    /// <summary>Tepsinin teması (1.6.0): Windows'a uy (varsayılan), açık ya da koyu. Bilinmeyen değer → Windows'a uy.</summary>
+    public static ThemeMode ThemeMode
+    {
+        get => ParseTheme(ReadString(ThemeValue));
+        set => Write(ThemeValue, value switch { ThemeMode.Light => "light", ThemeMode.Dark => "dark", _ => "system" });
+    }
+
+    /// <summary>
+    /// <see cref="Design"/>'ı okur; false = kayıt OKUNAMADI (değer yoksa true + varsayılan). Çalışırken tema yeniden başlaması
+    /// geçici bir okuma hatasını değişiklik saymasın diye (gidip gelen yeniden başlama).
+    /// </summary>
+    public static bool TryReadDesign(out AppDesign design)
+    {
+        bool ok = TryRead(DesignValue, out var v);
+        design = ParseDesign(v as string);
+        return ok;
+    }
+
+    /// <summary><see cref="ThemeMode"/>'u okur; false = kayıt okunamadı (bkz. <see cref="TryReadDesign"/>).</summary>
+    public static bool TryReadThemeMode(out ThemeMode mode)
+    {
+        bool ok = TryRead(ThemeValue, out var v);
+        mode = ParseTheme(v as string);
+        return ok;
+    }
+
+    private const string DesignValue = "Design"; // metin: "brand" | "windows"
+    private const string ThemeValue = "Theme";   // metin: "system" | "light" | "dark"
+
+    private static AppDesign ParseDesign(string? s) =>
+        string.Equals(s?.Trim(), "windows", StringComparison.OrdinalIgnoreCase) ? AppDesign.Windows : AppDesign.Brand;
+
+    private static ThemeMode ParseTheme(string? s) => s?.Trim().ToLowerInvariant() switch
+    {
+        "light" => ThemeMode.Light,
+        "dark" => ThemeMode.Dark,
+        _ => ThemeMode.System,
+    };
+
+    private static object? Read(string name) => TryRead(name, out var v) ? v : null;
+
+    /// <summary>Değeri okur; false yalnız kayıt okunamadığında (yetki, G/Ç). Anahtar ya da değer yoksa true + null.</summary>
+    private static bool TryRead(string name, out object? value)
     {
         try
         {
             using var key = Registry.CurrentUser.OpenSubKey(LanguageSetting.KeyPath);
-            return key?.GetValue(name);
+            value = key?.GetValue(name);
+            return true;
         }
-        catch (Exception e) when (e is System.Security.SecurityException or UnauthorizedAccessException or IOException) { return null; }
+        catch (Exception e) when (e is System.Security.SecurityException or UnauthorizedAccessException or IOException)
+        {
+            value = null;
+            return false;
+        }
     }
 
     private static int? ReadInt(string name) => Read(name) is int v ? v : null;
@@ -73,3 +127,9 @@ public static class UserSettings
         catch (Exception e) when (e is System.Security.SecurityException or UnauthorizedAccessException or IOException) { }
     }
 }
+
+/// <summary>Tepsinin görünümü: 橋戸 marka ya da sade Windows 11 (renk, yazı tipi, düğme davranışı; yerleşim aynı).</summary>
+public enum AppDesign { Brand, Windows }
+
+/// <summary>Tepsinin teması: Windows'un uygulama modunu izle, ya da hep açık / hep koyu.</summary>
+public enum ThemeMode { System, Light, Dark }

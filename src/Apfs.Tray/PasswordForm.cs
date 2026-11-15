@@ -27,11 +27,13 @@ internal sealed class PasswordForm : Form
         int width = this.S(360);
         int glyph = this.S(32), indent = glyph + this.S(14);
 
-        Label Line(string t, Font f, Color c, int top = 0, int max = 0) => new()
+        Label Line(string t, Font f, Color c, int top = 0, int max = 0)
         {
-            Text = t, Font = f, ForeColor = c, AutoSize = true, MaximumSize = new Size(max > 0 ? max : width, 0), UseMnemonic = false,
-            Margin = new Padding(0, this.S(top), 0, 0),
-        };
+            var l = HeadingLabel.For(f); // başlıkta rakamlar düz (1.6.0)
+            l.Text = t; l.Font = f; l.ForeColor = c; l.AutoSize = true; l.MaximumSize = new Size(max > 0 ? max : width, 0); l.UseMnemonic = false;
+            l.Margin = new Padding(0, this.S(top), 0, 0);
+            return l;
+        }
 
         var layout = new FlowLayoutPanel
         {
@@ -76,7 +78,7 @@ internal sealed class PasswordForm : Form
         field.Controls.Add(eye, 1, 0);
         layout.Controls.Add(field);
 
-        _error = Line(error ?? "", Theme.Body, Theme.Shu, 8);
+        _error = Line(error ?? "", Theme.Body, Theme.Alert, 8);
         _error.Visible = error is not null;
         layout.Controls.Add(_error);
         layout.Controls.Add(Line(WinText.U("Password.Reassurance"), Theme.Small, Theme.InkSoft, 10));

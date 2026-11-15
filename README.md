@@ -25,7 +25,7 @@ Plug the disk in and within a few seconds it shows up in File Explorer with a dr
 | 10 interface languages | English, Türkçe, Deutsch, Français, Español, Português (Brasil), Italiano, 日本語, 简体中文, 한국어 |
 
 ## Installation
-Run `Hashido-Setup-1.5.1.exe` and follow the wizard (Next › Install › Finish). Windows 10/11 (64-bit) is all you need;
+Run `Hashido-Setup-1.6.0.exe` and follow the wizard (Next › Install › Finish). Windows 10/11 (64-bit) is all you need;
 nothing else has to be installed: .NET comes with the program, and if the [WinFsp](https://winfsp.dev) driver is missing the wizard
 installs it too. After installation, **Hashido** is in the Start menu and the tray icon starts automatically at every sign-in.
 
@@ -37,7 +37,7 @@ installs it too. After installation, **Hashido** is in the Start menu and the tr
 To uninstall: **Settings › Apps › Installed apps › Hashido › Uninstall**. Uninstalling writes nothing to your disks;
 the log (`C:\ProgramData\APFS for Windows\log.txt`) is kept for you to inspect, and WinFsp is not removed. Unsent reports and
 the list of sent ones (`C:\ProgramData\APFS for Windows\reports`, `%LOCALAPPDATA%\APFS for Windows\reports`) and your answer to the
-automatic-reports question are deleted, so a reinstall asks again; your language and update-notification settings are kept.
+automatic-reports question are deleted, so a reinstall asks again; your language, appearance and update-notification settings are kept.
 
 ## Usage
 - **Main window** (Start menu, or "Open main window" in the tray menu): each attached Mac disk is listed with its name and
@@ -47,7 +47,9 @@ automatic-reports question are deleted, so a reinstall asks again; your language
   close the program; the disks stay mounted and the program keeps running in the notification area.
 - **Tray panel**: left-click the Hashido icon (the red seal) next to the clock; the same actions in a small panel. The right-click
   menu has "Open main window", "safely eject" for each disk, "Scan again", "Open log" and "Exit".
-- **Light and dark:** the program follows Windows' app mode (Settings › Personalization › Colors). When you switch it, the program
+- **Appearance:** two designs, Hashido (paper and ink) and Windows 11 (Windows' own look and accent color), each light or dark.
+  Choose them under Settings (the gear icon) › Appearance; the program restarts to apply them. With the theme set to "Match
+  Windows" (the default), the program follows Windows' app mode (Settings › Personalization › Colors) and, when you switch it,
   restarts itself in the new mode as soon as nothing is in progress.
 
 ## Language

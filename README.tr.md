@@ -25,7 +25,7 @@ Diski takarsınız, birkaç saniye içinde Dosya Gezgini'nde sürücü harfi ola
 | 10 arayüz dili | Türkçe, English, Deutsch, Français, Español, Português (Brasil), Italiano, 日本語, 简体中文, 한국어 |
 
 ## Kurulum
-`Hashido-Setup-1.5.1.exe` dosyasını çalıştırın ve sihirbazı izleyin (İleri › Kur › Son). Windows 10/11 (64 bit) yeter;
+`Hashido-Setup-1.6.0.exe` dosyasını çalıştırın ve sihirbazı izleyin (İleri › Kur › Son). Windows 10/11 (64 bit) yeter;
 başka bir şey kurmanız gerekmez: .NET programla birlikte gelir, [WinFsp](https://winfsp.dev) sürücüsü yoksa sihirbaz onu da kurar.
 Kurulumdan sonra Başlat menüsünde **Hashido** bulunur ve tepsi simgesi her oturumda kendiliğinden açılır.
 
@@ -37,7 +37,7 @@ Kurulumdan sonra Başlat menüsünde **Hashido** bulunur ve tepsi simgesi her ot
 Kaldırmak için: **Ayarlar › Uygulamalar › Yüklü uygulamalar › Hashido › Kaldır**. Kaldırma disklerinize hiçbir şey yazmaz;
 günlük (`C:\ProgramData\APFS for Windows\log.txt`) incelemeniz için bırakılır, WinFsp kaldırılmaz. Gönderilmemiş
 raporlar ile gönderilenlerin listesi (`C:\ProgramData\APFS for Windows\reports`, `%LOCALAPPDATA%\APFS for Windows\reports`) ve otomatik raporlar
-sorusuna verdiğiniz cevap silinir, yeniden kurulumda yeniden sorulur; dil ve güncelleme bildirimi ayarlarınız kalır.
+sorusuna verdiğiniz cevap silinir, yeniden kurulumda yeniden sorulur; dil, görünüm ve güncelleme bildirimi ayarlarınız kalır.
 
 ## Kullanım
 - **Ana pencere** (Başlat menüsü veya tepsi menüsünden "Ana pencereyi aç"): takılı her Mac diski adıyla ve yanında **Güvenle
@@ -47,8 +47,10 @@ sorusuna verdiğiniz cevap silinir, yeniden kurulumda yeniden sorulur; dil ve g�
   devam eder.
 - **Tepsi paneli**: saatin yanındaki Hashido simgesine (kırmızı mühür) sol tıklayın; aynı işlemler küçük bir panelde. Sağ tık
   menüsünde "Ana pencereyi aç", disk başına "güvenle çıkar", "Yeniden tara", "Günlüğü aç" ve "Çıkış" bulunur.
-- **Açık ve koyu:** program Windows'un uygulama modunu izler (Ayarlar › Kişiselleştirme › Renkler). Modu değiştirdiğinizde program,
-  süren bir şey kalmayınca kendini yeni modda yeniden başlatır.
+- **Görünüm:** iki tasarım, Hashido (kâğıt ve mürekkep) ve Windows 11 (Windows'un kendi görünümü ve vurgu rengi); ikisi de açık ya
+  da koyu. Ayarlar (çark simgesi) › Görünüm'den seçilir; program yeni görünüm için yeniden açılır. Tema "Windows'a uy" iken
+  (varsayılan) program Windows'un uygulama modunu izler (Ayarlar › Kişiselleştirme › Renkler) ve modu değiştirdiğinizde, süren
+  bir şey kalmayınca kendini yeni modda yeniden başlatır.
 
 ## Dil
 Program Windows'un görüntü dilinde açılır (Türkçe, İngilizce, Almanca, Fransızca, İspanyolca, Brezilya Portekizcesi, İtalyanca,

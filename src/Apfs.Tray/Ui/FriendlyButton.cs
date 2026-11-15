@@ -8,11 +8,22 @@ namespace Apfs.Tray.Ui;
 /// <see cref="Kind.Secondary"/> mürekkep çizgi (üzerine gelince dolar), <see cref="Kind.Quiet"/> yalnız metin (isteğe bağlı
 /// ikonla), <see cref="Kind.Icon"/> yalnız ikon (metin araç ipucu ve erişilebilir ad olur). Üzerine gelince renk yumuşakça
 /// değişir; basınca her türde gövde ortasından yumuşakça küçülür (Quiet'te soluk bir zemin belirir), yazı yerinden
-/// oynamaz; odakta 2 px zinober halka. "Meşgul" durumunda dönen bir halka ve <see cref="BusyText"/> gösterir, tıklanamaz.
+/// oynamaz; odakta 2 px halka (<see cref="Theme.Focus"/>). "Meşgul" durumunda dönen bir halka ve <see cref="BusyText"/>
+/// gösterir, tıklanamaz. Windows 11 tasarımında (1.6.0, Fluent) basınca küçülme yok: birincil vurgu dolgu, ikincil hafif dolgu +
+/// ince çerçeve + yükselti kenarı, sessiz/ikon saydam (üzerine gelince Track); durum dolgu ve metin rengiyle gösterilir.
 /// </summary>
 internal sealed class FriendlyButton : Control, IButtonControl
 {
     public enum Kind { Primary, Secondary, Quiet, Icon }
+
+    /// <summary>
+    /// Sessiz, ikon ve ikincil düğmenin rengi (1.6.0): <see cref="Tone.Alert"/> geri alınmaz eylem (Güvenle çıkar; markada
+    /// zinober), <see cref="Tone.Caution"/> dikkatli eylem (Yazmaya izin ver; markada kincha). Sessiz/ikonda metin/ikon rol
+    /// renginde, üzerine gelince belirginleşir (mürekkebe doğru), basınca rol renginden açık bir zemin belirir. İkincilde
+    /// (iletişim kutusunun devam düğmesi) markada çizgi ve metin rol renginde, üzerine gelince rol rengiyle dolar; Windows 11'de
+    /// yalnız metin rol renginde.
+    /// </summary>
+    public enum Tone { None, Alert, Caution }
 
     private static readonly System.Windows.Forms.Timer Ticker = new() { Interval = 15 };
     private static readonly HashSet<FriendlyButton> Animating = [];
@@ -62,6 +73,18 @@ internal sealed class FriendlyButton : Control, IButtonControl
         get => _icon;
         set { _icon = value; PerformLayout(); Invalidate(); }
     }
+
+    /// <summary>Sessiz/ikon/ikincil düğmenin rol rengi (bkz. <see cref="Tone"/>); birincilde etkisiz.</summary>
+    [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
+    public Tone ButtonTone
+    {
+        get => _tone;
+        set { _tone = value; Invalidate(); }
+    }
+
+    private Tone _tone;
+
+    private Color? ToneColor => _tone switch { Tone.Alert => Theme.Alert, Tone.Caution => Theme.Caution, _ => null };
 
     [DesignerSerializationVisibility(DesignerSerializationVisibility.Hidden)]
     public bool Busy
@@ -235,39 +258,78 @@ internal sealed class FriendlyButton : Control, IButtonControl
         g.SmoothingMode = SmoothingMode.AntiAlias;
 
         bool off = !Enabled || _busy;
+        bool win = Theme.IsWindows;
         float h = Math.Max(_hover, _press);
         // Zemin (bg ile karışık, opak) ve metin rengi
-        Color fill, fore, border = Color.Empty;
+        Color fill, fore, border = Color.Empty, edge = Color.Empty;
         switch (_kind)
         {
+            // ---- Windows 11 (1.6.0): basınca küçülme yok; durum dolgu ve metin rengiyle (Fluent) ----
+            case Kind.Primary when win:
+                // Fluent hover/basılıda vurgu %10/%20 açılır ve metin solar; açık temada yazı kontrastı 3'e iniyordu → en çok
+                // %12 açılma, metin solmaz (her karede ≥ 4,5; v160/buttons.cs)
+                fill = Theme.Lerp(Theme.Accent, bg, 0.08f * h + 0.04f * _press);
+                fore = Theme.OnAccent;
+                break;
+            case Kind.Secondary when win:
+                fill = Theme.Lerp(Theme.Lerp(Theme.ControlFill(0), Theme.ControlFill(1), _hover), Theme.ControlFill(2), _press);
+                fore = ToneColor ?? Theme.Lerp(Theme.Ink, Theme.InkSoft, _press); // tonlu: rol renginde, basınca solmaz
+                (border, edge) = Theme.ControlStroke;
+                break;
+            case Kind.Icon or Kind.Quiet when win:
+                fill = Theme.Lerp(bg, Theme.Track, _hover * (1 - 0.4f * _press));
+                if (ToneColor is { } winTone)
+                {
+                    fill = Theme.Lerp(fill, winTone, 0.10f * _press);
+                    fore = Theme.Lerp(winTone, Theme.Ink, 0.3f * h); // basınca solmaz (Caution açıkta 4,5'in altına iniyordu)
+                }
+                else fore = Theme.Lerp(_kind == Kind.Icon ? Theme.Ink : Theme.Lerp(Theme.InkSoft, Theme.Ink, _hover), Theme.InkSoft, _press);
+                break;
+            // ---- 橋戸 marka ----
+            case Kind.Secondary when ToneColor is { } secondaryTone: // tonlu (iletişim kutusunun devam eylemi): rol rengi çizgi
+                fill = Theme.Lerp(bg, secondaryTone, h);
+                fore = Theme.Lerp(secondaryTone, Theme.OnInk, h);
+                border = secondaryTone;
+                break;
             case Kind.Primary:
-                fill = Theme.Lerp(Theme.Ink, bg, 0.12f * h + 0.08f * _press);
-                fore = Theme.OnInk;
+                fill = Theme.Lerp(Theme.Accent, bg, 0.12f * h + 0.08f * _press);
+                fore = Theme.OnAccent;
                 break;
             case Kind.Secondary:
                 fill = Theme.Lerp(bg, Theme.Ink, h);
                 fore = Theme.Lerp(Theme.Ink, Theme.OnInk, h);
                 border = Theme.Ink;
                 break;
+            case Kind.Icon when ToneColor is { } tone:
+                fill = Theme.Lerp(bg, tone, 0.10f * h + 0.06f * _press);
+                fore = Theme.Lerp(tone, Theme.Ink, 0.3f * h);
+                break;
             case Kind.Icon:
                 fill = Theme.Lerp(bg, Theme.Track, h);
                 fore = Theme.Ink;
                 break;
             default: // Quiet: zemin yalnız basınca (öbür türler gibi ortasından küçüldüğü görünsün)
+                if (ToneColor is { } quietTone)
+                {
+                    fill = Theme.Lerp(bg, quietTone, 0.12f * _press);
+                    fore = Theme.Lerp(quietTone, Theme.Ink, 0.3f * h);
+                    break;
+                }
                 fill = Theme.Lerp(bg, Theme.Track, _press);
                 fore = Theme.Lerp(Theme.InkSoft, Theme.Ink, h);
                 break;
         }
         if (off)
         {
-            fill = _kind == Kind.Primary ? Theme.Lerp(Theme.Ink, bg, 0.55f) : bg;
-            fore = _kind == Kind.Primary ? Theme.OnInk : Theme.Lerp(Theme.InkSoft, bg, 0.35f);
+            fill = _kind == Kind.Primary ? Theme.Lerp(Theme.Accent, bg, 0.55f) : bg;
+            fore = _kind == Kind.Primary ? Theme.OnAccent : Theme.Lerp(Theme.InkSoft, bg, 0.35f);
             border = border.IsEmpty ? border : Theme.Lerp(Theme.Ink, bg, 0.6f);
         }
 
-        // Basınca gövde dört yandan eşit içe çekilir (ortasından küçülür); yazı ve ikon sabit dikdörtgende kalır
+        // Marka: basınca gövde dört yandan eşit içe çekilir (ortasından küçülür); yazı ve ikon sabit dikdörtgende kalır.
+        // Windows 11: gövde yerinde kalır.
         float rest = Ring + 0.5f;
-        float inset = rest + _press * 1.5f * DeviceDpi / 96f;
+        float inset = rest + (win ? 0 : _press * 1.5f * DeviceDpi / 96f);
         var body = new RectangleF(inset, inset, Width - 1 - inset * 2, Height - 1 - inset * 2);
         float radius = this.S(4);
         if (fill != bg)
@@ -281,13 +343,25 @@ internal sealed class FriendlyButton : Control, IButtonControl
             using var path = Theme.RoundedRect(body, radius);
             using var pen = new Pen(border, Math.Max(1, this.S(1)));
             g.DrawPath(pen, path);
+            if (!edge.IsEmpty && !off)
+            {
+                // Yükselti: açıkta alt kenar, koyuda üst kenar bir ton farklı (Fluent ControlElevationBorder)
+                var state = g.Save();
+                float band = radius;
+                g.SetClip(Theme.IsDark
+                    ? new RectangleF(body.X - 1, body.Y - 1, body.Width + 2, band)
+                    : new RectangleF(body.X - 1, body.Bottom - band + 1, body.Width + 2, band));
+                using var edgePen = new Pen(edge, Math.Max(1, this.S(1)));
+                g.DrawPath(edgePen, path);
+                g.Restore(state);
+            }
         }
 
         if (Focused && ShowFocusCues)
         {
             float w = this.S(2);
             using var path = Theme.RoundedRect(new RectangleF(w / 2, w / 2, Width - 1 - w, Height - 1 - w), radius + Ring / 2f);
-            using var pen = new Pen(Theme.Shu, w);
+            using var pen = new Pen(Theme.Focus, w);
             g.DrawPath(pen, path);
         }
 
@@ -309,7 +383,7 @@ internal sealed class FriendlyButton : Control, IButtonControl
         }
         if (_kind == Kind.Icon)
         {
-            float s = this.S(16) * (1 - 0.08f * _press); // ikon da ortasından küçülür
+            float s = this.S(16) * (1 - (win ? 0 : 0.08f) * _press); // markada ikon da ortasından küçülür
             Glyphs.DrawIcon(g, new RectangleF((Width - s) / 2f, (Height - s) / 2f, s, s), _icon, fore);
             return;
         }

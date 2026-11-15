@@ -140,6 +140,12 @@
   <data name="Consent.Yes" xml:space="preserve">
     <value>Evet, gönder</value>
   </data>
+  <data name="Design.Brand" xml:space="preserve">
+    <value>Hashido</value>
+  </data>
+  <data name="Design.Windows" xml:space="preserve">
+    <value>Windows 11</value>
+  </data>
   <data name="Disk.Gone" xml:space="preserve">
     <value>Bu disk artık takılı değil.</value>
   </data>
@@ -287,6 +293,15 @@
   <data name="Settings.AboutHeading" xml:space="preserve">
     <value>Hakkında</value>
   </data>
+  <data name="Settings.AppearanceHeading" xml:space="preserve">
+    <value>Görünüm</value>
+  </data>
+  <data name="Settings.AppearanceNote" xml:space="preserve">
+    <value>Yeni görünüm için program yeniden açılır.</value>
+  </data>
+  <data name="Settings.Design" xml:space="preserve">
+    <value>Tasarım</value>
+  </data>
   <data name="Settings.Language" xml:space="preserve">
     <value>Dil</value>
   </data>
@@ -302,6 +317,9 @@
   <data name="Settings.ShowSent" xml:space="preserve">
     <value>Gönderilenleri göster</value>
   </data>
+  <data name="Settings.Theme" xml:space="preserve">
+    <value>Tema</value>
+  </data>
   <data name="Settings.Title" xml:space="preserve">
     <value>{0} ayarları</value>
   </data>
@@ -313,6 +331,15 @@
   </data>
   <data name="Settings.WhatIsSent" xml:space="preserve">
     <value>Ne gönderiliyor?</value>
+  </data>
+  <data name="Theme.Dark" xml:space="preserve">
+    <value>Koyu</value>
+  </data>
+  <data name="Theme.Light" xml:space="preserve">
+    <value>Açık</value>
+  </data>
+  <data name="Theme.System" xml:space="preserve">
+    <value>Windows'a uy</value>
   </data>
   <data name="Tray.MenuEject" xml:space="preserve">
     <value>{0}{1}: güvenle çıkar</value>

@@ -140,6 +140,12 @@
   <data name="Consent.Yes" xml:space="preserve">
     <value>예, 보내기</value>
   </data>
+  <data name="Design.Brand" xml:space="preserve">
+    <value>Hashido</value>
+  </data>
+  <data name="Design.Windows" xml:space="preserve">
+    <value>Windows 11</value>
+  </data>
   <data name="Disk.Gone" xml:space="preserve">
     <value>이 디스크는 더 이상 연결되어 있지 않습니다.</value>
   </data>
@@ -287,6 +293,15 @@
   <data name="Settings.AboutHeading" xml:space="preserve">
     <value>정보</value>
   </data>
+  <data name="Settings.AppearanceHeading" xml:space="preserve">
+    <value>모양</value>
+  </data>
+  <data name="Settings.AppearanceNote" xml:space="preserve">
+    <value>새 모양은 프로그램을 다시 시작하면 적용됩니다.</value>
+  </data>
+  <data name="Settings.Design" xml:space="preserve">
+    <value>디자인</value>
+  </data>
   <data name="Settings.Language" xml:space="preserve">
     <value>언어</value>
   </data>
@@ -302,6 +317,9 @@
   <data name="Settings.ShowSent" xml:space="preserve">
     <value>전송한 내용 보기</value>
   </data>
+  <data name="Settings.Theme" xml:space="preserve">
+    <value>테마</value>
+  </data>
   <data name="Settings.Title" xml:space="preserve">
     <value>{0} 설정</value>
   </data>
@@ -313,6 +331,15 @@
   </data>
   <data name="Settings.WhatIsSent" xml:space="preserve">
     <value>무엇이 전송되나요?</value>
+  </data>
+  <data name="Theme.Dark" xml:space="preserve">
+    <value>어둡게</value>
+  </data>
+  <data name="Theme.Light" xml:space="preserve">
+    <value>밝게</value>
+  </data>
+  <data name="Theme.System" xml:space="preserve">
+    <value>Windows 설정 따르기</value>
   </data>
   <data name="Tray.MenuEject" xml:space="preserve">
     <value>{0}{1}: 안전하게 꺼내기</value>

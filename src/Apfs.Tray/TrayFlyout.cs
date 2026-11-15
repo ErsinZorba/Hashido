@@ -13,8 +13,10 @@ internal sealed class TrayFlyout : Form
     private readonly AppController _app;
     private readonly DiskListView _list;
     private readonly System.Windows.Forms.Timer _fade = new() { Interval = 15 };
-    private int _targetTop;
+    private int _targetTop, _targetLeft;
     private long _hiddenAt;
+    private Screen? _screen; // panelin açılacağı (tıklanan simgenin) ekranı
+    private bool _armed;     // ekran dışında kurulu, yerine gelmeyi bekliyor
 
     public TrayFlyout(AppController app, Action openMain)
     {
@@ -42,7 +44,7 @@ internal sealed class TrayFlyout : Form
         header.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         header.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         header.Controls.Add(new MarkView(seal: true, this.S(20)) { Anchor = AnchorStyles.Left, Margin = new Padding(0, 0, this.S(10), 0) }, 0, 0);
-        header.Controls.Add(new Label
+        header.Controls.Add(new HeadingLabel
         {
             Text = Branding.ProductName, Font = Theme.Heading(12f), ForeColor = Theme.Ink, AutoSize = true, UseMnemonic = false,
             Anchor = AnchorStyles.Left, Margin = Padding.Empty,
@@ -94,6 +96,12 @@ internal sealed class TrayFlyout : Form
         base.OnHandleCreated(e);
         int round = 2; // DWMWCP_ROUND: Windows 11'de yuvarlak köşe (Windows 10'da etkisiz)
         _ = DwmSetWindowAttribute(Handle, 33, ref round, sizeof(int));
+        if (Theme.IsWindows)
+        {
+            // Windows 11 tasarımı: kenarlığı Windows çizer (DWMWA_BORDER_COLOR = Hair; COLORREF 0x00BBGGRR), içte ikinci çizgi yok
+            int border = ColorTranslator.ToWin32(Theme.Hair);
+            _ = DwmSetWindowAttribute(Handle, 34, ref border, sizeof(int));
+        }
     }
 
     [DllImport("dwmapi.dll")]
@@ -102,35 +110,63 @@ internal sealed class TrayFlyout : Form
     protected override void OnPaintBackground(PaintEventArgs e)
     {
         base.OnPaintBackground(e);
+        if (Theme.IsWindows) return; // kenarlık DWM'de (OnHandleCreated)
         using var pen = new Pen(Theme.Hair);
         e.Graphics.DrawRectangle(pen, 0, 0, Width - 1, Height - 1);
     }
 
-    /// <summary>Simgeye tıklanınca: açıksa kapat, kapalıysa imlecin yanında (görev çubuğunun hemen üstünde) aç.</summary>
-    public void Toggle()
+    /// <summary>
+    /// Simgeye tek tıklanınca, tıklama anında (Windows öne gelme hakkını yalnız bu anda verir): açıksa kapatır ve false döner;
+    /// kapalıysa listeyi kurar, hedef konumu imleçten hesaplar ve paneli ekran DIŞINDA gösterip etkinleştirir, true döner —
+    /// çağıran kısa bekleme (<see cref="TrayApp.RevealDelay"/>) dolunca <see cref="Reveal"/> der. Bekleme sırasında odak
+    /// giderse panel kendiliğinden gizlenir.
+    /// </summary>
+    public bool Arm()
     {
-        if (Visible) { Hide(); return; }
+        if (Visible) { Hide(); return false; }
         // Panel açıkken simgeye tıklamak önce paneli kapatır (odak kaybı); aynı tık yeniden açmasın.
-        if (Environment.TickCount64 - _hiddenAt < 300) return;
+        if (Environment.TickCount64 - _hiddenAt < 300) return false;
+        var cursor = Cursor.Position;
+        _screen = Screen.FromPoint(cursor); // ekran dışındayken Screen.FromControl başka monitörü verebilir
         _list.Rebuild();
         FitHeight();
-        var cursor = Cursor.Position;
-        var wa = Screen.FromPoint(cursor).WorkingArea;
+        var wa = _screen.WorkingArea;
         int gap = this.S(12);
-        Left = Math.Clamp(cursor.X - Width / 2, wa.Left + gap, wa.Right - Width - gap);
+        _targetLeft = Math.Clamp(cursor.X - Width / 2, wa.Left + gap, wa.Right - Width - gap);
         _targetTop = Math.Clamp(cursor.Y - Height - gap, wa.Top + gap, wa.Bottom - Height - gap);
-        Top = _targetTop + this.S(10);
+        // Bekleme yeri tüm ekranların sağında: boy değişip Top kaysa da hiçbir ekrana girmez
+        var virt = SystemInformation.VirtualScreen;
+        Left = virt.Right + this.S(200);
+        Top = virt.Top;
         Opacity = 0;
         Show();
         Activate();
+        _armed = true;
+        return true;
+    }
+
+    /// <summary>Bekleme doldu: panel hâlâ kurulu ve açıksa (odak gitmediyse) yerine gelip yukarı kayarak belirir.</summary>
+    public void Reveal()
+    {
+        if (!_armed || !Visible) return;
+        _armed = false;
+        Left = _targetLeft;
+        Top = _targetTop + this.S(10);
         _fade.Start();
+    }
+
+    /// <summary>Çift tık: kurulu panel hiç görünmeden gizlenir.</summary>
+    public void Cancel()
+    {
+        _armed = false;
+        if (Visible) Hide();
     }
 
     private void FitHeight()
     {
         int chrome = Controls.Cast<Control>().Where(c => c != _list).Sum(c => c.Height) + Padding.Vertical;
         int wanted = chrome + _list.Padding.Vertical + _list.ContentHeight;
-        int max = (int)(Screen.FromControl(this).WorkingArea.Height * 0.8);
+        int max = (int)((_screen ?? Screen.FromControl(this)).WorkingArea.Height * 0.8);
         int old = Height;
         Height = Math.Clamp(wanted, this.S(200), max);
         if (Visible) Top -= Height - old; // alt kenar sabit kalsın
@@ -139,7 +175,7 @@ internal sealed class TrayFlyout : Form
 
     private void FadeStep()
     {
-        Opacity = Math.Min(1, Opacity + 0.15);
+        Opacity = Math.Min(1, Opacity + 0.25); // ~4 adımda (1.6.0: 0,15 ile ~7 adım kullanıcıya ağır geldi)
         int step = Math.Max(1, (Top - _targetTop + 1) / 2);
         Top = Math.Max(_targetTop, Top - step);
         if (Opacity >= 1 && Top == _targetTop) _fade.Stop();
@@ -158,6 +194,7 @@ internal sealed class TrayFlyout : Form
         if (!Visible)
         {
             _hiddenAt = Environment.TickCount64;
+            _armed = false;
             _fade.Stop();
         }
     }

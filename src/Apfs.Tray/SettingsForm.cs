@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -11,13 +10,16 @@ using Apfs.Windows.Reporting;
 namespace Apfs.Tray;
 
 /// <summary>
-/// Ayarlar: arayüz dili, otomatik raporlar (+ "Ne gönderiliyor?", "Gönderilenleri göster"), yeni sürüm bildirimi, Hakkında
-/// (sürüm → Hakkında penceresi, günlüğü aç). Tamam'a
-/// basılınca seçimler özelliklerden okunur ve çağıran uygular (dil değiştiyse program yeniden başlar).
+/// Ayarlar: arayüz dili, görünüm (tasarım + tema, 1.6.0), otomatik raporlar (+ "Ne gönderiliyor?", "Gönderilenleri göster"),
+/// yeni sürüm bildirimi, Hakkında (sürüm → Hakkında penceresi, günlüğü aç, sahip). Tamam'a basılınca seçimler özelliklerden
+/// okunur ve çağıran uygular (dil ya da görünüm değiştiyse program bir kez yeniden başlar).
 /// </summary>
 internal sealed class SettingsForm : Form
 {
     private readonly ComboBox _language;
+    private readonly ComboBox _design;
+    private readonly ComboBox _theme;
+    private readonly TableLayoutPanel _appearance;
     private readonly FriendlyCheck _reports;
     private readonly FriendlyCheck _updates;
     private readonly List<CultureInfo?> _cultures = [];
@@ -38,11 +40,13 @@ internal sealed class SettingsForm : Form
         Theme.ApplyFrame(this);
         int width = this.S(400);
 
-        Label Line(string t, Font f, Color c, int top = 0) => new()
+        Label Line(string t, Font f, Color c, int top = 0)
         {
-            Text = t, Font = f, ForeColor = c, AutoSize = true, MaximumSize = new Size(width, 0), UseMnemonic = false,
-            Margin = new Padding(0, this.S(top), 0, 0),
-        };
+            var l = HeadingLabel.For(f); // başlıkta rakamlar düz (1.6.0)
+            l.Text = t; l.Font = f; l.ForeColor = c; l.AutoSize = true; l.MaximumSize = new Size(width, 0); l.UseMnemonic = false;
+            l.Margin = new Padding(0, this.S(top), 0, 0);
+            return l;
+        }
         // Onay kutusu metni kaydırılır (uzun diller için şart); yükseklik kontrolün kendi ölçümünden (çizimle aynı hesap)
         FriendlyCheck Check(string t, bool value)
         {
@@ -76,6 +80,42 @@ internal sealed class SettingsForm : Form
         _language.SelectedIndex = Math.Max(0, _cultures.FindIndex(c => c?.Name == saved?.Name));
         layout.Controls.Add(_language);
         layout.Controls.Add(Line(WinText.U("Settings.LanguageNote"), Theme.Small, Theme.InkSoft, 4));
+
+        // Görünüm (1.6.0): tasarım (橋戸 marka / Windows 11) ve tema (Windows'a uy / açık / koyu); Tamam'da program yeniden açılır
+        layout.Controls.Add(Line(WinText.U("Settings.AppearanceHeading"), Theme.Heading(12f), Theme.Ink, 20));
+        var appearance = new TableLayoutPanel
+        {
+            ColumnCount = 2, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, Margin = new Padding(0, this.S(6), 0, 0),
+            Padding = Padding.Empty,
+        };
+        appearance.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        appearance.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        ComboBox Choice(string label, string[] items, int selected, int row)
+        {
+            var caption = new Label
+            {
+                Text = label, AutoSize = true, UseMnemonic = false, ForeColor = Theme.Ink, Anchor = AnchorStyles.Left, Font = Theme.Body,
+                Margin = new Padding(0, row == 0 ? 0 : this.S(6), this.S(12), 0),
+            };
+            var combo = new ComboBox
+            {
+                DropDownStyle = ComboBoxStyle.DropDownList, Width = this.S(240), Anchor = AnchorStyles.Left, Font = Theme.Body,
+                Margin = new Padding(0, row == 0 ? 0 : this.S(6), 0, 0),
+            };
+            Theme.Style(combo);
+            combo.Items.AddRange(items);
+            combo.SelectedIndex = selected;
+            appearance.Controls.Add(caption, 0, row);
+            appearance.Controls.Add(combo, 1, row);
+            return combo;
+        }
+        _design = Choice(WinText.U("Settings.Design"), [WinText.U("Design.Brand"), WinText.U("Design.Windows")],
+            UserSettings.Design == AppDesign.Windows ? 1 : 0, 0);
+        _theme = Choice(WinText.U("Settings.Theme"), [WinText.U("Theme.System"), WinText.U("Theme.Light"), WinText.U("Theme.Dark")],
+            (int)UserSettings.ThemeMode, 1);
+        layout.Controls.Add(appearance);
+        _appearance = appearance;
+        layout.Controls.Add(Line(WinText.U("Settings.AppearanceNote"), Theme.Small, Theme.InkSoft, 4));
 
         // Raporlar
         layout.Controls.Add(Line(WinText.U("Settings.ReportsHeading"), Theme.Heading(12f), Theme.Ink, 20));
@@ -111,6 +151,8 @@ internal sealed class SettingsForm : Form
         about.Controls.Add(versionButton);
         about.Controls.Add(log);
         layout.Controls.Add(about);
+        // Sahip (1.6.0): derlemenin telif özniteliğinden (Directory.Build.props; tek kaynak, çevrilmez)
+        if (OwnerLine(typeof(SettingsForm).Assembly) is { } owner) layout.Controls.Add(Line(owner, Theme.Small, Theme.InkSoft, 2));
 
         var buttons = new FlowLayoutPanel
         {
@@ -133,28 +175,37 @@ internal sealed class SettingsForm : Form
 
     /// <summary>
     /// Hakkında penceresi. WinFsp lisansı (FLOSS istisnası) WinFsp telif notunun ve depo bağlantısının arayüzde bulunmasını
-    /// şart koşar; not burada durur (1.5.1'e kadar ana pencerenin sürüm düğmesindeydi).
+    /// şart koşar; not burada durur (1.5.1'e kadar ana pencerenin sürüm düğmesindeydi; 1.6.0'dan beri temalı kutuda).
     /// </summary>
-    private void ShowAbout(string version)
+    private void ShowAbout(string version) => MessageDialog.About(this, version);
+
+    /// <summary>
+    /// Açılır listenin ön ölçüsü (PreferredHeight) tutamaç kurulunca aldığı gerçek boydan kısa (%150'de 33 ↔ 35 px); Görünüm
+    /// tablosu satırları ön ölçüyle kurup Tema listesinin alt kenarını kırpıyordu (v160/settings.cs ölçtü). Yüklenince (boylar
+    /// kesin) tablo en az satırların gerçek boyu kadar yapılır.
+    /// </summary>
+    protected override void OnLoad(EventArgs e)
     {
-        var page = new TaskDialogPage
-        {
-            Caption = Branding.ProductName,
-            Heading = $"{Branding.ProductName} {version}",
-            Text = WinText.U("About.Text") + "\n" +
-                   "<a href=\"https://github.com/ErsinZorba/Hashido\">github.com/ErsinZorba/Hashido</a>",
-            Footnote = new TaskDialogFootnote(
-                "WinFsp - Windows File System Proxy, Copyright (C) Bill Zissimopoulos\n" +
-                "<a href=\"https://github.com/winfsp/winfsp\">github.com/winfsp/winfsp</a>"),
-            EnableLinks = true,
-            Buttons = { TaskDialogButton.OK },
-        };
-        page.LinkClicked += (_, e) => Process.Start(new ProcessStartInfo(e.LinkHref) { UseShellExecute = true });
-        AppController.Modal(() => TaskDialog.ShowDialog(this, page));
+        base.OnLoad(e);
+        int need = _appearance.Controls.Cast<Control>().GroupBy(_appearance.GetRow).Sum(r => r.Max(x => x.Height + x.Margin.Vertical));
+        if (need > _appearance.Height) _appearance.MinimumSize = new Size(0, need);
     }
+
+    /// <summary>"Copyright (c) 2026 Ersin Zorba" → "© 2026 Ersin Zorba"; öznitelik yoksa null.</summary>
+    internal static string? OwnerLine(System.Reflection.Assembly assembly) =>
+        assembly.GetCustomAttributes(typeof(System.Reflection.AssemblyCopyrightAttribute), false)
+            .OfType<System.Reflection.AssemblyCopyrightAttribute>().FirstOrDefault()?.Copyright is { Length: > 0 } c
+            ? System.Text.RegularExpressions.Regex.Replace(c, @"^\s*Copyright\s*(\(c\)|©)?\s*", "© ", System.Text.RegularExpressions.RegexOptions.IgnoreCase)
+            : null;
 
     /// <summary>Seçilen dil (null = Windows dili).</summary>
     public CultureInfo? Language => _cultures[Math.Max(0, _language.SelectedIndex)];
+
+    /// <summary>Seçilen tasarım.</summary>
+    public AppDesign Design => _design.SelectedIndex == 1 ? AppDesign.Windows : AppDesign.Brand;
+
+    /// <summary>Seçilen tema (açılır listedeki sıra <see cref="Apfs.Windows.ThemeMode"/> sırasıyla aynı).</summary>
+    public ThemeMode ThemeMode => (ThemeMode)Math.Clamp(_theme.SelectedIndex, 0, 2);
 
     public bool Reports => _reports.Checked;
 

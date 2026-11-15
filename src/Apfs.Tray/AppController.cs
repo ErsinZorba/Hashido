@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text.Json;
+using Apfs.Tray.Ui;
 using Apfs.Windows;
 using Apfs.Windows.Ipc;
 
@@ -49,7 +50,7 @@ internal sealed class AppController : IDisposable
 
     private static int _openDialogs; // yalnız arayüz iş parçacığında değişir
 
-    /// <summary>Kalıcı (modal) pencere gösterir (ShowDialog, TaskDialog, MessageBox); açıkken tepsi yeniden başlamaz.</summary>
+    /// <summary>Kalıcı (modal) pencere gösterir (ShowDialog, MessageDialog); açıkken tepsi yeniden başlamaz.</summary>
     public static T Modal<T>(Func<T> show)
     {
         _openDialogs++;
@@ -266,7 +267,7 @@ internal sealed class AppController : IDisposable
                 r = await SendEjectAsync(d.Id, force: true);
             }
             if (r is not { Ok: true })
-                Modal(() => MessageBox.Show(owner, r?.Message ?? WinText.U("Eject.Failed"), Branding.ProductName, MessageBoxButtons.OK, MessageBoxIcon.Warning));
+                MessageDialog.Inform(owner, null, r?.Message ?? WinText.U("Eject.Failed"), Glyphs.Icon.Warning);
         }
         finally
         {
@@ -288,23 +289,8 @@ internal sealed class AppController : IDisposable
         }
     }
 
-    private static bool ConfirmBusyEject(IWin32Window? owner, string message)
-    {
-        var eject = new TaskDialogButton(WinText.U("Action.EjectAnyway"));
-        var cancel = new TaskDialogButton(WinText.U("Action.Cancel"));
-        var page = new TaskDialogPage
-        {
-            Caption = Branding.ProductName,
-            Heading = WinText.U("Eject.BusyHeading"),
-            Text = message,
-            Icon = TaskDialogIcon.Warning,
-            Buttons = { eject, cancel },
-            DefaultButton = cancel,
-            AllowCancel = true,
-        };
-        var result = Modal(() => owner is null ? TaskDialog.ShowDialog(page, TaskDialogStartupLocation.CenterScreen) : TaskDialog.ShowDialog(owner, page));
-        return result == eject;
-    }
+    private static bool ConfirmBusyEject(IWin32Window? owner, string message) =>
+        MessageDialog.Confirm(owner, WinText.U("Eject.BusyHeading"), message, WinText.U("Action.EjectAnyway"), FriendlyButton.Tone.Alert);
 
     // ---------------- Yazma (deneysel) ----------------
 
@@ -329,8 +315,7 @@ internal sealed class AppController : IDisposable
                 r = await SendSetWritableAsync(d.Id, container, enable, force: true);
             }
             if (r is not { Ok: true })
-                Modal(() => MessageBox.Show(owner, r?.Message ?? WinText.U("Error.OperationFailed"), enable ? WinText.U("Write.EnableFailedTitle") : Branding.ProductName,
-                    MessageBoxButtons.OK, MessageBoxIcon.Information));
+                MessageDialog.Inform(owner, enable ? WinText.U("Write.EnableFailedTitle") : null, r?.Message ?? WinText.U("Error.OperationFailed"), Glyphs.Icon.Info);
         }
         finally
         {
@@ -353,41 +338,11 @@ internal sealed class AppController : IDisposable
         }
     }
 
-    private static bool ConfirmEnableWrite(IWin32Window? owner, string disk)
-    {
-        var allow = new TaskDialogButton(WinText.U("Action.AllowWriting"));
-        var cancel = new TaskDialogButton(WinText.U("Action.Cancel"));
-        var page = new TaskDialogPage
-        {
-            Caption = Branding.ProductName,
-            Heading = WinText.U("Write.ConfirmHeading"),
-            Text = WinText.U("Write.ConfirmText", disk),
-            Icon = TaskDialogIcon.ShieldWarningYellowBar,
-            Buttons = { allow, cancel },
-            DefaultButton = cancel,
-            AllowCancel = true,
-        };
-        var result = Modal(() => owner is null ? TaskDialog.ShowDialog(page, TaskDialogStartupLocation.CenterScreen) : TaskDialog.ShowDialog(owner, page));
-        return result == allow;
-    }
+    private static bool ConfirmEnableWrite(IWin32Window? owner, string disk) =>
+        MessageDialog.Confirm(owner, WinText.U("Write.ConfirmHeading"), WinText.U("Write.ConfirmText", disk), WinText.U("Action.AllowWriting"), FriendlyButton.Tone.Caution);
 
-    private static bool ConfirmBusy(IWin32Window? owner, string heading, string message, string proceed)
-    {
-        var go = new TaskDialogButton(proceed);
-        var cancel = new TaskDialogButton(WinText.U("Action.Cancel"));
-        var page = new TaskDialogPage
-        {
-            Caption = Branding.ProductName,
-            Heading = heading,
-            Text = message,
-            Icon = TaskDialogIcon.Warning,
-            Buttons = { go, cancel },
-            DefaultButton = cancel,
-            AllowCancel = true,
-        };
-        var result = Modal(() => owner is null ? TaskDialog.ShowDialog(page, TaskDialogStartupLocation.CenterScreen) : TaskDialog.ShowDialog(owner, page));
-        return result == go;
-    }
+    private static bool ConfirmBusy(IWin32Window? owner, string heading, string message, string proceed) =>
+        MessageDialog.Confirm(owner, heading, message, proceed, FriendlyButton.Tone.Caution);
 
     // ---------------- Diğer ----------------
 
@@ -413,11 +368,11 @@ internal sealed class AppController : IDisposable
     {
         string path = File.Exists(ServiceLog.PathName) ? ServiceLog.PathName : ServiceLog.FallbackPathName;
         if (File.Exists(path)) Process.Start(new ProcessStartInfo("notepad.exe", $"\"{path}\"") { UseShellExecute = true });
-        else Modal(() => MessageBox.Show(WinText.U("Log.NoneYet"), Branding.ProductName));
+        else MessageDialog.Inform(null, null, WinText.U("Log.NoneYet"), Glyphs.Icon.Info);
     }
 
     public static void ShowDetails(IWin32Window? owner, VolumeStatus v) =>
-        Modal(() => MessageBox.Show(owner, v.Message ?? WinText.U("Error.Unknown"), $"{Branding.ProductName}: {v.Name}", MessageBoxButtons.OK, MessageBoxIcon.Warning));
+        MessageDialog.Inform(owner, v.Name, v.Message ?? WinText.U("Error.Unknown"), Glyphs.Icon.Warning);
 
     private bool _disposed;
 

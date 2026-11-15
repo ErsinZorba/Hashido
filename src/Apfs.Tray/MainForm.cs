@@ -54,7 +54,7 @@ internal sealed class MainForm : Form
         header.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         header.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         header.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
-        header.Controls.Add(new Label
+        header.Controls.Add(new HeadingLabel
         {
             Text = WinText.U("Main.Disks"), Font = Theme.Heading(18f), ForeColor = Theme.Ink, AutoSize = true, UseMnemonic = false,
             Anchor = AnchorStyles.Left, Margin = Padding.Empty,
@@ -102,7 +102,7 @@ internal sealed class MainForm : Form
         _update = new LinkLabel
         {
             Dock = DockStyle.Bottom, AutoSize = true, Visible = false, UseMnemonic = false, BackColor = Theme.Paper,
-            ForeColor = Theme.InkSoft, LinkColor = Theme.Ink, ActiveLinkColor = Theme.Ink, VisitedLinkColor = Theme.Ink,
+            ForeColor = Theme.InkSoft, LinkColor = Theme.Link, ActiveLinkColor = Theme.Link, VisitedLinkColor = Theme.Link,
             LinkBehavior = LinkBehavior.HoverUnderline, Font = Theme.Small,
             Padding = new Padding(this.S(24), this.S(6), this.S(24), this.S(4)),
         };
@@ -136,12 +136,18 @@ internal sealed class MainForm : Form
         if (u is not null) _update.Text = WinText.U("Update.Link", u.Version.ToString(3));
     }
 
-    /// <summary>Ayarlar: seçimler Tamam'la uygulanır; dil değiştiyse program yeniden başlar.</summary>
+    /// <summary>Ayarlar: seçimler Tamam'la uygulanır; dil ya da görünüm değiştiyse kaydedilir ve program BİR kez yeniden başlar.</summary>
     private void ShowSettings()
     {
         using var f = new SettingsForm(_features?.Sent ?? new Apfs.Windows.Reporting.SentLog(
             Path.Combine(Apfs.Windows.Reporting.ReportRecorder.DefaultUserDirectory, "sent.jsonl")));
         if (AppController.Modal(() => f.ShowDialog(this)) != DialogResult.OK) return;
+        ApplySettings(f);
+    }
+
+    /// <summary>Tamam'dan sonra seçimleri kaydeder (düzenek de pencereyi açmadan bunu çağırır: v160/settings.cs).</summary>
+    private void ApplySettings(SettingsForm f)
+    {
         if (UserSettings.ReportsConsent != f.Reports)
         {
             UserSettings.ReportsConsent = f.Reports;
@@ -149,7 +155,19 @@ internal sealed class MainForm : Form
         }
         UserSettings.UpdateNotify = f.UpdateNotify;
         RefreshUpdateLink();
-        ChooseLanguage(f.Language);
+        bool restart = false;
+        if (f.Design != UserSettings.Design || f.ThemeMode != UserSettings.ThemeMode)
+        {
+            UserSettings.Design = f.Design;
+            UserSettings.ThemeMode = f.ThemeMode;
+            restart = true;
+        }
+        if (LanguageSetting.Load()?.Name != f.Language?.Name)
+        {
+            LanguageSetting.Save(f.Language);
+            restart = true;
+        }
+        if (restart) RestartRequested?.Invoke(); // dil ve görünüm birlikte değişse de tek yeniden başlama
     }
 
     private void OnChanged()
@@ -183,8 +201,16 @@ internal sealed class MainForm : Form
     /// <summary>Gizliyse gösterir, simge durumundaysa geri getirir ve öne alır.</summary>
     public void ShowAndActivate()
     {
-        if (!Visible) Show();
-        if (WindowState == FormWindowState.Minimized) WindowState = FormWindowState.Normal;
+        var restoreTo = WindowState == FormWindowState.Maximized ? FormWindowState.Maximized : FormWindowState.Normal;
+        if (!Visible)
+        {
+            // Windows 11, çalışan bir programın Show() ile gösterdiği pencereye açılış animasyonu oynatmıyor (öndeyken de;
+            // v160/open-anim.cs ölçtü: 0 ms), simge durumundan geri getirmeye ise kendi animasyonunu oynatıyor (~110-180 ms).
+            // Kendi animasyonumuz yok: pencere simge durumunda gösterilip hemen geri getirilir, Windows'un geçişi oynar (1.6.0).
+            WindowState = FormWindowState.Minimized;
+            Show();
+        }
+        if (WindowState == FormWindowState.Minimized) WindowState = restoreTo;
         Activate();
         BringToFront();
     }

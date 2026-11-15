@@ -140,6 +140,12 @@
   <data name="Consent.Yes" xml:space="preserve">
     <value>はい、送信する</value>
   </data>
+  <data name="Design.Brand" xml:space="preserve">
+    <value>Hashido</value>
+  </data>
+  <data name="Design.Windows" xml:space="preserve">
+    <value>Windows 11</value>
+  </data>
   <data name="Disk.Gone" xml:space="preserve">
     <value>このディスクはもう接続されていません。</value>
   </data>
@@ -287,6 +293,15 @@
   <data name="Settings.AboutHeading" xml:space="preserve">
     <value>バージョン情報</value>
   </data>
+  <data name="Settings.AppearanceHeading" xml:space="preserve">
+    <value>外観</value>
+  </data>
+  <data name="Settings.AppearanceNote" xml:space="preserve">
+    <value>新しい外観は、プログラムを再起動すると反映されます。</value>
+  </data>
+  <data name="Settings.Design" xml:space="preserve">
+    <value>デザイン</value>
+  </data>
   <data name="Settings.Language" xml:space="preserve">
     <value>言語</value>
   </data>
@@ -302,6 +317,9 @@
   <data name="Settings.ShowSent" xml:space="preserve">
     <value>送信した内容を表示</value>
   </data>
+  <data name="Settings.Theme" xml:space="preserve">
+    <value>テーマ</value>
+  </data>
   <data name="Settings.Title" xml:space="preserve">
     <value>{0} の設定</value>
   </data>
@@ -313,6 +331,15 @@
   </data>
   <data name="Settings.WhatIsSent" xml:space="preserve">
     <value>何が送信されますか？</value>
+  </data>
+  <data name="Theme.Dark" xml:space="preserve">
+    <value>ダーク</value>
+  </data>
+  <data name="Theme.Light" xml:space="preserve">
+    <value>ライト</value>
+  </data>
+  <data name="Theme.System" xml:space="preserve">
+    <value>Windows に合わせる</value>
   </data>
   <data name="Tray.MenuEject" xml:space="preserve">
     <value>{0}{1}：安全に取り出す</value>

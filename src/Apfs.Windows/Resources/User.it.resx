@@ -140,6 +140,12 @@
   <data name="Consent.Yes" xml:space="preserve">
     <value>Sì, invia</value>
   </data>
+  <data name="Design.Brand" xml:space="preserve">
+    <value>Hashido</value>
+  </data>
+  <data name="Design.Windows" xml:space="preserve">
+    <value>Windows 11</value>
+  </data>
   <data name="Disk.Gone" xml:space="preserve">
     <value>Questo disco non è più collegato.</value>
   </data>
@@ -287,6 +293,15 @@
   <data name="Settings.AboutHeading" xml:space="preserve">
     <value>Informazioni</value>
   </data>
+  <data name="Settings.AppearanceHeading" xml:space="preserve">
+    <value>Aspetto</value>
+  </data>
+  <data name="Settings.AppearanceNote" xml:space="preserve">
+    <value>Il nuovo aspetto avrà effetto al riavvio del programma.</value>
+  </data>
+  <data name="Settings.Design" xml:space="preserve">
+    <value>Stile</value>
+  </data>
   <data name="Settings.Language" xml:space="preserve">
     <value>Lingua</value>
   </data>
@@ -302,6 +317,9 @@
   <data name="Settings.ShowSent" xml:space="preserve">
     <value>Mostra ciò che è stato inviato</value>
   </data>
+  <data name="Settings.Theme" xml:space="preserve">
+    <value>Tema</value>
+  </data>
   <data name="Settings.Title" xml:space="preserve">
     <value>Impostazioni di {0}</value>
   </data>
@@ -313,6 +331,15 @@
   </data>
   <data name="Settings.WhatIsSent" xml:space="preserve">
     <value>Che cosa viene inviato?</value>
+  </data>
+  <data name="Theme.Dark" xml:space="preserve">
+    <value>Scuro</value>
+  </data>
+  <data name="Theme.Light" xml:space="preserve">
+    <value>Chiaro</value>
+  </data>
+  <data name="Theme.System" xml:space="preserve">
+    <value>Come Windows</value>
   </data>
   <data name="Tray.MenuEject" xml:space="preserve">
     <value>{0}{1}: espelli in sicurezza</value>

@@ -18,6 +18,14 @@ internal sealed class TrayApp : ApplicationContext
     private readonly WindowsFormsSynchronizationContext _ui = new();
     private readonly RegisteredWaitHandle _showWait;
     private readonly TrayFeatures _features;
+    /// <summary>
+    /// Tek tıktan sonra bekler; dolarsa kurulu panel yerine gelir. Süre Windows'un çift tık süresinin %40'ı (varsayılan
+    /// 500 ms → 200 ms): tam süre ve %60'ı kullanıcıya geç geldi (1.6.0 denemeleri); çift tıkta ikinci basış çoğunlukla
+    /// bundan önce gelir. Daha yavaş bir çift tıkta panel kısa bir an görünüp ana pencereye yer bırakır. Zamanlayıcı panel
+    /// kurulmadan ÖNCE başlar: kurulum süresi beklemeye eklenmez.
+    /// </summary>
+    internal static int RevealDelay => Math.Max(1, SystemInformation.DoubleClickTime * 2 / 5);
+    private readonly System.Windows.Forms.Timer _reveal = new() { Interval = RevealDelay };
     private MainForm? _main;
     private Uri? _balloonLink; // son balon bir güncelleme bildirimiyse tıklayınca açılacak sayfa
 
@@ -26,8 +34,26 @@ internal sealed class TrayApp : ApplicationContext
     public TrayApp(EventWaitHandle showEvent, bool showMain, ReportRecorder localReports)
     {
         _icon = new NotifyIcon { Icon = Theme.AppIcon(SystemInformation.SmallIconSize.Width), Text = Branding.ProductName, Visible = true, ContextMenuStrip = new ContextMenuStrip { Renderer = Theme.MenuRenderer } };
-        _icon.ContextMenuStrip.Opening += (_, _) => BuildMenu();
-        _icon.MouseClick += (_, e) => { if (e.Button == MouseButtons.Left) _flyout!.Toggle(); };
+        // Menü boş kurulur, öğeler her açılışta eklenir. WinForms boş menüde Opening'i Cancel=true ile başlatır
+        // (DisplayedItems.Count == 0) → iptal geri alınmazsa soğuk açılışta ilk sağ tık menüyü açmıyordu (1.6.0).
+        _icon.ContextMenuStrip.Opening += (_, e) => { BuildMenu(); e.Cancel = false; };
+        // Tek tık: panel hemen (ekran dışında) kurulup etkinleşir, kısa bekleme (RevealDelay) dolunca yerine gelir. Çift tık: panel hiç
+        // görünmeden gizlenir, ana pencere açılır. NotifyIcon çift tıkta önce bir MouseClick, sonra MouseDoubleClick verir.
+        _icon.MouseClick += (_, e) =>
+        {
+            if (e.Button != MouseButtons.Left) return;
+            _reveal.Stop();
+            _reveal.Start(); // tıklama anından say (Arm'ın kurulum süresi beklemenin içinde kalsın)
+            if (!_flyout!.Arm()) _reveal.Stop();
+        };
+        _icon.MouseDoubleClick += (_, e) =>
+        {
+            if (e.Button != MouseButtons.Left) return;
+            _reveal.Stop();
+            _flyout!.Cancel();
+            ShowMain();
+        };
+        _reveal.Tick += (_, _) => { _reveal.Stop(); _flyout!.Reveal(); };
         _icon.BalloonTipClicked += (_, _) =>
         {
             if (_balloonLink is { } link) OpenLink(link);
@@ -141,7 +167,8 @@ internal sealed class TrayApp : ApplicationContext
     /// </summary>
     private void TryThemeRestart()
     {
-        if (_exiting || Theme.SystemPalette() == Theme.Colors)
+        // Okunamayan girdi geçerli paletin değerini korur: geçici bir kayıt hatası yeniden başlatmasın (Theme.Resolve)
+        if (_exiting || Theme.EffectivePalette(Theme.Colors) == Theme.Colors)
         {
             _themeRetry.Stop();
             return;
@@ -177,6 +204,7 @@ internal sealed class TrayApp : ApplicationContext
         _exiting = true;
         SystemEvents.UserPreferenceChanged -= OnUserPreferenceChanged; // statik olay: abonelik süreci tutmasın
         _themeRetry.Dispose();
+        _reveal.Dispose();
         _showWait.Unregister(null);
         _app.Dispose();
         _features.Dispose();

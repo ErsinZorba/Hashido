@@ -1,57 +1,162 @@
 using System.Drawing.Drawing2D;
 using System.Drawing.Text;
 using System.Runtime.InteropServices;
+using Apfs.Windows;
 
 namespace Apfs.Tray.Ui;
 
 /// <summary>Renkler, yazı tipleri ve ortak çizim yardımcıları. Tek yerde tutulur ki pencere, panel ve parola penceresi aynı görünsün.</summary>
 internal static class Theme
 {
-    // ---- 橋戸 marka paleti (1.5.0): kâğıt, mürekkep, tek vurgu zinober ----
-    // Zinober (Shu) yalnız dikkat isteyen yerde: yazılabilir birim, dolmak üzere disk, sorun. Her şey yolundaysa yalnız mühür.
+    // ---- Paletler (1.6.0: iki tasarım × açık/koyu) ----
+    // 橋戸 marka (1.5.0): kâğıt, mürekkep, tek vurgu zinober. Zinober (Shu) yalnız dikkat isteyen yerde: yazılabilir birim,
+    // dolmak üzere disk, sorun, "Güvenle çıkar"; "Yazmaya izin ver" kincha (金茶). Windows 11: Fluent nötrleri + Windows'un
+    // vurgu rengi (AccentPalette). Denetimler rengi ROLDEN alır (Alert, Caution, Focus, Accent…), sabit renk yok.
 
-    /// <summary>Renk takımı; açık ve koyu tema aynı adları taşır.</summary>
-    internal sealed record Palette(Color Paper, Color Washi, Color Ink, Color InkSoft, Color Hair, Color Track, Color Bar, Color Shu)
+    /// <summary>
+    /// Renk takımı; dört palet aynı adları taşır. Roller: <see cref="Alert"/> sorun/uyarı (az boş alan, parola hatası,
+    /// Güvenle çıkar), <see cref="WritableMark"/> yazılabilir birim, <see cref="Caution"/> dikkatli eylem (Yazmaya izin ver),
+    /// <see cref="Focus"/> odak halkası, <see cref="Accent"/>/<see cref="OnAccent"/> birincil düğme ve işaretli kutu dolgusu
+    /// ve üstündeki işaret/metin, <see cref="Link"/> bağlantı metni. <see cref="Light"/>/<see cref="Dark"/> markadır (adları
+    /// düzenekler yansımayla okur).
+    /// </summary>
+    internal sealed record Palette(Color Paper, Color Washi, Color Ink, Color InkSoft, Color Hair, Color Track, Color Bar, Color Shu,
+        Color Alert, Color WritableMark, Color Caution, Color Focus, Color Accent, Color OnAccent, Color Link, bool IsDark, AppDesign Design)
     {
-        public static readonly Palette Light = new(Hex(0xFBFAF7), Hex(0xF5F2EC), Hex(0x1E1C19), Hex(0x6B665E), Hex(0xDCD6CB),
-            Hex(0xE6E1D7), Hex(0x4A4640), Hex(0xC2412A));
-        public static readonly Palette Dark = new(Hex(0x1B1A18), Hex(0x141312), Hex(0xECE7DF), Hex(0x9D978D), Hex(0x34312C),
-            Hex(0x2E2B27), Hex(0xBDB6AA), Hex(0xE4664C));
+        public static readonly Palette Light = Brand(false);
+        public static readonly Palette Dark = Brand(true);
 
-        private static Color Hex(int rgb) => Color.FromArgb(255, Color.FromArgb(rgb));
+        private static Palette Brand(bool dark)
+        {
+            if (!dark)
+            {
+                Color paper = Hex(0xFBFAF7), ink = Hex(0x1E1C19), shu = Hex(0xC2412A);
+                return new(paper, Hex(0xF5F2EC), ink, Hex(0x6B665E), Hex(0xDCD6CB), Hex(0xE6E1D7), Hex(0x4A4640), shu,
+                    Alert: shu, WritableMark: shu, Caution: Hex(0x9A6200), Focus: shu, Accent: ink, OnAccent: paper, Link: ink,
+                    IsDark: false, Design: AppDesign.Brand);
+            }
+            Color dPaper = Hex(0x1B1A18), dInk = Hex(0xECE7DF), dShu = Hex(0xE4664C);
+            return new(dPaper, Hex(0x141312), dInk, Hex(0x9D978D), Hex(0x34312C), Hex(0x2E2B27), Hex(0xBDB6AA), dShu,
+                Alert: dShu, WritableMark: dShu, Caution: Hex(0xD9A44A), Focus: dShu, Accent: dInk, OnAccent: dPaper, Link: dInk,
+                IsDark: true, Design: AppDesign.Brand);
+        }
+
+        /// <summary>Windows 11 (Fluent) paleti: nötrler sabit, vurgu Windows'un vurgu renginden.</summary>
+        public static Palette Windows(bool dark, AccentColors accent)
+        {
+            if (!dark)
+            {
+                Color caution = Hex(0x9D5D00);
+                return new(Hex(0xF3F3F3), Hex(0xFBFBFB), Hex(0x1A1A1A), Hex(0x5D5D5D), Hex(0xE5E5E5), Hex(0xEAEAEA), accent.Dark1,
+                    Hex(0xC2412A), Alert: Hex(0xC42B1C), WritableMark: caution, Caution: caution, Focus: Hex(0x1A1A1A),
+                    Accent: accent.Dark1, OnAccent: Hex(0xFFFFFF), Link: accent.Dark2, IsDark: false, Design: AppDesign.Windows);
+            }
+            Color dCaution = Hex(0xFCE100);
+            return new(Hex(0x202020), Hex(0x2B2B2B), Hex(0xFFFFFF), Hex(0xC5C5C5), Hex(0x333333), Hex(0x2D2D2D), accent.Light2,
+                Hex(0xE4664C), Alert: Hex(0xFF99A4), WritableMark: dCaution, Caution: dCaution, Focus: Hex(0xFFFFFF),
+                Accent: accent.Light2, OnAccent: Hex(0x000000), Link: accent.Light3, IsDark: true, Design: AppDesign.Windows);
+        }
+
+        internal static Color Hex(int rgb) => Color.FromArgb(255, Color.FromArgb(rgb));
     }
 
     /// <summary>
-    /// Geçerli renk takımı: süreç başında Windows'un uygulama temasından seçilir (<see cref="SystemPalette"/>); çalışırken
-    /// değişmez. Windows teması değişince tepsi boştayken yeniden başlar (<c>TrayApp</c>).
+    /// Windows'un vurgu renginin tonları (HKCU <c>…\Explorer\Accent\AccentPalette</c>, 8 × RGBA: [0] Light3, [1] Light2,
+    /// [4] Dark1, [5] Dark2). Fluent: açık temada dolgu Dark1, bağlantı Dark2; koyuda dolgu Light2, bağlantı Light3.
     /// </summary>
-    public static Palette Colors { get; set; } = SystemPalette();
+    internal readonly record struct AccentColors(Color Light3, Color Light2, Color Dark1, Color Dark2)
+    {
+        /// <summary>Değer yoksa ya da bozuksa: Windows'un varsayılan mavisi.</summary>
+        public static readonly AccentColors Default = new(Palette.Hex(0x99EBFF), Palette.Hex(0x4CC2FF), Palette.Hex(0x0067C0), Palette.Hex(0x003E92));
 
-    /// <summary>Koyu tema seçili mi.</summary>
-    public static bool IsDark => Colors == Palette.Dark;
+        public static AccentColors FromBytes(byte[]? b)
+        {
+            if (b is not { Length: >= 32 }) return Default;
+            Color At(int i) => Color.FromArgb(255, b[i * 4], b[i * 4 + 1], b[i * 4 + 2]);
+            return new(At(0), At(1), At(4), At(5));
+        }
+    }
 
     /// <summary>
-    /// Windows'un uygulama teması: HKCU <c>…\Themes\Personalize\AppsUseLightTheme</c> = 0 → koyu; değer yoksa ya da
-    /// okunamazsa açık. Geliştirme kancası <c>APFS_DEV_THEME=dark|light</c> kaydı geçersiz kılar (görüntü düzenekleri; Claude
-    /// araçlarının HKCU'su sanal).
+    /// Paletin girdileri; null = o girdi OKUNAMADI (yetki/G/Ç hatası — değer yoksa varsayılan verilir, null değil).
+    /// <paramref name="DevTheme"/>/<paramref name="DevDesign"/> geliştirme kancaları (<c>APFS_DEV_THEME</c>, <c>APFS_DEV_DESIGN</c>).
     /// </summary>
-    public static Palette SystemPalette()
+    internal sealed record PaletteInputs(string? DevTheme, string? DevDesign, ThemeMode? Mode, AppDesign? Design, bool? SystemDark,
+        AccentColors? Accent);
+
+    /// <summary>
+    /// Saf palet seçimi: tasarım = <c>APFS_DEV_DESIGN</c> &gt; kayıtlı tasarım; koyu mu = <c>APFS_DEV_THEME</c> &gt; kayıtlı tema
+    /// (açık/koyu) &gt; Windows'un uygulama modu; Windows tasarımında vurgu = AccentPalette. Okunamayan girdi (null): açılışta
+    /// (<paramref name="current"/> null) varsayılan, çalışırken GEÇERLİ paletin değeri — geçici bir okuma hatası paleti
+    /// değiştirip tepsiyi yeniden başlatmasın (sonraki okuma tutunca geri başlatırdı).
+    /// </summary>
+    internal static Palette Resolve(PaletteInputs i, Palette? current)
     {
-        switch (Environment.GetEnvironmentVariable("APFS_DEV_THEME")?.Trim().ToLowerInvariant())
+        AppDesign design = i.DevDesign?.Trim().ToLowerInvariant() switch
         {
-            case "dark": return Palette.Dark;
-            case "light": return Palette.Light;
-        }
+            "windows" => AppDesign.Windows,
+            "brand" => AppDesign.Brand,
+            _ => i.Design ?? current?.Design ?? AppDesign.Brand,
+        };
+        bool dark = i.DevTheme?.Trim().ToLowerInvariant() switch
+        {
+            "dark" => true,
+            "light" => false,
+            _ => i.Mode switch
+            {
+                ThemeMode.Light => false,
+                ThemeMode.Dark => true,
+                ThemeMode.System => i.SystemDark ?? current?.IsDark ?? false,
+                _ => current?.IsDark ?? false,
+            },
+        };
+        if (design == AppDesign.Brand) return dark ? Palette.Dark : Palette.Light;
+        AccentColors accent = i.Accent ?? (current is { Design: AppDesign.Windows } c && c.IsDark == dark
+            ? (dark ? AccentColors.Default with { Light2 = c.Accent, Light3 = c.Link } : AccentColors.Default with { Dark1 = c.Accent, Dark2 = c.Link })
+            : AccentColors.Default);
+        return Palette.Windows(dark, accent);
+    }
+
+    /// <summary>Girdileri okuyup paleti seçer (<see cref="Resolve"/>). <paramref name="current"/>: çalışırken geçerli palet.</summary>
+    public static Palette EffectivePalette(Palette? current = null) => Resolve(ReadInputs(), current);
+
+    internal static PaletteInputs ReadInputs() => new(
+        Environment.GetEnvironmentVariable("APFS_DEV_THEME"),
+        Environment.GetEnvironmentVariable("APFS_DEV_DESIGN"),
+        UserSettings.TryReadThemeMode(out var mode) ? mode : null,
+        UserSettings.TryReadDesign(out var design) ? design : null,
+        ReadHkcu(@"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize", "AppsUseLightTheme", out var light)
+            ? light is int v && v == 0 : null,
+        ReadHkcu(@"Software\Microsoft\Windows\CurrentVersion\Explorer\Accent", "AccentPalette", out var accent)
+            ? AccentColors.FromBytes(accent as byte[]) : null);
+
+    /// <summary>HKCU değeri; false yalnız okunamadığında (anahtar/değer yoksa true + null).</summary>
+    private static bool ReadHkcu(string path, string name, out object? value)
+    {
         try
         {
-            using var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize");
-            return key?.GetValue("AppsUseLightTheme") is int v && v == 0 ? Palette.Dark : Palette.Light;
+            using var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(path);
+            value = key?.GetValue(name);
+            return true;
         }
         catch (Exception e) when (e is System.Security.SecurityException or UnauthorizedAccessException or IOException)
         {
-            return Palette.Light;
+            value = null;
+            return false;
         }
     }
+
+    /// <summary>
+    /// Geçerli renk takımı: süreç başında seçilir (<see cref="EffectivePalette"/>); çalışırken değişmez. Seçim değişince
+    /// (Ayarlar, Windows teması, vurgu rengi) tepsi boştayken yeniden başlar (<c>TrayApp</c>).
+    /// </summary>
+    public static Palette Colors { get; set; } = EffectivePalette();
+
+    /// <summary>Koyu tema seçili mi.</summary>
+    public static bool IsDark => Colors.IsDark;
+
+    /// <summary>Windows 11 tasarımı mı (değilse 橋戸 marka).</summary>
+    public static bool IsWindows => Colors.Design == AppDesign.Windows;
 
     /// <summary>Pencere zemini (kâğıt).</summary>
     public static Color Paper => Colors.Paper;
@@ -67,10 +172,24 @@ internal static class Theme
     public static Color Track => Colors.Track;
     /// <summary>Doluluk çubuğu.</summary>
     public static Color Bar => Colors.Bar;
-    /// <summary>Zinober: mühür ve dikkat.</summary>
+    /// <summary>Zinober (marka rengi; denetimler rolleri kullanır).</summary>
     public static Color Shu => Colors.Shu;
     /// <summary>Mürekkep dolgunun üstündeki metin.</summary>
     public static Color OnInk => Colors.Paper;
+    /// <summary>Sorun ve geri alınmaz eylem: sorunlu birim, az boş alan, parola hatası, Güvenle çıkar.</summary>
+    public static Color Alert => Colors.Alert;
+    /// <summary>Yazılabilir birimin işareti ve durum yazısı.</summary>
+    public static Color WritableMark => Colors.WritableMark;
+    /// <summary>Dikkatli eylem: Yazmaya izin ver.</summary>
+    public static Color Caution => Colors.Caution;
+    /// <summary>Klavye odak halkası.</summary>
+    public static Color Focus => Colors.Focus;
+    /// <summary>Birincil düğme ve işaretli onay kutusu dolgusu.</summary>
+    public static Color Accent => Colors.Accent;
+    /// <summary>Vurgu dolgusunun üstündeki metin/işaret.</summary>
+    public static Color OnAccent => Colors.OnAccent;
+    /// <summary>Bağlantı metni.</summary>
+    public static Color Link => Colors.Link;
 
     /// <summary>
     /// Arayüz dili Asya diliyse o dilin Windows arayüz yazı tipi: Segoe UI'ın yedek yazı tipi Windows'un diline göre seçilir,
@@ -107,19 +226,46 @@ internal static class Theme
     public static Font Small => Font(8.75f);
 
     /// <summary>
-    /// Başlık yazı tipi: Sitka Heading (Windows'la gelir) → Georgia → gövde. Japonca, Çince ve Korecede Latin serifi o dilin
-    /// karakterlerini taşımaz; orada gövdenin Asya yazı tipi (<see cref="PickFontName"/>) kullanılır.
+    /// Başlık yazı tipi. Marka: Sitka Heading (Windows'la gelir) → Georgia → gövde. Windows 11 tasarımı (1.6.0): Segoe UI Variable
+    /// Display Semibold (GDI aile adı kesik: "…Semib") → Segoe UI Semibold → gövde. Japonca, Çince ve Korecede Latin yazı tipleri
+    /// o dilin karakterlerini taşımaz; orada gövdenin Asya yazı tipi (<see cref="PickFontName"/>) kullanılır. Punto iki
+    /// tasarımda aynı (yerleşim kaymasın).
     /// </summary>
-    private static readonly string HeadingName = PickHeadingName();
+    private static string HeadingName => _headingName ??= PickHeadingName();
+    private static string? _headingName;
 
     private static string PickHeadingName()
     {
         if (FontName is "Yu Gothic UI" or "Microsoft YaHei UI" or "Malgun Gothic") return FontName;
         var installed = new InstalledFontCollection().Families.Select(f => f.Name).ToHashSet();
-        return installed.Contains("Sitka Heading") ? "Sitka Heading" : installed.Contains("Georgia") ? "Georgia" : FontName;
+        string[] order = IsWindows
+            ? ["Segoe UI Variable Display Semib", "Segoe UI Variable Display Semibold", "Segoe UI Semibold"]
+            : ["Sitka Heading", "Georgia"];
+        return order.FirstOrDefault(installed.Contains) ?? FontName;
     }
 
+    // ---- Windows 11 tasarımının denetim dolguları (Fluent ControlFill*: yarı saydam beyazın kâğıt üstündeki karşılığı) ----
+
+    /// <summary>İkincil düğmenin dolgusu: 0 bekleme, 1 üzerine gelme, 2 basılı (Fluent Default / Secondary / Tertiary).</summary>
+    public static Color ControlFill(int state) => (IsDark, state) switch
+    {
+        (false, 0) => Palette.Hex(0xFDFDFD),
+        (false, 1) => Palette.Hex(0xF9F9F9),
+        (false, _) => Palette.Hex(0xF5F5F5),
+        (true, 0) => Palette.Hex(0x2D2D2D),
+        (true, 1) => Palette.Hex(0x323232),
+        (true, _) => Palette.Hex(0x272727),
+    };
+
+    /// <summary>İkincil düğmenin çerçevesi ve "yükselti" kenarı (açıkta alt kenar bir ton koyu, koyuda üst kenar bir ton açık).</summary>
+    public static (Color Border, Color Edge) ControlStroke => IsDark
+        ? (Palette.Hex(0x353535), Palette.Hex(0x3C3C3C))
+        : (Palette.Hex(0xE5E5E5), Palette.Hex(0xCCCCCC));
+
     private static readonly Dictionary<float, Font> Headings = [];
+
+    /// <summary>Yazı tipi <see cref="Heading"/>'den mi (başlık etiketi seçimi için; önbellek nesnesiyle karşılaştırılır).</summary>
+    public static bool IsHeading(Font font) => Headings.ContainsValue(font);
 
     /// <summary>Paylaşılan başlık yazı tipi (önbellekten; elden çıkarılmamalı).</summary>
     public static Font Heading(float size)
@@ -162,7 +308,8 @@ internal static class Theme
     }
 
     // ---- Koyu tema (1.5.0 P3): pencere çerçevesi, kaydırma çubukları, Windows denetimleri, menüler ----
-    // Açık temada hiçbirine dokunulmaz (Windows'un kendi görünüşü). TaskDialog ve MessageBox Windows'un, açık kalır (kabul).
+    // Açık temada hiçbirine dokunulmaz (Windows'un kendi görünüşü). İletişim kutuları 1.6.0'dan beri temalı (Ui/MessageDialog);
+    // araç ipuçları Windows'un, açık kalır (kabul).
 
     /// <summary>Koyu temada başlık çubuğu ve pencere kenarlığı koyu (DWMWA_USE_IMMERSIVE_DARK_MODE). Tutamaç kurulunca uygulanır.</summary>
     public static void ApplyFrame(Form form) => WhenCreated(form, h =>

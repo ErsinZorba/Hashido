@@ -120,6 +120,7 @@ internal sealed class DiskListView : Panel
         var eject = Button(WinText.U("Action.SafelyEject"), Compact ? FriendlyButton.Kind.Icon : FriendlyButton.Kind.Quiet,
             async () => await _app.EjectAsync(d, DialogOwner), Glyphs.Icon.Eject);
         eject.BusyText = WinText.U("Action.Ejecting");
+        eject.ButtonTone = FriendlyButton.Tone.Alert; // 1.6.0: geri alınmaz eylem (markada zinober)
         eject.Busy = _app.IsEjecting(d.Id);
         eject.Anchor = AnchorStyles.Right;
         eject.Margin = Padding.Empty;
@@ -149,11 +150,11 @@ internal sealed class DiskListView : Panel
                 {
                     VolumeStatus.Mounted => (v.Writable ? Glyphs.State.Writable : Glyphs.State.Open,
                         Capitalize(v.Writable ? WinText.U("Card.Writable") : WinText.U("Card.ReadOnly")),
-                        v.Writable ? Theme.Shu : Theme.InkSoft,
+                        v.Writable ? Theme.WritableMark : Theme.InkSoft,
                         Button(WinText.U("Action.Open"), FriendlyButton.Kind.Secondary, () => AppController.OpenDrive(v.MountPoint!))),
                     VolumeStatus.NeedsPassword => (Glyphs.State.Locked, WinText.U("Card.NeedsPassword"), Theme.InkSoft,
                         Button(WinText.U("Action.Unlock"), FriendlyButton.Kind.Secondary, async () => await _app.UnlockAsync(d, v))),
-                    _ => (Glyphs.State.Problem, WinText.U("Card.Failed"), Theme.Shu,
+                    _ => (Glyphs.State.Problem, WinText.U("Card.Failed"), Theme.Alert,
                         Button(WinText.U("Action.Details"), FriendlyButton.Kind.Secondary, () => AppController.ShowDetails(DialogOwner, v))),
                 };
                 if (v.State == VolumeStatus.Mounted) button.Enabled = !_app.IsEjecting(d.Id) && !_app.IsSwitching(d.Id);
@@ -286,6 +287,7 @@ internal sealed class DiskListView : Panel
         var toggle = Button(writable ? WinText.U("Action.BackToReadOnly") : WinText.U("Action.AllowWriting"), FriendlyButton.Kind.Quiet,
             async () => await _app.SetWritableAsync(d, g.Key, multi ? $"{d.Description} · \"{name}\"" : d.Description, !writable, DialogOwner));
         toggle.BusyText = writable ? WinText.U("Action.Saving") : WinText.U("Action.Checking");
+        if (!writable) toggle.ButtonTone = FriendlyButton.Tone.Caution; // 1.6.0: "Yazmaya izin ver" dikkatli eylem; "Salt okunura dön" nötr
         toggle.Busy = _app.IsSwitching(d.Id, g.Key);
         toggle.Enabled = !_app.IsEjecting(d.Id);
         return toggle;
@@ -340,11 +342,13 @@ internal sealed class DiskListView : Panel
         return p;
     }
 
-    private static Label Label(string text, Font font, Color color) => new()
+    private static Label Label(string text, Font font, Color color)
     {
-        Text = text, Font = font, ForeColor = color, AutoSize = true, Margin = Padding.Empty, UseMnemonic = false,
-        BackColor = Color.Transparent,
-    };
+        var l = HeadingLabel.For(font); // başlıkta (disk adı, boş liste) rakamlar düz (1.6.0)
+        l.Text = text; l.Font = font; l.ForeColor = color; l.AutoSize = true; l.Margin = Padding.Empty; l.UseMnemonic = false;
+        l.BackColor = Color.Transparent;
+        return l;
+    }
 
     private FriendlyButton Button(string text, FriendlyButton.Kind kind, Action onClick, Glyphs.Icon icon = Glyphs.Icon.None)
     {
@@ -426,7 +430,7 @@ internal sealed class DiskListView : Panel
                 Bar.Set(s.Used, s.Low);
                 string free = SizeText.Format(s.Free);
                 _text.Text = _compact ? WinText.U("Card.Free", free) : WinText.U("Card.Space", SizeText.Format(s.Total), free);
-                _text.ForeColor = s.Low ? Theme.Shu : Theme.InkSoft;
+                _text.ForeColor = s.Low ? Theme.Alert : Theme.InkSoft;
             }
             Arrange();
         }
@@ -470,11 +474,35 @@ internal sealed class DiskListView : Panel
 
         protected override void OnPaint(PaintEventArgs e)
         {
-            e.Graphics.Clear(Theme.Track);
             int filled = (int)Math.Round(Width * _used);
             if (_used > 0 && filled == 0) filled = 1; // birazcık dolu disk boş görünmesin
-            using var brush = new SolidBrush(_low ? Theme.Shu : Theme.Bar);
+            using var brush = new SolidBrush(_low ? Theme.Alert : Theme.Bar);
+            if (Theme.IsWindows)
+            {
+                // Windows 11 (Fluent ProgressBar): yuvarlak uçlu yol ve dolgu, vurgu renginde
+                var g = e.Graphics;
+                g.Clear(BackgroundColor());
+                g.SmoothingMode = SmoothingMode.AntiAlias;
+                float r = Height / 2f;
+                using (var track = Theme.RoundedRect(new RectangleF(0, 0, Width, Height), r))
+                using (var trackBrush = new SolidBrush(Theme.Track))
+                    g.FillPath(trackBrush, track);
+                if (filled > 0)
+                {
+                    using var bar = Theme.RoundedRect(new RectangleF(0, 0, Math.Max(filled, Height), Height), r);
+                    g.FillPath(brush, bar);
+                }
+                return;
+            }
+            e.Graphics.Clear(Theme.Track);
             e.Graphics.FillRectangle(brush, 0, 0, filled, Height);
+        }
+
+        private Color BackgroundColor()
+        {
+            for (Control? c = Parent; c is not null; c = c.Parent)
+                if (c.BackColor.A == 255) return c.BackColor;
+            return Theme.Paper;
         }
     }
 
@@ -500,7 +528,8 @@ internal sealed class DiskListView : Panel
             base.OnPaint(e);
             if (_line == Line.None) return;
             using var pen = new Pen(Theme.Hair, 1);
-            if (_line == Line.DottedTop)
+            if (_line == Line.DottedTop && Theme.IsWindows) e.Graphics.DrawLine(pen, 0, 0, Width, 0); // Windows 11: düz ayırıcı
+            else if (_line == Line.DottedTop)
             {
                 pen.DashStyle = DashStyle.Custom;
                 pen.DashPattern = [1f, 2f];

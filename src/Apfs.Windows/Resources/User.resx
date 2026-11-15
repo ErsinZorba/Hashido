@@ -140,6 +140,12 @@
   <data name="Consent.Yes" xml:space="preserve">
     <value>Yes, send</value>
   </data>
+  <data name="Design.Brand" xml:space="preserve">
+    <value>Hashido</value>
+  </data>
+  <data name="Design.Windows" xml:space="preserve">
+    <value>Windows 11</value>
+  </data>
   <data name="Disk.Gone" xml:space="preserve">
     <value>This disk is no longer attached.</value>
   </data>
@@ -287,6 +293,15 @@
   <data name="Settings.AboutHeading" xml:space="preserve">
     <value>About</value>
   </data>
+  <data name="Settings.AppearanceHeading" xml:space="preserve">
+    <value>Appearance</value>
+  </data>
+  <data name="Settings.AppearanceNote" xml:space="preserve">
+    <value>The program restarts to apply a new appearance.</value>
+  </data>
+  <data name="Settings.Design" xml:space="preserve">
+    <value>Design</value>
+  </data>
   <data name="Settings.Language" xml:space="preserve">
     <value>Language</value>
   </data>
@@ -302,6 +317,9 @@
   <data name="Settings.ShowSent" xml:space="preserve">
     <value>Show what was sent</value>
   </data>
+  <data name="Settings.Theme" xml:space="preserve">
+    <value>Theme</value>
+  </data>
   <data name="Settings.Title" xml:space="preserve">
     <value>{0} settings</value>
   </data>
@@ -313,6 +331,15 @@
   </data>
   <data name="Settings.WhatIsSent" xml:space="preserve">
     <value>What is sent?</value>
+  </data>
+  <data name="Theme.Dark" xml:space="preserve">
+    <value>Dark</value>
+  </data>
+  <data name="Theme.Light" xml:space="preserve">
+    <value>Light</value>
+  </data>
+  <data name="Theme.System" xml:space="preserve">
+    <value>Match Windows</value>
   </data>
   <data name="Tray.MenuEject" xml:space="preserve">
     <value>{0}{1}: safely eject</value>
