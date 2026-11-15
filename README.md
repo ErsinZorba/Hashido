@@ -189,23 +189,17 @@ version exists. Nothing about you or your disks is sent; GitHub sees the request
 **Contact.** Questions and requests: [GitHub Issues](https://github.com/ErsinZorba/Hashido/issues). Changes to this
 statement are visible in the repository history.
 
-## Development
+## Building from source
 ```
-dotnet build
-dotnet test
 powershell -File tools\build-installer.ps1   # setup wizard: publish\Hashido-Setup-<version>.exe
 ```
-`build-installer.ps1` needs Inno Setup 6 (`winget install --id JRSoftware.InnoSetup -e`) and WinFsp's official
+Needs the .NET 10 SDK, Inno Setup 6 (`winget install --id JRSoftware.InnoSetup -e`) and WinFsp's official
 `winfsp-2.1.25156.msi` package under `installer\redist\` (not added to git; the script checks its signature). For the program folder
-only, `tools\build-release.ps1` (`publish\APFS for Windows\`); to install that without the wizard, `install.ps1` in an
-administrator PowerShell. A version installed with `install.ps1` does not appear in "Installed apps" (remove it with
-`uninstall.ps1`); if you installed with the wizard, uninstall from there — using `uninstall.ps1` leaves an orphaned entry in the list.
-Test images are produced with `tests/Apfs.ImageBuilder` and compared with an independent reader, 7-Zip
-(`tools/compare_with_7z.ps1`). Writing is tested against independent referees: Linux's APFS tools (apfsprogs: `mkapfs`, `apfsck`;
-the linux-apfs-rw driver) run inside WSL (`tools/make-linux-fixtures.sh`, `tools/make-linux-populated.sh`); for macOS's own checker,
-`tools/mac/` (Mac kit). To test the real disk path on a virtual disk, `tools/vhd-write-test.ps1` (administrator).
-Interface texts: `src/Apfs.Core/Resources` and `src/Apfs.Windows/Resources` (`User.<language>.resx`; technical texts `Tech.resx`
-in English and Turkish only). Long tests: `APFS_LONG=1 dotnet test`.
+only (`publish\APFS for Windows\`), `tools\build-release.ps1`. The programs are in `src` (`Apfs.Core` reader, `Apfs.Mount`
+WinFsp drive, `Apfs.Windows`, `Apfs.Service`, `Apfs.Tray`, `Apfs.Cli`); interface texts are in `src/Apfs.Core/Resources` and
+`src/Apfs.Windows/Resources` (`User.<language>.resx`; technical texts `Tech.resx` in English and Turkish only).
+Reading and writing are tested against independent referees (7-Zip, Linux's APFS tools apfsprogs and linux-apfs-rw, and macOS's
+own First Aid); the tests and development tools are not part of this repository.
 
 ## The name
 Hashido (橋戸) is Japanese for "bridge gate", a real family and place name: a gate between your Mac disk and Windows.

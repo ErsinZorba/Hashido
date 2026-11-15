@@ -185,22 +185,17 @@ olmadığını sorar. Size ya da disklerinize dair hiçbir şey gönderilmez; Gi
 **İletişim.** Sorular ve istekler: [GitHub Issues](https://github.com/ErsinZorba/Hashido/issues). Bu açıklamadaki
 değişiklikler depo geçmişinde görünür.
 
-## Geliştirme
+## Kaynaktan derleme
 ```
-dotnet build
-dotnet test
 powershell -File tools\build-installer.ps1   # kurulum sihirbazı: publish\Hashido-Setup-<sürüm>.exe
 ```
-`build-installer.ps1` için Inno Setup 6 (`winget install --id JRSoftware.InnoSetup -e`) ve `installer\redist\` altında WinFsp'in
-resmi `winfsp-2.1.25156.msi` paketi gerekir (git'e eklenmez; betik imzasını denetler). Yalnızca program klasörü için
-`tools\build-release.ps1` (`publish\APFS for Windows\`); onu sihirbazsız kurmak için yönetici PowerShell'de `install.ps1`.
-`install.ps1` ile kurulan sürüm "Yüklü uygulamalar"da görünmez (kaldırmak için `uninstall.ps1`); sihirbazla kurduysanız
-oradan kaldırın, `uninstall.ps1` kullanılırsa listede sahipsiz bir kayıt kalır.
-Test görüntüleri `tests/Apfs.ImageBuilder` ile üretilir ve bağımsız bir okuyucu olan 7-Zip ile karşılaştırılır
-(`tools/compare_with_7z.ps1`). Yazma desteği bağımsız hakemlerle sınanır: Linux'un APFS araçları (apfsprogs: `mkapfs`, `apfsck`;
-linux-apfs-rw sürücüsü) WSL içinde çalışır (`tools/make-linux-fixtures.sh`, `tools/make-linux-populated.sh`); macOS'un kendi
-denetleyicisi için `tools/mac/` (Mac kiti). Gerçek disk yolunu sanal diskte sınamak için `tools/vhd-write-test.ps1` (yönetici).
-Uzun testler: `APFS_LONG=1 dotnet test`.
+.NET 10 SDK, Inno Setup 6 (`winget install --id JRSoftware.InnoSetup -e`) ve `installer\redist\` altında WinFsp'in resmi
+`winfsp-2.1.25156.msi` paketi gerekir (git'e eklenmez; betik imzasını denetler). Yalnızca program klasörü için
+(`publish\APFS for Windows\`) `tools\build-release.ps1`. Programlar `src` altında (`Apfs.Core` okuyucu, `Apfs.Mount` WinFsp
+sürücüsü, `Apfs.Windows`, `Apfs.Service`, `Apfs.Tray`, `Apfs.Cli`); arayüz metinleri `src/Apfs.Core/Resources` ve
+`src/Apfs.Windows/Resources` içinde (`User.<dil>.resx`; teknik metinler `Tech.resx` yalnız İngilizce ve Türkçe).
+Okuma ve yazma bağımsız hakemlerle sınanır (7-Zip, Linux'un APFS araçları apfsprogs ve linux-apfs-rw, macOS'un kendi İlk Yardım'ı);
+testler ve geliştirme araçları bu depoda yer almaz.
 
 ## Ad
 Hashido (橋戸) Japoncada "köprü kapısı" demektir; gerçek bir soyadı ve yer adıdır: Mac diskinizle Windows arasında bir kapı.

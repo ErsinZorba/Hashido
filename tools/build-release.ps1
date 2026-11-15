@@ -16,6 +16,11 @@ foreach ($p in 'src\Apfs.Cli', 'src\Apfs.Service', 'src\Apfs.Tray') {
     if ($LASTEXITCODE -ne 0) { throw "derleme başarısız: $p" }
 }
 Copy-Item (Join-Path $root 'README.md'), (Join-Path $root 'README.tr.md'), (Join-Path $root 'LICENSE'), (Join-Path $root 'THIRD_PARTY_NOTICES.md') $out
-if ($Runtime -eq 'win-x64') { Copy-Item (Join-Path $root 'install.ps1'), (Join-Path $root 'uninstall.ps1') (Split-Path -Parent $out) }
+# Sihirbazsız kurulum betikleri yalnız gizli depoda (geliştirme); açık depoda yoklar, setup'a da girmezler
+if ($Runtime -eq 'win-x64') {
+    foreach ($s in 'install.ps1', 'uninstall.ps1') {
+        if (Test-Path (Join-Path $root $s)) { Copy-Item (Join-Path $root $s) (Split-Path -Parent $out) }
+    }
+}
 $size = (Get-ChildItem $out -Recurse | Measure-Object Length -Sum).Sum
 "Hazır: $out ($([math]::Round($size / 1MB, 1)) MB)"
