@@ -180,7 +180,7 @@
     <value>正在连接…</value>
   </data>
   <data name="List.NoDiskBody" xml:space="preserve">
-    <value>请插入你的 Mac 磁盘；几秒钟内它就会显示在这里。磁盘会先以只读方式打开；如果想写入，请使用其卡片上的按钮另行允许。</value>
+    <value>请插入你的 Mac 磁盘；几秒钟内它就会显示在这里。磁盘会先以只读方式打开；如果想写入，请使用"允许写入"按钮另行允许。</value>
   </data>
   <data name="List.NoDiskHeading" xml:space="preserve">
     <value>尚无 Mac 磁盘</value>

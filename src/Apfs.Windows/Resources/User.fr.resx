@@ -180,7 +180,7 @@
     <value>Connexion…</value>
   </data>
   <data name="List.NoDiskBody" xml:space="preserve">
-    <value>Branchez votre disque Mac ; il apparaîtra ici en quelques secondes. Votre disque s'ouvre d'abord en lecture seule ; si vous souhaitez y écrire, vous l'autorisez séparément avec le bouton de sa carte.</value>
+    <value>Branchez votre disque Mac ; il apparaîtra ici en quelques secondes. Votre disque s'ouvre d'abord en lecture seule ; si vous souhaitez y écrire, vous l'autorisez séparément avec le bouton "Autoriser l'écriture".</value>
   </data>
   <data name="List.NoDiskHeading" xml:space="preserve">
     <value>Aucun disque Mac pour l'instant</value>

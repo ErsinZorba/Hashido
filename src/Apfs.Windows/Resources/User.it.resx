@@ -180,7 +180,7 @@
     <value>Connessione in corso…</value>
   </data>
   <data name="List.NoDiskBody" xml:space="preserve">
-    <value>Collega il disco del Mac: comparirà qui entro pochi secondi. Il disco viene aperto prima in sola lettura; se vuoi scriverci, puoi consentirlo separatamente con il pulsante sulla sua scheda.</value>
+    <value>Collega il disco del Mac: comparirà qui entro pochi secondi. Il disco viene aperto prima in sola lettura; se vuoi scriverci, puoi consentirlo separatamente con il pulsante "Consenti scrittura".</value>
   </data>
   <data name="List.NoDiskHeading" xml:space="preserve">
     <value>Ancora nessun disco Mac</value>

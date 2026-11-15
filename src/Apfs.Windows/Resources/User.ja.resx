@@ -180,7 +180,7 @@
     <value>接続しています…</value>
   </data>
   <data name="List.NoDiskBody" xml:space="preserve">
-    <value>Mac のディスクを接続してください。数秒以内にここに表示されます。ディスクはまず読み取り専用で開かれます。書き込みたい場合は、ディスクのカードにあるボタンで別途許可してください。</value>
+    <value>Mac のディスクを接続してください。数秒以内にここに表示されます。ディスクはまず読み取り専用で開かれます。書き込みたい場合は、"書き込みを許可" ボタンで別途許可してください。</value>
   </data>
   <data name="List.NoDiskHeading" xml:space="preserve">
     <value>Mac のディスクはまだありません</value>

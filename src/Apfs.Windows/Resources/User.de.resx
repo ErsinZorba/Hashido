@@ -180,7 +180,7 @@
     <value>Verbindung wird hergestellt…</value>
   </data>
   <data name="List.NoDiskBody" xml:space="preserve">
-    <value>Schließen Sie Ihren Mac-Datenträger an; er erscheint innerhalb weniger Sekunden hier. Ihr Datenträger wird zunächst schreibgeschützt geöffnet; wenn Sie darauf schreiben möchten, erlauben Sie das separat über die Schaltfläche auf seiner Karte.</value>
+    <value>Schließen Sie Ihren Mac-Datenträger an; er erscheint innerhalb weniger Sekunden hier. Ihr Datenträger wird zunächst schreibgeschützt geöffnet; wenn Sie darauf schreiben möchten, erlauben Sie das separat über die Schaltfläche "Schreiben erlauben".</value>
   </data>
   <data name="List.NoDiskHeading" xml:space="preserve">
     <value>Noch kein Mac-Datenträger</value>

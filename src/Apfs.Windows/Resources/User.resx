@@ -180,7 +180,7 @@
     <value>Connecting…</value>
   </data>
   <data name="List.NoDiskBody" xml:space="preserve">
-    <value>Plug in your Mac disk; it appears here within a few seconds. Your disk opens read-only first; if you want to write to it, you allow that separately with the button on its card.</value>
+    <value>Plug in your Mac disk; it appears here within a few seconds. Your disk opens read-only first; if you want to write to it, you allow that separately with its "Allow writing" button.</value>
   </data>
   <data name="List.NoDiskHeading" xml:space="preserve">
     <value>No Mac disk yet</value>

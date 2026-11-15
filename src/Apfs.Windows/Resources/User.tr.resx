@@ -180,7 +180,7 @@
     <value>Bağlanıyor…</value>
   </data>
   <data name="List.NoDiskBody" xml:space="preserve">
-    <value>Mac diskinizi takın; birkaç saniye içinde burada görünür. Diskiniz önce salt okunur açılır; yazmak isterseniz kartındaki düğmeyle ayrıca izin verirsiniz.</value>
+    <value>Mac diskinizi takın; birkaç saniye içinde burada görünür. Diskiniz önce salt okunur açılır; yazmak isterseniz "Yazmaya izin ver" düğmesiyle ayrıca izin verirsiniz.</value>
   </data>
   <data name="List.NoDiskHeading" xml:space="preserve">
     <value>Henüz bir Mac diski yok</value>

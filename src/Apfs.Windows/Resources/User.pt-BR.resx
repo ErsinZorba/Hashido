@@ -180,7 +180,7 @@
     <value>Conectando…</value>
   </data>
   <data name="List.NoDiskBody" xml:space="preserve">
-    <value>Conecte seu disco do Mac; ele aparecerá aqui em alguns segundos. Seu disco é aberto primeiro como somente leitura; se quiser gravar nele, permita isso separadamente com o botão no cartão do disco.</value>
+    <value>Conecte seu disco do Mac; ele aparecerá aqui em alguns segundos. Seu disco é aberto primeiro como somente leitura; se quiser gravar nele, permita isso separadamente com o botão "Permitir gravação".</value>
   </data>
   <data name="List.NoDiskHeading" xml:space="preserve">
     <value>Nenhum disco do Mac ainda</value>

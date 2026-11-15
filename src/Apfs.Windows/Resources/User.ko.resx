@@ -180,7 +180,7 @@
     <value>연결 중…</value>
   </data>
   <data name="List.NoDiskBody" xml:space="preserve">
-    <value>Mac 디스크를 연결하세요. 몇 초 안에 여기에 표시됩니다. 디스크는 처음에 읽기 전용으로 열리며, 디스크에 쓰려면 디스크 카드의 버튼으로 따로 허용하면 됩니다.</value>
+    <value>Mac 디스크를 연결하세요. 몇 초 안에 여기에 표시됩니다. 디스크는 처음에 읽기 전용으로 열리며, 디스크에 쓰려면 "쓰기 허용" 버튼으로 따로 허용하면 됩니다.</value>
   </data>
   <data name="List.NoDiskHeading" xml:space="preserve">
     <value>아직 Mac 디스크가 없습니다</value>
