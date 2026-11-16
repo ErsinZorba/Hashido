@@ -52,6 +52,13 @@ public sealed class ApfsWritableFileSystem : FileSystemBase, IDisposable
 
     public event Action<string>? Error;
 
+    /// <summary>
+    /// Kullanıcının başka yerden göremeyeceği değişiklik kaybı: bekleyen değişiklikler diske yazılamadı (commit zamanlayıcısı/
+    /// Flush) ya da kapatılırken silinmek istenen dosya silinemedi. <see cref="Error"/>'dan ayrı: hizmet bunları seyreltmeden
+    /// bildirir (1.6.4).
+    /// </summary>
+    public event Action<string>? ChangeLost;
+
     public ApfsWritableFileSystem(WriteSession session, int volumeIndex, TimeSpan? commitInterval = null)
     {
         _session = session;
@@ -85,7 +92,7 @@ public sealed class ApfsWritableFileSystem : FileSystemBase, IDisposable
         {
             if (_disposed || !_vol.IsDirty) return;
             try { _session.Commit(); _commits++; }
-            catch (Exception e) { Error?.Invoke(CoreText.T("Fs.WriteBackFailed", e.Message)); }
+            catch (Exception e) { ChangeLost?.Invoke(CoreText.T("Fs.WriteBackFailed", e.Message)); }
         }
     }
 
@@ -290,7 +297,7 @@ public sealed class ApfsWritableFileSystem : FileSystemBase, IDisposable
             }
             catch (ApfsException e) when (e.Code is not ApfsErrorCode.IoError)
             {
-                Error?.Invoke(CoreText.T("Fs.DeleteFailed", fileName, e.Message));
+                ChangeLost?.Invoke(CoreText.T("Fs.DeleteFailed", fileName, e.Message));
             }
         }
     }

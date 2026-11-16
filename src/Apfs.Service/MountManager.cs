@@ -616,7 +616,9 @@ internal sealed class MountManager : IDisposable
             tv = new TrackedVolume(session.Container, container, 0, vw.Oid, vw.Name);
             string volumeKey = $"{key}#{container}#0";
             tv.WritableMount = ApfsWritableMount.Mount(session, 0, null,
-                msg => OnFileError(description, vw.Name, volumeKey, msg), closeSession: false);
+                msg => OnFileError(description, vw.Name, volumeKey, msg), closeSession: false,
+                // Değişiklik kaybı (kaydedilemedi/silinemedi) birim seyreltmesine girmez: kullanıcı onu başka yerden göremez
+                onChangeLost: msg => AddNotice("uyarı", $"{description} \"{vw.Name}\": {msg}", throttleKey: msg));
             tv.State = VolumeStatus.Mounted;
             if (raw is RawDiskWriter rw) write.RemovalWatch = DeviceNotifications.WatchHandle(rw.Handle, a => OnHandleEvent(key, a));
             bool attached;
@@ -947,7 +949,10 @@ internal sealed class MountManager : IDisposable
         ServiceLog.Write($"[{level}] {text}");
     }
 
-    /// <summary>Birimin dosya hatası bildirimleri bu sürede en çok bir kez (günlükte hepsi; bkz. <see cref="AddNotice"/>).</summary>
+    /// <summary>
+    /// Birimin dosya hatası bildirimleri bu sürede en çok bir kez (günlükte hepsi; bkz. <see cref="AddNotice"/>). Değişiklik
+    /// kaybı (<see cref="ApfsWritableFileSystem.ChangeLost"/>) buraya girmez (1.6.4).
+    /// </summary>
     private static readonly TimeSpan FileErrorNoticeWindow = TimeSpan.FromMinutes(10);
 
     private void OnFileError(string description, string volumeName, string volumeKey, string msg) =>
