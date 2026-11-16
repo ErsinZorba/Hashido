@@ -659,9 +659,11 @@ internal sealed class MountManager : IDisposable
 
     private UnlockResponse DisableWrite(TrackedDisk disk, int container)
     {
-        CloseWrite(disk, container, abandon: false, closeKind: "read-only"); // son commit + blok 0; kimlik kilit içinde tazelenir
+        bool saved = CloseWrite(disk, container, abandon: false, closeKind: "read-only"); // son commit + blok 0; kimlik kilit içinde tazelenir
         RemountReadOnly(disk, container, null);
-        AddNotice("bilgi", WinText.U("Notice.RemountedReadOnly", disk.Description));
+        // "Kaydedildi" yalnız bu çağrı kaydettiyse: Close başarısızsa "kaydedilemedi" (Notice.CloseWriteFailed) zaten eklendi,
+        // oturumu bu arada başka bir yol kapattıysa onun bildirimi var; ikisinde de "kaydedildi" çelişirdi (1.6.5)
+        if (saved) AddNotice("bilgi", WinText.U("Notice.RemountedReadOnly", disk.Description));
         return new UnlockResponse(true, WinText.U("Write.RemountedReadOnly"));
     }
 
@@ -684,7 +686,9 @@ internal sealed class MountManager : IDisposable
     /// yazılmaz (commit ve blok 0 yok); önce kayıtlar durdurulur ki ayırma sırasında gelen Flush da yazmasın.
     /// </summary>
     /// <param name="closeKind">Raporda kapanış biçimi: read-only, eject, removed, changed, service-stop.</param>
-    private void CloseWrite(TrackedDisk disk, int container, bool abandon, string closeKind)
+    /// <returns>true yalnız bu çağrı oturumu kaydederek kapattıysa; false: Close başarısız (<c>Notice.CloseWriteFailed</c>
+    /// eklendi), terk edildi (<paramref name="abandon"/>) ya da oturum bu arada başka bir yolla kapatılmıştı.</returns>
+    private bool CloseWrite(TrackedDisk disk, int container, bool abandon, string closeKind)
     {
         lock (disk.IdentityLock)
         {
@@ -692,7 +696,7 @@ internal sealed class MountManager : IDisposable
             List<TrackedVolume> volumes;
             lock (_gate)
             {
-                if (!disk.Writes.Remove(container, out write)) return;
+                if (!disk.Writes.Remove(container, out write)) return false; // başka bir yol (çıkarma, değişme) kapattı
                 volumes = disk.Volumes.Where(v => v.ContainerIndex == container).ToList();
                 disk.Volumes.RemoveAll(v => v.ContainerIndex == container);
             }
@@ -718,6 +722,9 @@ internal sealed class MountManager : IDisposable
             {
                 try
                 {
+                    // Yalnız geliştirme modu (testler): kaydederek kapatmanın başarısız olması (ör. disk bu sırada çekildi)
+                    if (_imageSources is not null && Environment.GetEnvironmentVariable("APFS_DEV_CLOSE_FAIL") == "1")
+                        throw new ApfsException(ApfsErrorCode.IoError, "APFS_DEV_CLOSE_FAIL");
                     write.Session.Close();
                     ServiceLog.Write(WinText.T("Svc.WriteSessionClosed", disk.Key, container, write.Session.CommittedXid));
                 }
@@ -741,6 +748,7 @@ internal sealed class MountManager : IDisposable
                 try { disk.Fingerprint = PartitionLocator.Fingerprint(disk.Device); }
                 catch (Exception e) when (e is ApfsException or ObjectDisposedException) { }
             }
+            return !abandon && !closeFailed;
         }
     }
 
