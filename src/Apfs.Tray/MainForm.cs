@@ -227,11 +227,13 @@ internal sealed class MainForm : Form
         {
             e.Cancel = true;
             Hide();
-            if (!_hintShown)
+            // İpucu kullanıcı başına bir kez (kalıcı işaret); kayıt yazılamazsa en azından bu oturumda bir kez
+            if (!_hintShown && !UserSettings.TrayHintShown)
             {
-                _hintShown = true;
+                UserSettings.TrayHintShown = true;
                 HiddenToTray?.Invoke();
             }
+            _hintShown = true;
             return;
         }
         base.OnFormClosing(e);

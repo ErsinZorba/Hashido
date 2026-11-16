@@ -4,6 +4,8 @@
     <TargetFramework>net10.0-windows</TargetFramework>
     <UseWindowsForms>true</UseWindowsForms>
     <AssemblyName>apfs-tray</AssemblyName>
+    <!-- Dosya açıklaması (FileDescription): Windows bildirimlerinde gönderen uygulamanın adı olarak görünür -->
+    <AssemblyTitle>Hashido</AssemblyTitle>
     <RootNamespace>Apfs.Tray</RootNamespace>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
     <ApplicationIcon>app.ico</ApplicationIcon>

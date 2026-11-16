@@ -215,6 +215,9 @@
   <data name="Notice.Detached" xml:space="preserve">
     <value>{0} のボリュームのマウントを解除しました。このディスクはリムーバブル デバイスとして表示されないため、再度マウントするには "再スキャン" を使用してください。</value>
   </data>
+  <data name="Notice.DiskMounted" xml:space="preserve">
+    <value>{0}：ドライブ {1} をマウントしました（読み取り専用）。</value>
+  </data>
   <data name="Notice.DiskUnreadable" xml:space="preserve">
     <value>{0} を読み取れませんでした：{1}</value>
   </data>
@@ -230,17 +233,11 @@
   <data name="Notice.MountedWritable" xml:space="preserve">
     <value>"{0}" を【書き込み可能】な状態でドライブ {1} としてマウントしました（試験的）。ディスクを取り外す前に "安全に取り出す" を使用してください。</value>
   </data>
-  <data name="Notice.NeedsPassword" xml:space="preserve">
-    <value>ボリューム "{0}" は暗号化されています。開くには、通知領域の APFS アイコンからパスワードを入力してください。</value>
-  </data>
   <data name="Notice.RemountedReadOnly" xml:space="preserve">
     <value>{0} を読み取り専用で再マウントしました。変更は保存されました。</value>
   </data>
   <data name="Notice.VolumeOpenFailed" xml:space="preserve">
     <value>{0}：ボリューム {1} を開けませんでした。{2}</value>
-  </data>
-  <data name="Notice.WriteRefused" xml:space="preserve">
-    <value>{0} では書き込みが有効になりませんでした。{1}</value>
   </data>
   <data name="Password.Hide" xml:space="preserve">
     <value>パスワードを隠す</value>

@@ -215,6 +215,9 @@
   <data name="Notice.Detached" xml:space="preserve">
     <value>Die Volumes von {0} wurden getrennt. Dieser Datenträger wird nicht als Wechselmedium angezeigt; um ihn erneut einzubinden, verwenden Sie "Erneut scannen".</value>
   </data>
+  <data name="Notice.DiskMounted" xml:space="preserve">
+    <value>{0}: Die Laufwerke {1} wurden eingebunden (schreibgeschützt).</value>
+  </data>
   <data name="Notice.DiskUnreadable" xml:space="preserve">
     <value>{0} konnte nicht gelesen werden: {1}</value>
   </data>
@@ -230,17 +233,11 @@
   <data name="Notice.MountedWritable" xml:space="preserve">
     <value>"{0}" wurde MIT SCHREIBZUGRIFF als Laufwerk {1} eingebunden (experimentell). Verwenden Sie "Sicher auswerfen", bevor Sie den Datenträger entfernen.</value>
   </data>
-  <data name="Notice.NeedsPassword" xml:space="preserve">
-    <value>Das Volume "{0}" ist verschlüsselt. Um es zu öffnen, geben Sie das Passwort über das APFS-Symbol im Infobereich ein.</value>
-  </data>
   <data name="Notice.RemountedReadOnly" xml:space="preserve">
     <value>{0} wurde wieder schreibgeschützt eingebunden; die Änderungen wurden gespeichert.</value>
   </data>
   <data name="Notice.VolumeOpenFailed" xml:space="preserve">
     <value>{0}: Volume {1} konnte nicht geöffnet werden. {2}</value>
-  </data>
-  <data name="Notice.WriteRefused" xml:space="preserve">
-    <value>Das Schreiben auf {0} wurde nicht aktiviert. {1}</value>
   </data>
   <data name="Password.Hide" xml:space="preserve">
     <value>Passwort ausblenden</value>

@@ -27,6 +27,7 @@ internal sealed class MountManager : IDisposable
     private readonly Dictionary<string, TrackedDisk> _disks = new(StringComparer.OrdinalIgnoreCase);
     private readonly List<Notice> _notices = [];
     private readonly Dictionary<string, DateTime> _recentNotices = [];
+    private readonly Dictionary<string, DateTime> _recentQueued = []; // AddNotice queueKey → son kuyruğa giriş
     private readonly IReadOnlyList<string>? _imageSources;
     private readonly HashSet<string> _released = new(StringComparer.OrdinalIgnoreCase); // güvenli kaldırma sonrası yeniden bağlanmasın
     private long _noticeId;
@@ -173,13 +174,14 @@ internal sealed class MountManager : IDisposable
     private void OnDiskUnreadable(string key, Exception e)
     {
         var now = DateTime.UtcNow;
-        bool first;
+        bool first, warn = false;
         TimeSpan elapsed;
         lock (_gate)
         {
             first = !_unreadableSince.TryGetValue(key, out var since);
             if (first) _unreadableSince[key] = since = now;
             elapsed = now - since;
+            if (elapsed >= UnreadableGrace) warn = _unreadableWarned.Add(key);
         }
         if (elapsed < UnreadableGrace)
         {
@@ -187,12 +189,32 @@ internal sealed class MountManager : IDisposable
             ScanRequested?.Invoke();
             return;
         }
-        AddNotice("uyarı", WinText.U("Notice.DiskUnreadable", key, e.Message), throttleKey: key);
+        // Okunamaz kaldığı sürece BİR kez (önceden takılı kaldıkça dakikada bir yineleniyordu); AddNotice kilit dışında
+        string text = WinText.U("Notice.DiskUnreadable", key, e.Message), level = "uyarı"; // Notice.Level protokol anahtarı
+        if (warn) AddNotice(level, text);
+        else
+        {
+            // Sonraki hatalar yalnız günlüğe, önceki gibi dakikada bir (hata iletisi değişse de iz kalsın)
+            bool log;
+            lock (_gate)
+            {
+                log = !_recentNotices.TryGetValue("unreadable#" + key, out var last) || now - last >= TimeSpan.FromMinutes(1);
+                if (log) _recentNotices["unreadable#" + key] = now;
+            }
+            if (log) ServiceLog.Write($"[{level}] {text}"); // AddNotice'in günlük satırıyla aynı biçim
+        }
     }
+
+    /// <summary>Okunamadığı için uyarılmış diskler (<see cref="_gate"/> altında); okunabilince ya da kaybolunca silinir.</summary>
+    private readonly HashSet<string> _unreadableWarned = new(StringComparer.OrdinalIgnoreCase);
 
     private void ForgetUnreadable(string key)
     {
-        lock (_gate) _unreadableSince.Remove(key);
+        lock (_gate)
+        {
+            _unreadableSince.Remove(key);
+            _unreadableWarned.Remove(key);
+        }
     }
 
     private IEnumerable<(string Key, Func<IBlockDevice?> Open)> EnumerateSources()
@@ -239,7 +261,18 @@ internal sealed class MountManager : IDisposable
 
         if (device is RawDiskDevice raw)
             disk.RemovalWatch = DeviceNotifications.WatchHandle(raw.Handle, a => OnHandleEvent(key, a));
-        lock (_gate) _disks[key] = disk;
+        List<TrackedVolume> mounted;
+        lock (_gate)
+        {
+            _disks[key] = disk;
+            mounted = [.. disk.Volumes.Where(v => v.State == VolumeStatus.Mounted && v.Mount is not null)
+                .OrderBy(v => v.ContainerIndex).ThenBy(v => v.Index)];
+        }
+        // Disk başına tek özet (çok bölümlü/birimli diskte birim başına bildirim yağıyordu); kilitli birim parola penceresiyle sorulur
+        if (mounted.Count == 1)
+            AddNotice("bilgi", WinText.U("Notice.Mounted", mounted[0].Name, mounted[0].Mount!.MountPoint));
+        else if (mounted.Count > 1)
+            AddNotice("bilgi", WinText.U("Notice.DiskMounted", disk.Description, string.Join(", ", mounted.Select(v => v.Mount!.MountPoint))));
     }
 
     /// <summary>
@@ -335,7 +368,7 @@ internal sealed class MountManager : IDisposable
         tv.State = VolumeStatus.NeedsPassword;
         tv.Hint = info?.Hint;
         tv.Message = null;
-        AddNotice("bilgi", WinText.U("Notice.NeedsPassword", tv.Name));
+        // Bildirim yok: tepsi parola penceresini kendiliğinden açar
         ServiceLog.Write(WinText.T("Svc.WaitingForPassword", disk.Key, tv.Name));
     }
 
@@ -348,7 +381,12 @@ internal sealed class MountManager : IDisposable
         return seen;
     }
 
-    private void TryMount(TrackedDisk disk, TrackedVolume tv, ApfsVolume v)
+    /// <summary>
+    /// Birimi salt okunur bağlar. "Bağlandı" bildirimi burada YOK: takınca disk başına tek özet (<see cref="AttachDisk"/>);
+    /// yazma durumu değişirken yeniden bağlamanın ve kilit açmanın sonucu isteğin yanıtıyla döner.
+    /// </summary>
+    /// <param name="notifyFailure">Bağlama hatası bildirilsin mi (kilit açmada hayır: hata parola penceresinde gösterilir).</param>
+    private void TryMount(TrackedDisk disk, TrackedVolume tv, ApfsVolume v, bool notifyFailure = true)
     {
         tv.Name = v.Name;
         if (!v.IsUserVisible)
@@ -359,11 +397,11 @@ internal sealed class MountManager : IDisposable
         }
         try
         {
-            var m = ApfsMount.Mount(v, null, msg => AddNotice("uyarı", $"{disk.Description} \"{v.Name}\": {msg}", throttleKey: msg));
+            string description = disk.Description, volumeKey = $"{disk.Key}#{tv.ContainerIndex}#{tv.Index}";
+            var m = ApfsMount.Mount(v, null, msg => OnFileError(description, v.Name, volumeKey, msg));
             tv.Mount = m;
             tv.State = VolumeStatus.Mounted;
             tv.Message = null;
-            AddNotice("bilgi", WinText.U("Notice.Mounted", v.Name, m.MountPoint));
             ServiceLog.Write(WinText.T("Svc.Mounted", disk.Key, v.Name, m.MountPoint));
         }
         catch (ApfsException e)
@@ -371,7 +409,8 @@ internal sealed class MountManager : IDisposable
             tv.State = VolumeStatus.Failed;
             tv.Message = e.Message;
             tv.FailureCode = e.Code.ToString();
-            AddNotice("hata", WinText.U("Notice.MountFailed", v.Name, e.Message));
+            if (notifyFailure) AddNotice("hata", WinText.U("Notice.MountFailed", v.Name, e.Message));
+            else ServiceLog.Write($"{disk.Key}: {WinText.U("Notice.MountFailed", v.Name, e.Message)}");
         }
     }
 
@@ -401,7 +440,7 @@ internal sealed class MountManager : IDisposable
                 disk.Keys[uuid] = key;
             }
             key = null; // sahipliği diske geçti
-            TryMount(disk, tv, v);
+            TryMount(disk, tv, v, notifyFailure: false); // sonuç yalnız yanıtta: tepsi balonu ya da parola penceresi
             _reports?.Record(() => Event("unlock", tv.State == VolumeStatus.Mounted ? "ok" : "fail", disk, container)
                 .WithCode(tv.FailureCode).WithDuration(watch.Elapsed));
             return tv.State == VolumeStatus.Mounted
@@ -552,7 +591,7 @@ internal sealed class MountManager : IDisposable
             foreach (var e in gate.Report?.Errors.Take(10) ?? [])
                 ServiceLog.Write(WinText.T("Svc.WriteCheck", key, container, Apfs.Diagnostics.CheckReport.HideNames(e)));
             RemountReadOnly(disk, container, refusal);
-            AddNotice("uyarı", WinText.U("Notice.WriteRefused", description, refusal));
+            // Bildirim yok: neden yanıtta (tepsi penceresi açar) ve bölümün satırında
             _reports?.Record(() => Event("write-enable", failCode is null ? "refused" : "fail", disk, container)
                 .WithGate(refusalKeys).WithCode(failCode).WithDuration(watch.Elapsed));
             return new UnlockResponse(false, refusal);
@@ -575,8 +614,9 @@ internal sealed class MountManager : IDisposable
             var volUuid = session.Container.VolumeUuid(session.Container.Superblock.FsOids[0]);
             var vw = session.Volume(0, KeysOf(disk).FirstOrDefault(k => k.VolumeUuid == volUuid)); // şifreli birimde anahtar şart
             tv = new TrackedVolume(session.Container, container, 0, vw.Oid, vw.Name);
+            string volumeKey = $"{key}#{container}#0";
             tv.WritableMount = ApfsWritableMount.Mount(session, 0, null,
-                msg => AddNotice("uyarı", $"{description} \"{vw.Name}\": {msg}", throttleKey: msg), closeSession: false);
+                msg => OnFileError(description, vw.Name, volumeKey, msg), closeSession: false);
             tv.State = VolumeStatus.Mounted;
             if (raw is RawDiskWriter rw) write.RemovalWatch = DeviceNotifications.WatchHandle(rw.Handle, a => OnHandleEvent(key, a));
             bool attached;
@@ -610,7 +650,7 @@ internal sealed class MountManager : IDisposable
             bool stillAttached;
             lock (_gate) stillAttached = _disks.TryGetValue(key, out var current) && ReferenceEquals(current, disk);
             if (stillAttached) RemountReadOnly(disk, container, msg);
-            AddNotice("hata", $"{description}: {msg}");
+            // Bildirim yok: hata yanıtta (tepsi penceresi açar); günlük satırı yukarıda
             return new UnlockResponse(false, msg);
         }
     }
@@ -810,9 +850,9 @@ internal sealed class MountManager : IDisposable
         }
         bool abandoned;
         List<TrackedVolume> mounted;
+        List<int> writes;
         lock (disk.IdentityLock) // süren bir bölüm kapatması bitsin; aygıtlar onun altından çekilmesin
         {
-            List<int> writes;
             lock (_gate)
             {
                 writes = [.. disk.Writes.Keys];
@@ -834,7 +874,11 @@ internal sealed class MountManager : IDisposable
             foreach (var k in keys) k.Dispose(); // çıkarılan/değişen diskin anahtarı bellekte kalmasın
         }
         if (contentChanged) _reports?.Record(() => Event("disk-changed", abandoned ? "abandoned" : "ok", disk, null));
+        if (reason.Length > 0) ServiceLog.Write($"{key}: {reason}.");
         if (!notify) return;
+        // Salt okunur diskin kablosu çekildi: veri riski yok, kullanıcı biliyor (Windows da USB çekilince susar) → yalnız günlük.
+        // Yazma oturumu vardıysa ya da içerik değiştiyse uyarı kalır. Karar türle verilir, çevrilmiş metinle değil.
+        if (closeKind == "removed" && !contentChanged && writes.Count == 0) return;
         var names = mounted.Where(v => v.State == VolumeStatus.Mounted).Select(v => $"\"{v.Name}\"").ToList();
         string text = $"{disk.Description}{(names.Count > 0 ? " (" + string.Join(", ", names) + ")" : "")} {reason}.";
         if (abandoned)
@@ -842,7 +886,6 @@ internal sealed class MountManager : IDisposable
                 ? WinText.U("Release.UnsavedNotWrittenChanged")
                 : WinText.U("Release.UnsavedLost"));
         AddNotice(abandoned ? "uyarı" : "bilgi", text);
-        ServiceLog.Write($"{key}: {reason}.");
     }
 
     // ---------------- Raporlama ----------------
@@ -874,21 +917,41 @@ internal sealed class MountManager : IDisposable
         }
     }
 
-    private void AddNotice(string level, string text, string? throttleKey = null)
+    /// <param name="throttleKey">Aynı ileti (ör. bozuk bir dosyaya tekrar tekrar erişim) bir dakikada bir kez yazılır: hem
+    /// günlükte hem bildirimde.</param>
+    /// <param name="queueKey">Bildirim kuyruğunu ayrıca seyreltir: bu anahtarla <paramref name="queueWindow"/> içinde en çok bir
+    /// bildirim (ör. birim başına dosya hataları; ileti dosya adı içerdiği için her dosya ayrı ileti). Günlük yalnız
+    /// <paramref name="throttleKey"/>'e bağlıdır; ayrıntı kaybolmaz.</param>
+    private void AddNotice(string level, string text, string? throttleKey = null, string? queueKey = null, TimeSpan queueWindow = default)
     {
         lock (_gate)
         {
-            // Aynı uyarı (ör. bozuk bir dosyaya tekrar tekrar erişim) bir dakikada bir kez bildirilir
+            var now = DateTime.UtcNow;
             if (throttleKey is not null)
             {
-                if (_recentNotices.TryGetValue(throttleKey, out var last) && DateTime.UtcNow - last < TimeSpan.FromMinutes(1)) return;
-                _recentNotices[throttleKey] = DateTime.UtcNow;
+                if (_recentNotices.TryGetValue(throttleKey, out var last) && now - last < TimeSpan.FromMinutes(1)) return;
+                _recentNotices[throttleKey] = now;
             }
-            _notices.Add(new Notice(++_noticeId, level, text, DateTime.Now));
-            if (_notices.Count > 200) _notices.RemoveAt(0);
+            bool queue = true;
+            if (queueKey is not null)
+            {
+                queue = !_recentQueued.TryGetValue(queueKey, out var last) || now - last >= queueWindow;
+                if (queue) _recentQueued[queueKey] = now;
+            }
+            if (queue)
+            {
+                _notices.Add(new Notice(++_noticeId, level, text, DateTime.Now));
+                if (_notices.Count > 200) _notices.RemoveAt(0);
+            }
         }
         ServiceLog.Write($"[{level}] {text}");
     }
+
+    /// <summary>Birimin dosya hatası bildirimleri bu sürede en çok bir kez (günlükte hepsi; bkz. <see cref="AddNotice"/>).</summary>
+    private static readonly TimeSpan FileErrorNoticeWindow = TimeSpan.FromMinutes(10);
+
+    private void OnFileError(string description, string volumeName, string volumeKey, string msg) =>
+        AddNotice("uyarı", $"{description} \"{volumeName}\": {msg}", throttleKey: msg, queueKey: volumeKey, queueWindow: FileErrorNoticeWindow);
 
     private static string DescribeDisk(string key, IBlockDevice device)
     {

@@ -215,6 +215,9 @@
   <data name="Notice.Detached" xml:space="preserve">
     <value>已卸载 {0} 的卷。此磁盘不显示为可移动设备；要重新装载，请使用 "重新扫描"。</value>
   </data>
+  <data name="Notice.DiskMounted" xml:space="preserve">
+    <value>{0}：已装载驱动器 {1}（只读）。</value>
+  </data>
   <data name="Notice.DiskUnreadable" xml:space="preserve">
     <value>无法读取 {0}：{1}</value>
   </data>
@@ -230,17 +233,11 @@
   <data name="Notice.MountedWritable" xml:space="preserve">
     <value>已将 "{0}" 以【可写】方式装载为驱动器 {1}（实验性）。移除磁盘前，请使用 "安全弹出"。</value>
   </data>
-  <data name="Notice.NeedsPassword" xml:space="preserve">
-    <value>卷 "{0}" 已加密。要打开它，请通过通知区域中的 APFS 图标输入密码。</value>
-  </data>
   <data name="Notice.RemountedReadOnly" xml:space="preserve">
     <value>已将 {0} 重新以只读方式装载；更改已保存。</value>
   </data>
   <data name="Notice.VolumeOpenFailed" xml:space="preserve">
     <value>{0}：无法打开卷 {1}。{2}</value>
-  </data>
-  <data name="Notice.WriteRefused" xml:space="preserve">
-    <value>未在 {0} 上启用写入。{1}</value>
   </data>
   <data name="Password.Hide" xml:space="preserve">
     <value>隐藏密码</value>

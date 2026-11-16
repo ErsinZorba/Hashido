@@ -48,6 +48,18 @@ public static class UserSettings
         set => Write(UpdateUrlValue, value);
     }
 
+    private const string TrayHintShownValue = "TrayHintShown"; // DWORD 1; yok = gösterilmedi
+
+    /// <summary>
+    /// "Program tepside çalışmaya devam ediyor" ipucu gösterildi mi (1.6.3): kullanıcı başına bir kez, kalıcı (önceden her
+    /// oturumda ana pencerenin ilk kapatılışında çıkıyordu).
+    /// </summary>
+    public static bool TrayHintShown
+    {
+        get => ReadInt(TrayHintShownValue) is int v && v != 0;
+        set => Write(TrayHintShownValue, value ? 1 : null);
+    }
+
     /// <summary>
     /// Tepsinin tasarımı (1.6.0): sade Windows 11 (varsayılan, kullanıcı kararı 2026-11-15; 1.6.x'te marka) ya da 橋戸 marka.
     /// Yalnız "brand" markadır; değer yoksa ya da bilinmiyorsa → Windows 11.

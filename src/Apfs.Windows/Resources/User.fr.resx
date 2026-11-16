@@ -215,6 +215,9 @@
   <data name="Notice.Detached" xml:space="preserve">
     <value>Les volumes de {0} ont été démontés. Ce disque n'apparaît pas comme un périphérique amovible ; pour le monter à nouveau, utilisez "Analyser à nouveau".</value>
   </data>
+  <data name="Notice.DiskMounted" xml:space="preserve">
+    <value>{0} : les lecteurs {1} ont été montés (lecture seule).</value>
+  </data>
   <data name="Notice.DiskUnreadable" xml:space="preserve">
     <value>Impossible de lire {0} : {1}</value>
   </data>
@@ -230,17 +233,11 @@
   <data name="Notice.MountedWritable" xml:space="preserve">
     <value>"{0}" a été monté en tant que lecteur {1} AVEC ÉCRITURE (expérimental). Utilisez "Éjecter sans risque" avant de retirer le disque.</value>
   </data>
-  <data name="Notice.NeedsPassword" xml:space="preserve">
-    <value>Le volume "{0}" est chiffré. Pour l'ouvrir, saisissez le mot de passe depuis l'icône APFS de la zone de notification.</value>
-  </data>
   <data name="Notice.RemountedReadOnly" xml:space="preserve">
     <value>{0} a été remonté en lecture seule ; les modifications ont été enregistrées.</value>
   </data>
   <data name="Notice.VolumeOpenFailed" xml:space="preserve">
     <value>{0} : impossible d'ouvrir le volume {1}. {2}</value>
-  </data>
-  <data name="Notice.WriteRefused" xml:space="preserve">
-    <value>L'écriture n'a pas été activée sur {0}. {1}</value>
   </data>
   <data name="Password.Hide" xml:space="preserve">
     <value>Masquer le mot de passe</value>

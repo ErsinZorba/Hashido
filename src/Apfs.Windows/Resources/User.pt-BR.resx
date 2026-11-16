@@ -215,6 +215,9 @@
   <data name="Notice.Detached" xml:space="preserve">
     <value>Os volumes de {0} foram desmontados. Este disco não aparece como um dispositivo removível; para montá-lo novamente, use "Procurar novamente".</value>
   </data>
+  <data name="Notice.DiskMounted" xml:space="preserve">
+    <value>{0}: as unidades {1} foram montadas (somente leitura).</value>
+  </data>
   <data name="Notice.DiskUnreadable" xml:space="preserve">
     <value>Não foi possível ler {0}: {1}</value>
   </data>
@@ -230,17 +233,11 @@
   <data name="Notice.MountedWritable" xml:space="preserve">
     <value>"{0}" foi montado como unidade {1} COM GRAVAÇÃO (experimental). Use "Ejetar com segurança" antes de remover o disco.</value>
   </data>
-  <data name="Notice.NeedsPassword" xml:space="preserve">
-    <value>O volume "{0}" está criptografado. Para abri-lo, digite a senha pelo ícone do APFS na área de notificação.</value>
-  </data>
   <data name="Notice.RemountedReadOnly" xml:space="preserve">
     <value>{0} foi montado novamente como somente leitura; as alterações foram salvas.</value>
   </data>
   <data name="Notice.VolumeOpenFailed" xml:space="preserve">
     <value>{0}: não foi possível abrir o volume {1}. {2}</value>
-  </data>
-  <data name="Notice.WriteRefused" xml:space="preserve">
-    <value>A gravação não foi ativada em {0}. {1}</value>
   </data>
   <data name="Password.Hide" xml:space="preserve">
     <value>Ocultar a senha</value>

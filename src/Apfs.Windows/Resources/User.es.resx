@@ -215,6 +215,9 @@
   <data name="Notice.Detached" xml:space="preserve">
     <value>Se desmontaron los volúmenes de {0}. Este disco no aparece como dispositivo extraíble; para volver a montarlo, use "Volver a buscar".</value>
   </data>
+  <data name="Notice.DiskMounted" xml:space="preserve">
+    <value>{0}: se montaron las unidades {1} (solo lectura).</value>
+  </data>
   <data name="Notice.DiskUnreadable" xml:space="preserve">
     <value>No se pudo leer {0}: {1}</value>
   </data>
@@ -230,17 +233,11 @@
   <data name="Notice.MountedWritable" xml:space="preserve">
     <value>"{0}" se montó como unidad {1} CON ESCRITURA (experimental). Use "Expulsar con seguridad" antes de retirar el disco.</value>
   </data>
-  <data name="Notice.NeedsPassword" xml:space="preserve">
-    <value>El volumen "{0}" está cifrado. Para abrirlo, escriba la contraseña desde el icono de APFS del área de notificación.</value>
-  </data>
   <data name="Notice.RemountedReadOnly" xml:space="preserve">
     <value>{0} se volvió a montar en modo de solo lectura; los cambios se guardaron.</value>
   </data>
   <data name="Notice.VolumeOpenFailed" xml:space="preserve">
     <value>{0}: no se pudo abrir el volumen {1}. {2}</value>
-  </data>
-  <data name="Notice.WriteRefused" xml:space="preserve">
-    <value>No se habilitó la escritura en {0}. {1}</value>
   </data>
   <data name="Password.Hide" xml:space="preserve">
     <value>Ocultar la contraseña</value>

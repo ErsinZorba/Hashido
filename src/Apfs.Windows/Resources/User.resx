@@ -215,6 +215,9 @@
   <data name="Notice.Detached" xml:space="preserve">
     <value>The volumes of {0} were unmounted. This disk does not appear as a removable device; to mount it again, use "Scan again".</value>
   </data>
+  <data name="Notice.DiskMounted" xml:space="preserve">
+    <value>{0}: drives {1} were mounted (read-only).</value>
+  </data>
   <data name="Notice.DiskUnreadable" xml:space="preserve">
     <value>{0} could not be read: {1}</value>
   </data>
@@ -230,17 +233,11 @@
   <data name="Notice.MountedWritable" xml:space="preserve">
     <value>"{0}" was mounted as drive {1} WITH WRITING (experimental). Use "Safely eject" before removing the disk.</value>
   </data>
-  <data name="Notice.NeedsPassword" xml:space="preserve">
-    <value>Volume "{0}" is encrypted. To open it, enter the password from the APFS icon in the notification area.</value>
-  </data>
   <data name="Notice.RemountedReadOnly" xml:space="preserve">
     <value>{0} was mounted read-only again; changes were saved.</value>
   </data>
   <data name="Notice.VolumeOpenFailed" xml:space="preserve">
     <value>{0}: volume {1} could not be opened. {2}</value>
-  </data>
-  <data name="Notice.WriteRefused" xml:space="preserve">
-    <value>Writing was not enabled on {0}. {1}</value>
   </data>
   <data name="Password.Hide" xml:space="preserve">
     <value>Hide password</value>

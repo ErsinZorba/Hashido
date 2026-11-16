@@ -215,6 +215,9 @@
   <data name="Notice.Detached" xml:space="preserve">
     <value>{0} birimleri ayrıldı. Bu disk çıkarılabilir bir aygıt olarak görünmüyor; yeniden bağlamak için "Yeniden tara".</value>
   </data>
+  <data name="Notice.DiskMounted" xml:space="preserve">
+    <value>{0}: {1} sürücüleri bağlandı (salt okunur).</value>
+  </data>
   <data name="Notice.DiskUnreadable" xml:space="preserve">
     <value>{0} okunamadı: {1}</value>
   </data>
@@ -230,17 +233,11 @@
   <data name="Notice.MountedWritable" xml:space="preserve">
     <value>"{0}" {1} sürücüsü YAZILABİLİR olarak bağlandı (deneysel). Diski çıkarmadan önce "Güvenle çıkar"ı kullanın.</value>
   </data>
-  <data name="Notice.NeedsPassword" xml:space="preserve">
-    <value>"{0}" birimi şifreli. Açmak için tepsideki APFS simgesinden parolayı girin.</value>
-  </data>
   <data name="Notice.RemountedReadOnly" xml:space="preserve">
     <value>{0} salt okunur olarak yeniden bağlandı; değişiklikler kaydedildi.</value>
   </data>
   <data name="Notice.VolumeOpenFailed" xml:space="preserve">
     <value>{0}: birim {1} açılamadı. {2}</value>
-  </data>
-  <data name="Notice.WriteRefused" xml:space="preserve">
-    <value>{0} yazmaya açılmadı. {1}</value>
   </data>
   <data name="Password.Hide" xml:space="preserve">
     <value>Parolayı gizle</value>
