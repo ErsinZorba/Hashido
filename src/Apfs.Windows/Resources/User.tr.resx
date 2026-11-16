@@ -233,6 +233,9 @@
   <data name="Notice.MountedWritable" xml:space="preserve">
     <value>"{0}" {1} sürücüsü YAZILABİLİR olarak bağlandı (deneysel). Diski çıkarmadan önce "Güvenle çıkar"ı kullanın.</value>
   </data>
+  <data name="Notice.MountedWritableMany" xml:space="preserve">
+    <value>{0}: {1} sürücüleri YAZILABİLİR olarak bağlandı (deneysel). Diski çıkarmadan önce "Güvenle çıkar"ı kullanın.</value>
+  </data>
   <data name="Notice.RemountedReadOnly" xml:space="preserve">
     <value>{0} salt okunur olarak yeniden bağlandı; değişiklikler kaydedildi.</value>
   </data>
@@ -371,6 +374,9 @@
   <data name="Unlock.NotWaiting" xml:space="preserve">
     <value>Bu birim artık parola beklemiyor.</value>
   </data>
+  <data name="Unlock.ReadOnlyFirst" xml:space="preserve">
+    <value>Bu bölüm yazmaya açık; bu birim kilitli ve dokunulmadan kalıyor. Kilidini açmak için önce "Salt okunura dön"ü seçin.</value>
+  </data>
   <data name="Update.Available" xml:space="preserve">
     <value>{0} sürümü çıktı. İndirme sayfasını açmak için tıklayın.</value>
   </data>
@@ -419,9 +425,6 @@ Yazma özelliği DENEYSELDİR. Önemli dosyalarınızın bir yedeği olsun.
   </data>
   <data name="Write.Enabled" xml:space="preserve">
     <value>"{0}" yazmaya açıldı ({1}).</value>
-  </data>
-  <data name="Write.MultipleVolumes" xml:space="preserve">
-    <value>Bu bölüm birden çok birim içeriyor; bu sürümde yalnızca tek birimli bölümler yazmaya açılabiliyor.</value>
   </data>
   <data name="Write.NoSuchPartition" xml:space="preserve">
     <value>Bu diskte böyle bir APFS bölümü yok.</value>

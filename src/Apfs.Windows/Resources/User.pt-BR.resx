@@ -233,6 +233,9 @@
   <data name="Notice.MountedWritable" xml:space="preserve">
     <value>"{0}" foi montado como unidade {1} COM GRAVAÇÃO (experimental). Use "Ejetar com segurança" antes de remover o disco.</value>
   </data>
+  <data name="Notice.MountedWritableMany" xml:space="preserve">
+    <value>{0}: as unidades {1} foram montadas COM GRAVAÇÃO (experimental). Use "Ejetar com segurança" antes de remover o disco.</value>
+  </data>
   <data name="Notice.RemountedReadOnly" xml:space="preserve">
     <value>{0} foi montado novamente como somente leitura; as alterações foram salvas.</value>
   </data>
@@ -371,6 +374,9 @@
   <data name="Unlock.NotWaiting" xml:space="preserve">
     <value>Este volume não está mais aguardando uma senha.</value>
   </data>
+  <data name="Unlock.ReadOnlyFirst" xml:space="preserve">
+    <value>A gravação está permitida nesta partição, então este volume continua bloqueado e intocado. Para desbloqueá-lo, escolha primeiro "Voltar a somente leitura".</value>
+  </data>
   <data name="Update.Available" xml:space="preserve">
     <value>A versão {0} está disponível. Clique para abrir a página de download.</value>
   </data>
@@ -419,9 +425,6 @@ A gravação é EXPERIMENTAL. Verifique se você tem um backup dos seus arquivos
   </data>
   <data name="Write.Enabled" xml:space="preserve">
     <value>A gravação agora está permitida em "{0}" ({1}).</value>
-  </data>
-  <data name="Write.MultipleVolumes" xml:space="preserve">
-    <value>Esta partição contém mais de um volume; nesta versão, a gravação só pode ser permitida em partições com um único volume.</value>
   </data>
   <data name="Write.NoSuchPartition" xml:space="preserve">
     <value>Este disco não tem essa partição APFS.</value>

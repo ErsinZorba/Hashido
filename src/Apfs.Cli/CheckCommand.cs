@@ -51,6 +51,7 @@ internal static class CheckCommand
         var g = Apfs.Write.WriteGate.Evaluate(c, keys);
         Console.WriteLine(g.Allowed ? WinText.T("Cli.GateOpen") : WinText.T("Cli.GateClosed"));
         foreach (var r in g.Reasons) Console.WriteLine(WinText.T("Cli.GateReason", r));
+        foreach (var l in g.LockedVolumes) Console.WriteLine(WinText.T("Cli.GateLocked", l.Name));
         if (g.Report is { IsClean: false } rep) foreach (var e in rep.Errors.Take(10)) Console.WriteLine(WinText.T("Cli.GateCheck", e));
         return 0;
     }

@@ -90,6 +90,9 @@
   <data name="Cli.GateReason" xml:space="preserve">
     <value>  Reason: {0}</value>
   </data>
+  <data name="Cli.GateLocked" xml:space="preserve">
+    <value>  Stays locked (not written to): {0}</value>
+  </data>
   <data name="Cli.HashError" xml:space="preserve">
     <value>ERROR: {0}</value>
   </data>
@@ -329,6 +332,12 @@ Encrypted volumes: --password-prompt (asks for the password) or --password-stdin
   </data>
   <data name="Svc.MountedWritable" xml:space="preserve">
     <value>{0}: "{1}" mounted writable ({2}).</value>
+  </data>
+  <data name="Svc.LockedVolumeUntouched" xml:space="preserve">
+    <value>{0}: "{1}" is locked; it stays untouched while writing is allowed.</value>
+  </data>
+  <data name="Svc.NoWritableVolume" xml:space="preserve">
+    <value>No volume in this partition can be written.</value>
   </data>
   <data name="Svc.PipeError" xml:space="preserve">
     <value>pipe error: {0}</value>

@@ -74,6 +74,9 @@ internal sealed class AppController : IDisposable
     {
         if (_busy) return;
         _busy = true;
+        // Sorgu başlarken yazma durumu değişen bölümler: yanıt geldiğinde geçiş bitmiş olsa da bu anlık görüntüde o bölümün
+        // birimleri eksik olabilir (AskPasswordsAsync onların "soruldu" kaydını silmesin)
+        var switchingAtStart = _switching.ToHashSet();
         try
         {
             var s = await PipeProtocol.SendAsync<StatusResponse>(new Request("status", Since: Math.Max(0, _lastNotice)), TimeSpan.FromSeconds(3));
@@ -83,7 +86,7 @@ internal sealed class AppController : IDisposable
             if (_lastNotice >= 0) ShowNotices(s.Notices); // ilk açılışta eski bildirimleri gösterme
             _lastNotice = s.LastNoticeId;
             RaiseIfChanged();
-            await AskPasswordsAsync(s);
+            await AskPasswordsAsync(s, switchingAtStart);
         }
         catch (Exception e) when (e is TimeoutException or IOException or OperationCanceledException or UnauthorizedAccessException)
         {
@@ -195,15 +198,19 @@ internal sealed class AppController : IDisposable
 
     // ---------------- Parola ----------------
 
-    private async Task AskPasswordsAsync(StatusResponse s)
+    private async Task AskPasswordsAsync(StatusResponse s, HashSet<string> switchingAtStart)
     {
         // Artık parola beklemeyen birimleri unut: disk çıkarılıp yeniden takılınca parola yine kendiliğinden sorulsun.
         // Vazgeçilen pencere, birim parola beklemeye devam ettikçe yeniden açılmaz (anahtar biçimi tek yerden: AskKey).
+        // Yazma durumu değişen bölümün birimleri o sırada listede olmaz: anahtarları silinmez, yoksa geçişten sonra (yazmaya açınca
+        // ya da Salt okunura dönünce) kilitli birimin parola penceresi yeniden açılırdı (1.7.0).
         var waiting = s.Disks.SelectMany(d => d.Volumes.Where(v => v.State == VolumeStatus.NeedsPassword).Select(v => AskKey(d, v))).ToHashSet();
-        _asked.RemoveWhere(k => !waiting.Contains(k));
+        _asked.RemoveWhere(k => !waiting.Contains(k) && !_switching.Contains(k[..k.LastIndexOf('#')]) && !switchingAtStart.Contains(k[..k.LastIndexOf('#')]));
         foreach (var d in s.Disks)
             foreach (var v in d.Volumes.Where(v => v.State == VolumeStatus.NeedsPassword))
             {
+                // Yazılabilir bölümdeki kilitli birim dokunulmadan kalır, kilidi açılamaz: parola kendiliğinden sorulmaz
+                if (PartitionWritable(d, v)) continue;
                 if (!_asked.Add(AskKey(d, v))) continue;
                 await UnlockAsync(d, v);
             }
@@ -212,8 +219,17 @@ internal sealed class AppController : IDisposable
     /// <summary>Birimin parola penceresi anahtarı: disk + APFS bölüm sırası + birim sırası.</summary>
     internal static string AskKey(DiskStatus d, VolumeStatus v) => $"{d.Id}#{v.Container}#{v.Index}";
 
-    public async Task UnlockAsync(DiskStatus d, VolumeStatus v)
+    /// <summary>Birimin APFS bölümü yazmaya açık mı (bölümün herhangi bir birimi yazılabilir bağlıysa).</summary>
+    internal static bool PartitionWritable(DiskStatus d, VolumeStatus v) => d.Volumes.Any(x => x.Container == v.Container && x.Writable);
+
+    public async Task UnlockAsync(DiskStatus d, VolumeStatus v, IWin32Window? owner = null)
     {
+        if (PartitionWritable(d, v))
+        {
+            // Hizmet de reddeder; parola penceresi boşuna açılmasın (1.7.0)
+            MessageDialog.Inform(owner, null, WinText.U("Unlock.ReadOnlyFirst"), Glyphs.Icon.Info);
+            return;
+        }
         string key = AskKey(d, v);
         _asked.Add(key);
         if (!_unlocking.Add(key)) return;
@@ -299,7 +315,8 @@ internal sealed class AppController : IDisposable
     /// Diskte açık dosya varsa hizmet "meşgul" der; kullanıcı onaylarsa zorla yapılır. Ret nedenini hizmet karta da yazar.
     /// </summary>
     /// <param name="container">APFS bölüm sırası (yazma bölüm başınadır).</param>
-    /// <param name="label">Onay penceresinde gösterilecek ad (tek bölümlü diskte disk, çok bölümlüde bölümün birimi).</param>
+    /// <param name="label">Onay penceresinde gösterilecek ad (tek birimli tek bölümde disk; çok bölümlüde ya da çok birimli bölümde
+    /// disk · bölümde yazılacak birimler).</param>
     public async Task SetWritableAsync(DiskStatus d, int container, string label, bool enable, IWin32Window? owner)
     {
         if (enable && !ConfirmEnableWrite(owner, label)) return;

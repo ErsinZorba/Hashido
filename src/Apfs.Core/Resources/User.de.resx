@@ -90,6 +90,9 @@
   <data name="Gate.Snapshots" xml:space="preserve">
     <value>Das Volume "{0}" enthält Schnappschüsse (z. B. von Time Machine); das Schreiben auf solche Datenträger wird nicht unterstützt.</value>
   </data>
+  <data name="Gate.ReserveQuota" xml:space="preserve">
+    <value>Für das Volume "{0}" ist in macOS ein Kontingent oder reservierter Speicherplatz festgelegt; das Schreiben auf solche Datenträger wird nicht unterstützt.</value>
+  </data>
   <data name="Gate.SystemVolume" xml:space="preserve">
     <value>"{0}" ist ein macOS-System-, Sicherungs- oder internes Volume; auf diesen Datenträger wird nicht geschrieben.</value>
   </data>

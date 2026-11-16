@@ -13,7 +13,16 @@ public sealed record GateResult(bool Allowed, IReadOnlyList<string> Reasons, Wri
     /// metin yerine bunu kullanır: anahtar dile bağlı değildir ve birim adı gibi yer tutucu değerleri taşımaz.
     /// </summary>
     public IReadOnlyList<string> ReasonKeys { get; init; } = [];
+
+    /// <summary>
+    /// İzin verildiğinde, anahtarı verilmediği için kilitli KALACAK şifreli birimler (kapsayıcıdaki sıra + ad). Bunlara yazılmaz,
+    /// yazıcıları açılmaz; kapsayıcıdaki öbür birimler yazılabilir (1.7.0).
+    /// </summary>
+    public IReadOnlyList<LockedVolume> LockedVolumes { get; init; } = [];
 }
+
+/// <summary>Yazma açıkken kilitli kalacak şifreli birim: <c>nx_fs_oid</c> sırası ve adı.</summary>
+public sealed record LockedVolume(int Index, string Name);
 
 /// <summary>
 /// Yazma kapısı: bir kapsayıcıya yazmaya başlamadan önce yapılan denetim. Tek bir kural bile tutmazsa disk salt okunur kalır.
@@ -22,8 +31,12 @@ public sealed record GateResult(bool Allowed, IReadOnlyList<string> Reasons, Wri
 /// <item>kapsayıcıdaki BÜTÜN birimler anlık görüntüsüz, mühürsüz ve rolsüz/Kullanıcı rollü olmalı (alan yöneticisi ortak
 /// olduğu için kardeş birimler de önemlidir);</item>
 /// <item>şifreli birim (1.2.0) yalnızca: yazılım şifrelemesi tek anahtarla (fs bayrakları tam ONEKEY), kapsayıcıda NX_CRYPTO_SW,
-/// kilidi açılmış anahtar verilmiş, şifreleme işlemi yok/bitmiş (er_state 0, ENC_ROLLED yok, omap'te şifreleme/anahtar değiştirme
-/// bayrağı yok), dosya başına anahtar (crypto_state) yok ve tam denetim anahtarla temiz;</item>
+/// şifreleme işlemi yok/bitmiş (er_state 0, ENC_ROLLED yok, omap'te şifreleme/anahtar değiştirme bayrağı yok), dosya başına
+/// anahtar (crypto_state) yok ve tam denetim anahtarla temiz;</item>
+/// <item>anahtarı verilmemiş (kilitli) böyle bir birim, kapsayıcıda en az bir yazılabilir birim (şifresiz ya da anahtarı verilmiş)
+/// varsa reddettirmez: <see cref="GateResult.LockedVolumes"/>'a girer ve dokunulmadan kalır (1.7.0); hepsi kilitliyse ret;</item>
+/// <item>kota hiçbir birimde, ayrılmış alan (rezerv) çok birimli kapsayıcıda hiçbir birimde tanımlı olmamalı (yazıcı kotaya
+/// bakmaz; rezervi yalnız kendi birimi için gözetir);</item>
 /// <item>Fusion yok, checkpoint halkaları bitişik, blok boyutu 4096, tanınmayan özellik biti yok;</item>
 /// <item>en yeni checkpoint kullanılıyor (daha eskisine düşülmemiş), reaper boşta;</item>
 /// <item>tam denetleyici (<see cref="FullCheck"/>) 0 hata veriyor.</item>
@@ -56,8 +69,11 @@ public static class WriteGate
             Add("Gate.CheckpointArea", CoreText.U("Gate.CheckpointArea"));
         if (c.Warnings.Count > 0) Add("Gate.OpenWarnings", CoreText.U("Gate.OpenWarnings"));
 
-        foreach (ulong oid in sb.FsOids)
+        var locked = new List<LockedVolume>();
+        int writable = 0;
+        for (int index = 0; index < sb.FsOids.Count; index++)
         {
+            ulong oid = sb.FsOids[index];
             byte[] v;
             try { v = c.Reader.ReadObject(c.Omap.Resolve(oid, c.Xid).Paddr, ApfsConstants.TypeFs, oid); }
             catch (ApfsException e) when (e.Code is not ApfsErrorCode.IoError) { Add("Gate.VolumeUnreadable", CoreText.U("Gate.VolumeUnreadable", e.Detail)); continue; }
@@ -69,7 +85,9 @@ public static class WriteGate
                 if (fsFlags != ApfsConstants.ApfsFsOneKey || (sb.Flags & ApfsConstants.NxCryptoSw) == 0)
                     Add("Gate.UnsupportedEncryption", CoreText.U("Gate.UnsupportedEncryption", name));
                 else if (!keyList.Any(k => k.VolumeUuid == Bin.Uuid(v, 240)))
-                    Add("Gate.Locked", CoreText.U("Gate.Locked", name));
+                    locked.Add(new LockedVolume(index, name));
+                else
+                    writable++;
                 if ((Bin.U64(v, 56) & ApfsConstants.ApfsIncompatEncRolled) != 0)
                     Add("Gate.EncRolled", CoreText.U("Gate.EncRolled", name));
                 try
@@ -80,8 +98,15 @@ public static class WriteGate
                 }
                 catch (ApfsException e) when (e.Code is not ApfsErrorCode.IoError) { Add("Gate.OmapUnreadable", CoreText.U("Gate.OmapUnreadable", name)); }
             }
-            else if ((fsFlags & ~ApfsFsFlagsAllowed) != 0)
-                Add("Gate.UnsupportedVolumeSetting", CoreText.U("Gate.UnsupportedVolumeSetting", name));
+            else
+            {
+                if ((fsFlags & ~ApfsFsFlagsAllowed) != 0)
+                    Add("Gate.UnsupportedVolumeSetting", CoreText.U("Gate.UnsupportedVolumeSetting", name));
+                writable++;
+            }
+            // Kota yazıcıda gözetilmez; rezerv yalnız yazılan birim için gözetilir (kardeşin rezervi tüketilebilirdi)
+            if (Bin.U64(v, 80) != 0 || (sb.FsOids.Count > 1 && Bin.U64(v, 72) != 0))
+                Add("Gate.ReserveQuota", CoreText.U("Gate.ReserveQuota", name));
             if (Bin.U64(v, 216) != 0) Add("Gate.Snapshots", CoreText.U("Gate.Snapshots", name));
             if (role is not (ApfsConstants.RoleNone or ApfsConstants.RoleUser))
                 Add("Gate.SystemVolume", CoreText.U("Gate.SystemVolume", name));
@@ -93,6 +118,10 @@ public static class WriteGate
                 Add("Gate.UnknownVolumeFeature", CoreText.U("Gate.UnknownVolumeFeature", name));
         }
 
+        // Kilitli birim yalnız yanında yazılabilir bir birim varsa dokunulmadan bırakılır; hepsi kilitliyse eskisi gibi ret
+        if (writable == 0)
+            foreach (var l in locked) Add("Gate.Locked", CoreText.U("Gate.Locked", l.Name));
+
         if (reasons.Count > 0) return Refused(reasons, null);
 
         // Yapısal denetim en sonda: pahalıdır ve yukarıdaki kurallar geçmeden anlamsızdır
@@ -103,7 +132,7 @@ public static class WriteGate
             return Refused([.. report.WriteBlockers.Select(b => ("Gate.WriteBlocker", CoreText.U("Gate.WriteBlocker", b)))], report);
         if (report.OwnershipIncomplete)
             return Refused([("Gate.Unresolvable", CoreText.U("Gate.Unresolvable"))], report);
-        return new GateResult(true, [], new WriteGrant(sb.Uuid, sb.Xid), report);
+        return new GateResult(true, [], new WriteGrant(sb.Uuid, sb.Xid), report) { LockedVolumes = locked };
     }
 
     /// <summary>Aynı metin bir kez (ör. iki birimde aynı neden); anahtar listesi metinle aynı sırada kalır.</summary>

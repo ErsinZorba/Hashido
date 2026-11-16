@@ -27,7 +27,7 @@ Plug the disk in and within a few seconds it shows up in File Explorer with a dr
 | 10 interface languages | English, Türkçe, Deutsch, Français, Español, Português (Brasil), Italiano, 日本語, 简体中文, 한국어 |
 
 ## Installation
-Run `Hashido-Setup-1.6.5.exe` and follow the wizard (Next › Install › Finish). Windows 10/11 (64-bit) is all you need;
+Run `Hashido-Setup-1.7.0.exe` and follow the wizard (Next › Install › Finish). Windows 10/11 (64-bit) is all you need;
 nothing else has to be installed: .NET comes with the program, and if the [WinFsp](https://winfsp.dev) driver is missing the wizard
 installs it too. After installation, **Hashido** is in the Start menu and the tray icon starts automatically at every sign-in.
 
@@ -84,15 +84,20 @@ read-only again.
 - If writing is interrupted (cable pulled, power cut), the disk opens in its previously saved state; your Mac disk is not damaged.
   The changes of the last few seconds may be lost. (Some USB enclosures ignore the "flush to disk" command; then the lost period
   can be a little longer, and the disk still opens in its previous intact state.)
-- Which disks can be opened for writing: single-volume APFS partitions, **unencrypted** or **password-encrypted** on the Mac
+- Which disks can be opened for writing: APFS partitions, **unencrypted** or **password-encrypted** on the Mac
   ("APFS (Encrypted)" in Disk Utility; 1.2.0). On an encrypted volume first **Unlock**, then **Allow writing**: files are written to
   the disk encrypted. The password is not asked again when allowing writing or on "Back to read-only" (the key is kept only in
   memory; it is erased when the disk is removed or the service stops, and is never saved anywhere).
 - On a disk with more than one APFS partition (e.g. a USB stick partitioned on a Mac) each partition has its own
   **«name»: Allow writing** button; allowing writing on one partition does not touch the others.
+- A partition with several volumes (e.g. an unencrypted and an encrypted volume side by side; 1.7.0) is opened for writing as a
+  whole: every volume that is open is written. A locked encrypted volume in it stays locked and untouched; to write to it too,
+  first **Unlock** it, then **Allow writing**. While writing is allowed, a locked volume cannot be unlocked: first choose
+  **Back to read-only**.
 - These stay read-only, and the reason is shown under the volume: volumes whose macOS encryption has not finished or was changed later, volumes encrypted
   by hardware (T2/Apple Silicon) or with per-file keys, disks with snapshots (e.g. Time Machine), macOS system/backup volumes, Fusion
-  Drive, several volumes in the same partition, and disks whose internal structure shows an inconsistency.
+  Drive, volumes with a quota (and, in a partition with several volumes, a reserved size), and disks whose internal structure shows
+  an inconsistency. One such volume keeps its whole partition read-only.
 - Files whose content cannot be changed in this version: files created with "Duplicate" on the Mac (clones) and files macOS stores
   compressed (mostly application and system files; not documents and photos copied with Finder). They can be opened, copied,
   deleted and moved; when you try to save over them, Windows says "access denied" (edit a copy).
@@ -155,7 +160,7 @@ uncompressed. A file compressed with an unsupported method (e.g. LZBITMAP) appea
 supported" error when opened, and the reason is written to the log.
 
 ## Not supported
-Writing to disks with several volumes in the same partition; changing the password of an encrypted volume, encrypting/decrypting;
+Writing to a locked encrypted volume; changing the password of an encrypted volume, encrypting/decrypting;
 repair, formatting; snapshots and the Time Machine structure; Fusion Drive; the sealed macOS system volume; DMG/sparsebundle files;
 HFS+; hardware encryption of Apple Silicon/T2 internal disks.
 

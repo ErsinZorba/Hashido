@@ -90,6 +90,9 @@
   <data name="Gate.Snapshots" xml:space="preserve">
     <value>卷 "{0}" 包含快照（例如 Time Machine）；不支持写入这样的磁盘。</value>
   </data>
+  <data name="Gate.ReserveQuota" xml:space="preserve">
+    <value>卷 "{0}" 在 macOS 中设置了配额或预留空间；不支持写入这样的磁盘。</value>
+  </data>
   <data name="Gate.SystemVolume" xml:space="preserve">
     <value>"{0}" 是 macOS 系统卷、备份卷或内部卷；不会写入此磁盘。</value>
   </data>

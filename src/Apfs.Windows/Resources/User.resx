@@ -233,6 +233,9 @@
   <data name="Notice.MountedWritable" xml:space="preserve">
     <value>"{0}" was mounted as drive {1} WITH WRITING (experimental). Use "Safely eject" before removing the disk.</value>
   </data>
+  <data name="Notice.MountedWritableMany" xml:space="preserve">
+    <value>{0}: drives {1} were mounted WITH WRITING (experimental). Use "Safely eject" before removing the disk.</value>
+  </data>
   <data name="Notice.RemountedReadOnly" xml:space="preserve">
     <value>{0} was mounted read-only again; changes were saved.</value>
   </data>
@@ -371,6 +374,9 @@
   <data name="Unlock.NotWaiting" xml:space="preserve">
     <value>This volume is no longer waiting for a password.</value>
   </data>
+  <data name="Unlock.ReadOnlyFirst" xml:space="preserve">
+    <value>Writing is allowed on this partition, so this volume stays locked and untouched. To unlock it, first choose "Back to read-only".</value>
+  </data>
   <data name="Update.Available" xml:space="preserve">
     <value>Version {0} is available. Click to open the download page.</value>
   </data>
@@ -419,9 +425,6 @@ Writing is EXPERIMENTAL. Make sure you have a backup of your important files.
   </data>
   <data name="Write.Enabled" xml:space="preserve">
     <value>Writing is now allowed on "{0}" ({1}).</value>
-  </data>
-  <data name="Write.MultipleVolumes" xml:space="preserve">
-    <value>This partition contains more than one volume; in this version writing can only be allowed on single-volume partitions.</value>
   </data>
   <data name="Write.NoSuchPartition" xml:space="preserve">
     <value>This disk has no such APFS partition.</value>

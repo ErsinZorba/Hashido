@@ -1347,6 +1347,9 @@
   <data name="Write.Block" xml:space="preserve">
     <value>block {0}</value>
   </data>
+  <data name="Write.BlockNotOwnedThisTx" xml:space="preserve">
+    <value>block {0} was not allocated for this volume's data in this transaction; cannot overwrite it</value>
+  </data>
   <data name="Write.BlockNotAllocatedThisTx" xml:space="preserve">
     <value>block {0} was not allocated in this transaction; cannot overwrite it</value>
   </data>
@@ -1385,9 +1388,6 @@
   </data>
   <data name="Write.PhysOidNotAddress" xml:space="preserve">
     <value>block {0}: physical object's oid is not its address</value>
-  </data>
-  <data name="Write.PlainWriteRefused" xml:space="preserve">
-    <value>writing data without a key refused in an encrypted volume's session</value>
   </data>
   <data name="Write.UnknownEphemeral" xml:space="preserve">
     <value>unrecognized ephemeral object: oid {0}, type 0x{1:x8}/{2}</value>

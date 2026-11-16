@@ -153,7 +153,7 @@ internal sealed class DiskListView : Panel
                         v.Writable ? Theme.WritableMark : Theme.InkSoft,
                         Button(WinText.U("Action.Open"), FriendlyButton.Kind.Secondary, () => AppController.OpenDrive(v.MountPoint!))),
                     VolumeStatus.NeedsPassword => (Glyphs.State.Locked, WinText.U("Card.NeedsPassword"), Theme.InkSoft,
-                        Button(WinText.U("Action.Unlock"), FriendlyButton.Kind.Secondary, async () => await _app.UnlockAsync(d, v))),
+                        Button(WinText.U("Action.Unlock"), FriendlyButton.Kind.Secondary, async () => await _app.UnlockAsync(d, v, DialogOwner))),
                     _ => (Glyphs.State.Problem, WinText.U("Card.Failed"), Theme.Alert,
                         Button(WinText.U("Action.Details"), FriendlyButton.Kind.Secondary, () => AppController.ShowDetails(DialogOwner, v))),
                 };
@@ -283,9 +283,11 @@ internal sealed class DiskListView : Panel
     {
         if (!g.Any(v => v.State == VolumeStatus.Mounted)) return null;
         bool writable = g.Any(v => v.Writable);
-        string name = g.First().Name;
+        // Onayda bölümde yazılacak (bağlı) birimler sayılır: kilitli birim dokunulmadan kalır (1.7.0)
+        var names = g.Where(v => v.State == VolumeStatus.Mounted).Select(v => $"\"{v.Name}\"").ToList();
+        string label = multi || names.Count > 1 ? $"{d.Description} · {string.Join(", ", names)}" : d.Description;
         var toggle = Button(writable ? WinText.U("Action.BackToReadOnly") : WinText.U("Action.AllowWriting"), FriendlyButton.Kind.Quiet,
-            async () => await _app.SetWritableAsync(d, g.Key, multi ? $"{d.Description} · \"{name}\"" : d.Description, !writable, DialogOwner));
+            async () => await _app.SetWritableAsync(d, g.Key, label, !writable, DialogOwner));
         toggle.BusyText = writable ? WinText.U("Action.Saving") : WinText.U("Action.Checking");
         if (!writable) toggle.ButtonTone = FriendlyButton.Tone.Caution; // 1.6.0: "Yazmaya izin ver" dikkatli eylem; "Salt okunura dön" nötr
         toggle.Busy = _app.IsSwitching(d.Id, g.Key);

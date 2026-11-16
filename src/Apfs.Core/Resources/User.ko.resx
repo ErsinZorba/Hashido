@@ -90,6 +90,9 @@
   <data name="Gate.Snapshots" xml:space="preserve">
     <value>"{0}" 볼륨에 스냅샷(예: Time Machine)이 있습니다. 이러한 디스크에 쓰는 기능은 지원되지 않습니다.</value>
   </data>
+  <data name="Gate.ReserveQuota" xml:space="preserve">
+    <value>"{0}" 볼륨에 macOS에서 할당량 또는 예약 공간이 설정되어 있습니다. 이러한 디스크에 쓰는 기능은 지원되지 않습니다.</value>
+  </data>
   <data name="Gate.SystemVolume" xml:space="preserve">
     <value>"{0}"은(는) macOS 시스템, 백업 또는 내부 볼륨입니다. 이 디스크에는 쓰지 않습니다.</value>
   </data>

@@ -27,7 +27,7 @@ Diski takarsınız, birkaç saniye içinde Dosya Gezgini'nde sürücü harfi ola
 | 10 arayüz dili | Türkçe, English, Deutsch, Français, Español, Português (Brasil), Italiano, 日本語, 简体中文, 한국어 |
 
 ## Kurulum
-`Hashido-Setup-1.6.5.exe` dosyasını çalıştırın ve sihirbazı izleyin (İleri › Kur › Son). Windows 10/11 (64 bit) yeter;
+`Hashido-Setup-1.7.0.exe` dosyasını çalıştırın ve sihirbazı izleyin (İleri › Kur › Son). Windows 10/11 (64 bit) yeter;
 başka bir şey kurmanız gerekmez: .NET programla birlikte gelir, [WinFsp](https://winfsp.dev) sürücüsü yoksa sihirbaz onu da kurar.
 Kurulumdan sonra Başlat menüsünde **Hashido** bulunur ve tepsi simgesi her oturumda kendiliğinden açılır.
 
@@ -83,15 +83,19 @@ diski yeniden salt okunur bağlar.
 - Yazma yarıda kesilirse (kablo çekilmesi, elektrik kesintisi) disk bir önceki kaydedilmiş hâliyle açılır; Mac diskiniz bozulmaz.
   Son birkaç saniyenin değişiklikleri kaybolabilir. (Bazı USB kutuları "diske boşalt" komutuna uymaz; o durumda kaybolan süre
   biraz uzayabilir, disk yine bir önceki sağlam hâliyle açılır.)
-- Hangi diskler yazmaya açılır: tek birimli APFS bölümleri, **şifresiz** ya da Mac'te **parolayla şifrelenmiş** (Disk İzlencesi'nde
+- Hangi diskler yazmaya açılır: APFS bölümleri, **şifresiz** ya da Mac'te **parolayla şifrelenmiş** (Disk İzlencesi'nde
   "APFS (Şifreli)"; 1.2.0). Şifreli birimde önce **Kilidi aç**, sonra **Yazmaya izin ver**: dosyalar diske yine şifreli yazılır.
   Parola yazmaya açarken yeniden sorulmaz, "Salt okunura dön"de de sorulmaz (anahtar yalnızca bellekte tutulur; disk çıkarılınca
   ya da hizmet durunca silinir, hiçbir yere kaydedilmez).
 - Birden çok APFS bölümü olan bir diskte (ör. Mac'te bölümlenmiş bir bellek) her bölümün kendi **«ad»: Yazmaya izin ver**
   düğmesi vardır; bir bölümü yazmaya açmak öbürlerine dokunmaz.
+- Birden çok birimli bir bölüm (ör. yan yana şifresiz ve şifreli birim; 1.7.0) bütün olarak yazmaya açılır: açık olan her birim
+  yazılır. İçindeki kilitli şifreli birim kilitli ve dokunulmadan kalır; ona da yazmak için önce **Kilidi aç**, sonra **Yazmaya izin
+  ver**. Yazma açıkken kilitli birimin kilidi açılamaz: önce **Salt okunura dön**.
 - Şunlar salt okunur kalır ve nedeni birimin altında yazar: macOS'un şifreleme işlemi bitmemiş ya da şifrelemesi sonradan değiştirilmiş
   birimler, donanımla (T2/Apple Silicon) veya dosya başına anahtarla şifrelenmiş birimler, anlık görüntüsü olan (ör. Time Machine)
-  diskler, macOS sistem/yedek birimleri, Fusion Drive, aynı bölümde birden çok birim ve iç yapısında tutarsızlık görülen diskler.
+  diskler, macOS sistem/yedek birimleri, Fusion Drive, kotası olan birimler (birden çok birimli bölümde ayrılmış boyutu olanlar da)
+  ve iç yapısında tutarsızlık görülen diskler. Böyle bir birim bulunduğu bölümün tamamını salt okunur bırakır.
 - Bu sürümde içeriği değiştirilemeyenler: Mac'te "Çoğalt" ile oluşturulmuş (klon) dosyalar ve macOS'un sıkıştırarak sakladığı
   dosyalar (çoğunlukla uygulama ve sistem dosyaları; Finder ile kopyalanan belgeler ve fotoğraflar değil). Bunlar açılabilir,
   kopyalanabilir, silinip taşınabilir; üzerine kaydedilmek istendiğinde Windows "erişim engellendi" der (kopyasını düzenleyin).
@@ -153,7 +157,7 @@ halleriyle gösterilir. Desteklenmeyen bir yöntemle (ör. LZBITMAP) sıkıştı
 "İstek desteklenmiyor" hatası verir ve nedeni günlüğe yazılır.
 
 ## Desteklenmeyenler
-Aynı bölümde birden çok birim olan disklere yazma; şifreli birimin parolasını değiştirme, şifreleme/şifre çözme; onarım, biçimlendirme; anlık görüntüler (snapshot) ve Time Machine yapısı;
+Kilitli şifreli birime yazma; şifreli birimin parolasını değiştirme, şifreleme/şifre çözme; onarım, biçimlendirme; anlık görüntüler (snapshot) ve Time Machine yapısı;
 Fusion Drive; mühürlü macOS sistem birimi; DMG/sparsebundle dosyaları; HFS+; Apple Silicon/T2 dahili disk donanım şifrelemesi.
 
 ## Gizlilik

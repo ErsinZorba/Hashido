@@ -124,7 +124,7 @@ public sealed partial class VolumeWriter
 
     private (ulong Start, ulong Count) AllocData(ulong maxBlocks)
     {
-        var r = _s.Spaceman.Allocate(maxBlocks, ReserveBlocks);
+        var r = _s.AllocateData(this, maxBlocks, ReserveBlocks);
         AddAlloc((long)r.Count);
         return r;
     }
@@ -334,12 +334,12 @@ public sealed partial class VolumeWriter
             {
                 ulong run = 1;
                 while (blk + run < Math.Min(last, inPlace.End) && _s.Spaceman.IsAllocatedThisTx(inPlace.Phys + (blk + run - inPlace.Start))) run++;
-                _s.WriteData(inPlace.Phys + (blk - inPlace.Start), buf.AsSpan(pos, (int)(run * Bs)), Crypto, inPlace.CryptoAt(blk - inPlace.Start));
+                _s.WriteData(this, inPlace.Phys + (blk - inPlace.Start), buf.AsSpan(pos, (int)(run * Bs)), inPlace.CryptoAt(blk - inPlace.Start));
                 blk += run; pos += (int)(run * Bs);
                 continue;
             }
             var (p, cnt) = AllocData(last - blk);
-            _s.WriteData(p, buf.AsSpan(pos, (int)(cnt * Bs)), Crypto, NewCryptoId(p));
+            _s.WriteData(this, p, buf.AsSpan(pos, (int)(cnt * Bs)), NewCryptoId(p));
             ReplaceRange(ino.PrivateId, exts, blk, cnt, p, NewCryptoId(p));
             blk += cnt; pos += (int)(cnt * Bs);
         }

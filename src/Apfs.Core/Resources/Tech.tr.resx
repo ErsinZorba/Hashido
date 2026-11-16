@@ -1347,6 +1347,9 @@
   <data name="Write.Block" xml:space="preserve">
     <value>blok {0}</value>
   </data>
+  <data name="Write.BlockNotOwnedThisTx" xml:space="preserve">
+    <value>blok {0} bu işlemde bu birimin verisi için ayrılmadı; üzerine yazılamaz</value>
+  </data>
   <data name="Write.BlockNotAllocatedThisTx" xml:space="preserve">
     <value>blok {0} bu işlemde ayrılmadı; üzerine yazılamaz</value>
   </data>
@@ -1385,9 +1388,6 @@
   </data>
   <data name="Write.PhysOidNotAddress" xml:space="preserve">
     <value>blok {0}: fiziksel nesnenin kimliği adresi değil</value>
-  </data>
-  <data name="Write.PlainWriteRefused" xml:space="preserve">
-    <value>şifreli birimin oturumunda anahtarsız veri yazımı reddedildi</value>
   </data>
   <data name="Write.UnknownEphemeral" xml:space="preserve">
     <value>tanınmayan geçici nesne: oid {0}, tür 0x{1:x8}/{2}</value>

@@ -119,19 +119,22 @@ public sealed class WriteSession : IDisposable
 
     /// <summary>
     /// Kapsayıcıdaki <paramref name="index"/>. birimin yazıcısı. Şifreli birimde kilidi açılmış <paramref name="key"/> şarttır
-    /// (yazıcı kendi kopyasını alır); şifresiz birimde yok sayılır.
+    /// (yazıcı kendi kopyasını alır); şifresiz birimde yok sayılır. Bir birimin yazıcısı ancak oturumun İLK commit'inden önce
+    /// açılabilir: görüntüsü oturum açılırken diskten okunan kapsayıcı üzerine kurulur ve commit'ler o kapsayıcının eski
+    /// bloklarını yeniden kullanabilir (sonra açılan birim bayat/bozuk okurdu) → sonra istenirse istisna. Çok birimli oturumda
+    /// yazılacak bütün birimler baştan açılır.
     /// </summary>
     public VolumeWriter Volume(int index, Crypto.VolumeKey? key = null)
     {
         ulong oid = _sb.FsOids[index];
         if (_volumes.TryGetValue(oid, out var vw)) return vw;
+        if (_sb.Xid != Container.Xid) throw new InvalidOperationException(CoreText.T("VolWriter.ViewTooLate"));
         ulong paddr = ResolveContainerOmap(oid);
         var apsb = LoadVirtual(oid, paddr);
         if (Bin.U32(apsb, 32) != ApfsConstants.ApfsMagic) throw ApfsException.Corrupt(CoreText.T("Write.NoApsbMagic"));
         vw = new VolumeWriter(this, oid, paddr, apsb, key);
-        if (vw.Crypto is not null) _encryptedVolumes++;
         // Görüntü HEMEN kurulur: sonraki commit'ler kapsayıcının eski omap bloklarını yeniden kullanabilir
-        if (_sb.Xid == Container.Xid) vw.View(Container);
+        vw.View(Container);
         return _volumes[oid] = vw;
     }
 
@@ -166,6 +169,12 @@ public sealed class WriteSession : IDisposable
     /// <summary>Oturum açılırken diskten açılan kapsayıcı (birim görüntüleri bunun üzerinde kurulur; kayıtları oturumdan okunur).</summary>
     public ApfsContainer Container { get; }
 
+    /// <summary>
+    /// Oturumun tek kilidi: oturum (ve yazıcıları) iş parçacığı güvenli değildir. Aynı oturumu paylaşan bütün sürücüler (çok birimli
+    /// bölümde birim başına bir <c>ApfsWritableFileSystem</c>) her çağrıyı ve commit'i bu kilit altında yapar.
+    /// </summary>
+    public Lock SyncRoot { get; } = new();
+
     public ulong CommittedXid => _sb.Xid;
     internal ulong TotalBlocks => _sb.BlockCount;
     /// <summary>Kullanılabilir boş blok sayısı (bu işlemde bırakılanlar hariç).</summary>
@@ -183,23 +192,32 @@ public sealed class WriteSession : IDisposable
         _spaceman.BeginTransaction(_txXid);
     }
 
-    private int _encryptedVolumes;
+    /// <summary>
+    /// <paramref name="owner"/> birimin dosya verisi için en fazla <paramref name="maxBlocks"/> ardışık blok ayırır; bu bloklara bu
+    /// işlemde yalnız o birim <see cref="WriteData"/> ile yazabilir.
+    /// </summary>
+    internal (ulong Start, ulong Count) AllocateData(VolumeWriter owner, ulong maxBlocks, ulong reserve = 0) =>
+        _spaceman.Allocate(maxBlocks, reserve, owner);
 
     /// <summary>
-    /// Dosya verisini hemen yazar. Yalnızca bu işlemde ayrılmış bloklara yazılabilir (hiçbir kalıcı checkpoint göstermez; commit
-    /// öncesi kesilirse zararsızdır); başka bloğa yazma girişimi programlama hatasıdır.
-    /// Şifreli birimin yazıldığı oturumda veri YALNIZ şifrelenerek yazılır: <paramref name="crypto"/> ve <paramref name="cryptoId"/>
-    /// (ilk bloğun crypto_id'si; tweak = crypto_id × (blok/512) + birim) verilmezse istisna — düz metin diske asla gitmez.
+    /// <paramref name="owner"/> birimin dosya verisini hemen yazar. Yalnızca bu işlemde O BİRİMİN verisi için ayrılmış bloklara
+    /// (<see cref="AllocateData"/>) yazılabilir: hiçbir kalıcı checkpoint göstermez (commit öncesi kesilirse zararsızdır) ve aynı
+    /// oturumdaki başka bir birimin bloğu ya da metadata bloğu değildir; başka bloğa yazma girişimi programlama hatasıdır.
+    /// Şifre birimden gelir: şifreli birimin verisi YALNIZ şifrelenerek yazılır, <paramref name="cryptoId"/> (ilk bloğun
+    /// crypto_id'si; tweak = crypto_id × (blok/512) + birim) 0 ise istisna — düz metin şifreli birimin bloğuna asla gitmez. Şifresiz
+    /// birimin verisi düz yazılır (aynı oturumda şifreli birim olsa da).
     /// </summary>
-    internal void WriteData(ulong paddr, ReadOnlySpan<byte> data, Crypto.VolumeCrypto? crypto = null, ulong cryptoId = 0)
+    internal void WriteData(VolumeWriter owner, ulong paddr, ReadOnlySpan<byte> data, ulong cryptoId)
     {
         uint bs = _reader.BlockSize;
+        var crypto = owner.Crypto;
         if (data.Length % bs != 0) throw new ArgumentException(CoreText.T("Write.DataNotBlockMultiple"));
-        if (_encryptedVolumes > 0 && (crypto is null || cryptoId == 0))
-            throw new InvalidOperationException(CoreText.T("Write.PlainWriteRefused"));
         if (crypto is not null && cryptoId == 0) throw new InvalidOperationException(CoreText.T("Write.CryptoIdZero"));
         for (ulong b = paddr; b < paddr + (ulong)(data.Length / bs); b++)
+        {
             if (!_spaceman.IsAllocatedThisTx(b)) throw new InvalidOperationException(CoreText.T("Write.BlockNotAllocatedThisTx", b));
+            if (!_spaceman.IsDataOwnedThisTx(b, owner)) throw new InvalidOperationException(CoreText.T("Write.BlockNotOwnedThisTx", b));
+        }
         if (crypto is null)
         {
             _device.Write((long)(paddr * bs), data);

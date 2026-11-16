@@ -233,6 +233,9 @@
   <data name="Notice.MountedWritable" xml:space="preserve">
     <value>"{0}" を【書き込み可能】な状態でドライブ {1} としてマウントしました（試験的）。ディスクを取り外す前に "安全に取り出す" を使用してください。</value>
   </data>
+  <data name="Notice.MountedWritableMany" xml:space="preserve">
+    <value>{0}：ドライブ {1} を【書き込み可能】な状態でマウントしました（試験的）。ディスクを取り外す前に "安全に取り出す" を使用してください。</value>
+  </data>
   <data name="Notice.RemountedReadOnly" xml:space="preserve">
     <value>{0} を読み取り専用で再マウントしました。変更は保存されました。</value>
   </data>
@@ -371,6 +374,9 @@
   <data name="Unlock.NotWaiting" xml:space="preserve">
     <value>このボリュームはもうパスワードの入力を待っていません。</value>
   </data>
+  <data name="Unlock.ReadOnlyFirst" xml:space="preserve">
+    <value>このパーティションは書き込みが許可されているため、このボリュームはロックされたまま変更されません。ロックを解除するには、先に "読み取り専用に戻す" を選択してください。</value>
+  </data>
   <data name="Update.Available" xml:space="preserve">
     <value>バージョン {0} が公開されました。クリックするとダウンロード ページが開きます。</value>
   </data>
@@ -419,9 +425,6 @@
   </data>
   <data name="Write.Enabled" xml:space="preserve">
     <value>"{0}"（{1}）で書き込みが許可されました。</value>
-  </data>
-  <data name="Write.MultipleVolumes" xml:space="preserve">
-    <value>このパーティションには複数のボリュームが含まれています。このバージョンでは、ボリュームが 1 つだけのパーティションでのみ書き込みを許可できます。</value>
   </data>
   <data name="Write.NoSuchPartition" xml:space="preserve">
     <value>このディスクにはそのような APFS パーティションはありません。</value>

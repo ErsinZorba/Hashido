@@ -90,6 +90,9 @@
   <data name="Gate.Snapshots" xml:space="preserve">
     <value>Il volume "{0}" contiene istantanee (ad es. di Time Machine); la scrittura su dischi di questo tipo non è supportata.</value>
   </data>
+  <data name="Gate.ReserveQuota" xml:space="preserve">
+    <value>Il volume "{0}" ha una quota o uno spazio riservato impostato in macOS; la scrittura su dischi di questo tipo non è supportata.</value>
+  </data>
   <data name="Gate.SystemVolume" xml:space="preserve">
     <value>"{0}" è un volume di sistema, di backup o interno di macOS; su questo disco non si scrive.</value>
   </data>

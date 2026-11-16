@@ -90,6 +90,9 @@
   <data name="Gate.Snapshots" xml:space="preserve">
     <value>ボリューム "{0}" にはスナップショット（Time Machine など）があります。このようなディスクへの書き込みはサポートされていません。</value>
   </data>
+  <data name="Gate.ReserveQuota" xml:space="preserve">
+    <value>ボリューム "{0}" には macOS でクォータまたは予約領域が設定されています。このようなディスクへの書き込みはサポートされていません。</value>
+  </data>
   <data name="Gate.SystemVolume" xml:space="preserve">
     <value>"{0}" は macOS のシステム、バックアップ、または内部ボリュームです。このディスクには書き込みません。</value>
   </data>

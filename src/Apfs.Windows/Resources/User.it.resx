@@ -233,6 +233,9 @@
   <data name="Notice.MountedWritable" xml:space="preserve">
     <value>"{0}" è stato montato come unità {1} CON SCRITTURA (sperimentale). Usa "Espelli in sicurezza" prima di rimuovere il disco.</value>
   </data>
+  <data name="Notice.MountedWritableMany" xml:space="preserve">
+    <value>{0}: le unità {1} sono state montate CON SCRITTURA (sperimentale). Usa "Espelli in sicurezza" prima di rimuovere il disco.</value>
+  </data>
   <data name="Notice.RemountedReadOnly" xml:space="preserve">
     <value>{0} è stato montato di nuovo in sola lettura; le modifiche sono state salvate.</value>
   </data>
@@ -371,6 +374,9 @@
   <data name="Unlock.NotWaiting" xml:space="preserve">
     <value>Questo volume non è più in attesa di una password.</value>
   </data>
+  <data name="Unlock.ReadOnlyFirst" xml:space="preserve">
+    <value>La scrittura è consentita su questa partizione, quindi questo volume resta bloccato e intatto. Per sbloccarlo, scegli prima "Torna a sola lettura".</value>
+  </data>
   <data name="Update.Available" xml:space="preserve">
     <value>È disponibile la versione {0}. Fai clic per aprire la pagina di download.</value>
   </data>
@@ -419,9 +425,6 @@ La scrittura è SPERIMENTALE. Assicurati di avere un backup dei tuoi file import
   </data>
   <data name="Write.Enabled" xml:space="preserve">
     <value>La scrittura è ora consentita su "{0}" ({1}).</value>
-  </data>
-  <data name="Write.MultipleVolumes" xml:space="preserve">
-    <value>Questa partizione contiene più di un volume; in questa versione la scrittura può essere consentita solo su partizioni con un singolo volume.</value>
   </data>
   <data name="Write.NoSuchPartition" xml:space="preserve">
     <value>Questa partizione APFS non esiste su questo disco.</value>

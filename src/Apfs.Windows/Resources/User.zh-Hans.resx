@@ -233,6 +233,9 @@
   <data name="Notice.MountedWritable" xml:space="preserve">
     <value>已将 "{0}" 以【可写】方式装载为驱动器 {1}（实验性）。移除磁盘前，请使用 "安全弹出"。</value>
   </data>
+  <data name="Notice.MountedWritableMany" xml:space="preserve">
+    <value>{0}：已将驱动器 {1} 以【可写】方式装载（实验性）。移除磁盘前，请使用 "安全弹出"。</value>
+  </data>
   <data name="Notice.RemountedReadOnly" xml:space="preserve">
     <value>已将 {0} 重新以只读方式装载；更改已保存。</value>
   </data>
@@ -371,6 +374,9 @@
   <data name="Unlock.NotWaiting" xml:space="preserve">
     <value>此卷已不再等待输入密码。</value>
   </data>
+  <data name="Unlock.ReadOnlyFirst" xml:space="preserve">
+    <value>此分区已允许写入，因此该卷保持锁定且不会被改动。要解锁它，请先选择 "恢复只读"。</value>
+  </data>
   <data name="Update.Available" xml:space="preserve">
     <value>版本 {0} 已发布。单击可打开下载页面。</value>
   </data>
@@ -419,9 +425,6 @@
   </data>
   <data name="Write.Enabled" xml:space="preserve">
     <value>现已允许写入 "{0}"（{1}）。</value>
-  </data>
-  <data name="Write.MultipleVolumes" xml:space="preserve">
-    <value>此分区包含多个卷；此版本仅允许对单卷分区启用写入。</value>
   </data>
   <data name="Write.NoSuchPartition" xml:space="preserve">
     <value>此磁盘上没有这样的 APFS 分区。</value>

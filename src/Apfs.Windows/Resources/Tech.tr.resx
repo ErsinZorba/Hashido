@@ -90,6 +90,9 @@
   <data name="Cli.GateReason" xml:space="preserve">
     <value>  Neden: {0}</value>
   </data>
+  <data name="Cli.GateLocked" xml:space="preserve">
+    <value>  Kilitli kalıyor (yazılmaz): {0}</value>
+  </data>
   <data name="Cli.HashError" xml:space="preserve">
     <value>HATA: {0}</value>
   </data>
@@ -329,6 +332,12 @@ Seçenekler: --volume N (birim sırası, varsayılan 0), --partition N (APFS bö
   </data>
   <data name="Svc.MountedWritable" xml:space="preserve">
     <value>{0}: "{1}" yazılabilir bağlandı ({2}).</value>
+  </data>
+  <data name="Svc.LockedVolumeUntouched" xml:space="preserve">
+    <value>{0}: "{1}" kilitli; yazma açıkken dokunulmadan kalıyor.</value>
+  </data>
+  <data name="Svc.NoWritableVolume" xml:space="preserve">
+    <value>Bu bölümde yazılabilecek birim yok.</value>
   </data>
   <data name="Svc.PipeError" xml:space="preserve">
     <value>kanal hatası: {0}</value>

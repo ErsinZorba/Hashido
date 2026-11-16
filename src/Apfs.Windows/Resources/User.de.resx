@@ -233,6 +233,9 @@
   <data name="Notice.MountedWritable" xml:space="preserve">
     <value>"{0}" wurde MIT SCHREIBZUGRIFF als Laufwerk {1} eingebunden (experimentell). Verwenden Sie "Sicher auswerfen", bevor Sie den Datenträger entfernen.</value>
   </data>
+  <data name="Notice.MountedWritableMany" xml:space="preserve">
+    <value>{0}: Die Laufwerke {1} wurden MIT SCHREIBZUGRIFF eingebunden (experimentell). Verwenden Sie "Sicher auswerfen", bevor Sie den Datenträger entfernen.</value>
+  </data>
   <data name="Notice.RemountedReadOnly" xml:space="preserve">
     <value>{0} wurde wieder schreibgeschützt eingebunden; die Änderungen wurden gespeichert.</value>
   </data>
@@ -371,6 +374,9 @@
   <data name="Unlock.NotWaiting" xml:space="preserve">
     <value>Dieses Volume wartet nicht mehr auf ein Passwort.</value>
   </data>
+  <data name="Unlock.ReadOnlyFirst" xml:space="preserve">
+    <value>Auf dieser Partition ist Schreiben erlaubt, daher bleibt dieses Volume gesperrt und unverändert. Um es zu entsperren, wählen Sie zuerst "Schreibschutz aktivieren".</value>
+  </data>
   <data name="Update.Available" xml:space="preserve">
     <value>Version {0} ist verfügbar. Klicken Sie hier, um die Downloadseite zu öffnen.</value>
   </data>
@@ -419,9 +425,6 @@ Das Schreiben ist EXPERIMENTELL. Stellen Sie sicher, dass Sie eine Sicherung Ihr
   </data>
   <data name="Write.Enabled" xml:space="preserve">
     <value>Das Schreiben auf "{0}" ist jetzt erlaubt ({1}).</value>
-  </data>
-  <data name="Write.MultipleVolumes" xml:space="preserve">
-    <value>Diese Partition enthält mehr als ein Volume; in dieser Version kann das Schreiben nur auf Partitionen mit einem einzigen Volume erlaubt werden.</value>
   </data>
   <data name="Write.NoSuchPartition" xml:space="preserve">
     <value>Dieser Datenträger hat keine solche APFS-Partition.</value>

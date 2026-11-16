@@ -90,6 +90,9 @@
   <data name="Gate.Snapshots" xml:space="preserve">
     <value>"{0}" biriminde anlık görüntü (ör. Time Machine) var; böyle disklere yazma desteklenmiyor.</value>
   </data>
+  <data name="Gate.ReserveQuota" xml:space="preserve">
+    <value>"{0}" biriminde macOS'ta kota ya da ayrılmış alan tanımlı; böyle disklere yazma desteklenmiyor.</value>
+  </data>
   <data name="Gate.SystemVolume" xml:space="preserve">
     <value>"{0}" bir macOS sistem, yedek veya iç birimi; bu diske yazılmaz.</value>
   </data>

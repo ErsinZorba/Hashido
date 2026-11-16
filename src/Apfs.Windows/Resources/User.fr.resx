@@ -233,6 +233,9 @@
   <data name="Notice.MountedWritable" xml:space="preserve">
     <value>"{0}" a été monté en tant que lecteur {1} AVEC ÉCRITURE (expérimental). Utilisez "Éjecter sans risque" avant de retirer le disque.</value>
   </data>
+  <data name="Notice.MountedWritableMany" xml:space="preserve">
+    <value>{0} : les lecteurs {1} ont été montés AVEC ÉCRITURE (expérimental). Utilisez "Éjecter sans risque" avant de retirer le disque.</value>
+  </data>
   <data name="Notice.RemountedReadOnly" xml:space="preserve">
     <value>{0} a été remonté en lecture seule ; les modifications ont été enregistrées.</value>
   </data>
@@ -371,6 +374,9 @@
   <data name="Unlock.NotWaiting" xml:space="preserve">
     <value>Ce volume n'attend plus de mot de passe.</value>
   </data>
+  <data name="Unlock.ReadOnlyFirst" xml:space="preserve">
+    <value>L'écriture est autorisée sur cette partition ; ce volume reste donc verrouillé et intact. Pour le déverrouiller, choisissez d'abord "Revenir en lecture seule".</value>
+  </data>
   <data name="Update.Available" xml:space="preserve">
     <value>La version {0} est disponible. Cliquez pour ouvrir la page de téléchargement.</value>
   </data>
@@ -419,9 +425,6 @@ L'écriture est EXPÉRIMENTALE. Assurez-vous d'avoir une sauvegarde de vos fichi
   </data>
   <data name="Write.Enabled" xml:space="preserve">
     <value>L'écriture est maintenant autorisée sur "{0}" ({1}).</value>
-  </data>
-  <data name="Write.MultipleVolumes" xml:space="preserve">
-    <value>Cette partition contient plus d'un volume ; dans cette version, l'écriture ne peut être autorisée que sur les partitions à volume unique.</value>
   </data>
   <data name="Write.NoSuchPartition" xml:space="preserve">
     <value>Ce disque ne contient pas cette partition APFS.</value>

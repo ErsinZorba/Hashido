@@ -17,7 +17,8 @@ public readonly record struct WriteStats(long Commits, long Bytes, long Operatio
 /// değişmeden kalır; bu sınıf yalnızca yazma kapısından geçmiş bir oturumla kurulur.
 /// <list type="bullet">
 /// <item>Okumalar oturumun güncel görüntüsünden (<see cref="VolumeWriter.View"/>), değişiklikler <see cref="VolumeWriter"/>'dan.</item>
-/// <item>Bütün çağrılar tek kilit altında (yazıcı iş parçacığı güvenli değildir).</item>
+/// <item>Bütün çağrılar OTURUMUN kilidi (<see cref="WriteSession.SyncRoot"/>) altında: yazıcı iş parçacığı güvenli değildir ve
+/// aynı oturumu (aynı kapsayıcının) başka birimlerin sürücüleri de kullanabilir.</item>
 /// <item>Değişiklikler ~5 sn'de bir, Flush'ta ve ayırmada commit edilir. Windows önbelleği kapalıdır (bkz. Init): her yazma
 /// doğrudan buraya gelir, dosya kapandıktan sonra geç yazma olmaz.</item>
 /// </list>
@@ -41,7 +42,7 @@ public sealed class ApfsWritableFileSystem : FileSystemBase, IDisposable
     private readonly WriteSession _session;
     private readonly VolumeWriter _vol;
     private readonly ApfsVolume _view;
-    private readonly Lock _gate = new();
+    private readonly Lock _gate; // = oturumun kilidi (aynı kapsayıcının bütün sürücüleri paylaşır)
     private readonly byte[] _securityDescriptor;
     private readonly Timer _commitTimer;
     private readonly uint _bs;
@@ -62,6 +63,7 @@ public sealed class ApfsWritableFileSystem : FileSystemBase, IDisposable
     public ApfsWritableFileSystem(WriteSession session, int volumeIndex, TimeSpan? commitInterval = null)
     {
         _session = session;
+        _gate = session.SyncRoot;
         _vol = session.Volume(volumeIndex);
         _view = _vol.View(session.Container);
         _bs = session.Container.BlockSize;

@@ -33,8 +33,9 @@ internal sealed class SpacemanWriter
     private readonly byte[] _ipBitmap;
     private readonly ulong _ipBase, _ipBlockCount;
 
-    // Bu işlemde ayrılanlar (bırakılırsa hemen boşa çıkar) ve bırakılanlar (commit'te boş kuyruğa girer)
-    private readonly HashSet<ulong> _allocatedThisTx = [];
+    // Bu işlemde ayrılanlar (bırakılırsa hemen boşa çıkar; değer = verisini yazacak birim, metadata için null) ve bırakılanlar
+    // (commit'te boş kuyruğa girer)
+    private readonly Dictionary<ulong, object?> _allocatedThisTx = [];
     private readonly HashSet<ulong> _quarantineMain = [];   // bu işlemde bırakılan kalıcı bloklar (commit'te boşa çıkar)
     private readonly HashSet<ulong> _quarantineIp = [];
     private readonly HashSet<ulong> _allocatedIpThisTx = [];
@@ -143,7 +144,9 @@ internal sealed class SpacemanWriter
     /// En fazla <paramref name="maxBlocks"/> ardışık boş blok ayırır (en az 1); bulunamazsa ApfsException (disk dolu).
     /// <paramref name="reserve"/> kadar blok her zaman boş bırakılır.
     /// </summary>
-    public (ulong Start, ulong Count) Allocate(ulong maxBlocks, ulong reserve = 0)
+    /// <paramref name="dataOwner"/>: blokların verisini yazacak birim (<see cref="WriteSession.WriteData"/> yalnız ona izin verir);
+    /// metadata için null.
+    public (ulong Start, ulong Count) Allocate(ulong maxBlocks, ulong reserve = 0, object? dataOwner = null)
     {
         if (maxBlocks == 0) throw new ArgumentOutOfRangeException(nameof(maxBlocks));
         if (FreeBlocks <= reserve) throw new ApfsException(ApfsErrorCode.DiskFull);
@@ -163,7 +166,7 @@ internal sealed class SpacemanWriter
                 for (ulong b = start; b < start + n; b++)
                 {
                     SetMain(b, used: true);
-                    _allocatedThisTx.Add(b);
+                    _allocatedThisTx.Add(b, dataOwner);
                 }
                 _searchHint = c;
                 return (start, n);
@@ -173,7 +176,11 @@ internal sealed class SpacemanWriter
     }
 
     /// <summary>Blok bu işlemde mi ayrıldı (henüz hiçbir kalıcı checkpoint göstermiyor; yerinde değiştirilebilir).</summary>
-    public bool IsAllocatedThisTx(ulong paddr) => _allocatedThisTx.Contains(paddr);
+    public bool IsAllocatedThisTx(ulong paddr) => _allocatedThisTx.ContainsKey(paddr);
+
+    /// <summary>Blok bu işlemde <paramref name="owner"/>'ın verisi için mi ayrıldı.</summary>
+    public bool IsDataOwnedThisTx(ulong paddr, object owner) =>
+        _allocatedThisTx.TryGetValue(paddr, out var o) && ReferenceEquals(o, owner);
 
     /// <summary>Tek blok ayırır (metadata düğümleri için).</summary>
     public ulong AllocateBlock() => Allocate(1).Start;
