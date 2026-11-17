@@ -62,19 +62,39 @@ public static class PartitionLocator
 
     private static List<ApfsPartition> ParseGpt(IBlockDevice device, byte[] header, int sector)
     {
+        uint headerSize = Bin.U32(header, 12);
+        if (headerSize < 92 || headerSize > header.Length)
+            throw ApfsException.Corrupt(CoreText.T("Partition.GptHeaderInvalid"));
+        var headerForCrc = header.AsSpan(0, (int)headerSize).ToArray();
+        uint headerCrc = Bin.U32(header, 16);
+        Array.Clear(headerForCrc, 16, 4);
+        if (ComputeCrc32(headerForCrc) != headerCrc)
+            throw ApfsException.Corrupt(CoreText.T("Partition.GptHeaderInvalid"));
+
+        long sectorCount = device.Length / sector;
+        ulong currentLba = Bin.U64(header, 24);
+        ulong backupLba = Bin.U64(header, 32);
+        ulong firstUsable = Bin.U64(header, 40);
+        ulong lastUsable = Bin.U64(header, 48);
         ulong entriesLba = Bin.U64(header, 72);
         uint count = Bin.U32(header, 80);
         uint entrySize = Bin.U32(header, 84);
-        if (entrySize < 128 || entrySize > 4096 || count == 0 || count > MaxPartitionEntries)
+        if (sectorCount < 3 || currentLba != 1 || backupLba != (ulong)(sectorCount - 1)
+            || firstUsable < 2 || firstUsable > lastUsable || lastUsable >= (ulong)sectorCount
+            || entrySize < 128 || entrySize > 4096 || entrySize % 8 != 0
+            || count == 0 || count > MaxPartitionEntries)
             throw ApfsException.Corrupt(CoreText.T("Partition.GptHeaderInvalid"));
 
-        long tableOffset = checked((long)entriesLba * sector);
         long tableLength = (long)count * entrySize;
-        if (tableOffset < 0 || tableOffset > device.Length - tableLength)
+        if (entriesLba < 2 || tableLength > device.Length
+            || entriesLba > (ulong)((device.Length - tableLength) / sector))
             throw ApfsException.Corrupt(CoreText.T("Partition.GptOutsideDisk"));
 
+        long tableOffset = checked((long)entriesLba * sector);
         var table = new byte[tableLength];
         device.Read(tableOffset, table);
+        if (ComputeCrc32(table) != Bin.U32(header, 88))
+            throw ApfsException.Corrupt(CoreText.T("Partition.GptHeaderInvalid"));
 
         var result = new List<ApfsPartition>();
         for (int i = 0; i < count; i++)
@@ -84,13 +104,27 @@ public static class PartitionLocator
             if (type != ApfsPartitionType) continue;
             ulong first = Bin.U64(entry, 32);
             ulong last = Bin.U64(entry, 40);
-            if (last < first) continue;
-            long offset = (long)first * sector;
-            long length = ((long)(last - first) + 1) * sector;
-            if (offset < 0 || offset > device.Length - length) continue; // diskin dışına taşan bölüm: atla
+            if (last < first || first < firstUsable || last > lastUsable || last >= (ulong)sectorCount) continue;
+            ulong blocks = last - first + 1;
+            if (first > (ulong)(long.MaxValue / sector) || blocks > (ulong)(long.MaxValue / sector)) continue;
+            long offset = (long)(first * (ulong)sector);
+            long length = (long)(blocks * (ulong)sector);
+            if (offset > device.Length - length) continue;
             string name = System.Text.Encoding.Unicode.GetString(entry.Slice(56, 72)).TrimEnd('\0');
             result.Add(new ApfsPartition(offset, length, i + 1, string.IsNullOrEmpty(name) ? CoreText.U("Partition.Numbered", i + 1) : name));
         }
         return result;
+    }
+
+    private static uint ComputeCrc32(ReadOnlySpan<byte> data)
+    {
+        uint crc = 0xFFFFFFFF;
+        foreach (byte value in data)
+        {
+            crc ^= value;
+            for (int bit = 0; bit < 8; bit++)
+                crc = (crc & 1) != 0 ? 0xEDB88320 ^ (crc >> 1) : crc >> 1;
+        }
+        return ~crc;
     }
 }
