@@ -19,9 +19,10 @@ public sealed class ApfsMount : IDisposable
     public ApfsFileSystem FileSystem { get; }
     public string MountPoint { get; }
 
-    /// <param name="mountPoint">"X:" biçiminde sürücü harfi; null ise boştaki ilk harf (Z'den geriye) kullanılır.</param>
+    /// <param name="mountPoint">"X:" biçiminde sürücü harfi; null ise boş T:–F: harflerinden biri kullanılır.</param>
     public static ApfsMount Mount(ApfsVolume volume, string? mountPoint, Action<string>? onError = null)
     {
+        mountPoint ??= DriveLetterAllocator.GetFreeMountPoint();
         var c = volume.Container;
         // APFS birimleri kapsayıcının alanını paylaşır: her birimde toplam = kapsayıcı boyutu, boş = kapsayıcıdaki boş alan.
         long total = (long)c.Superblock.BlockCount * c.BlockSize;

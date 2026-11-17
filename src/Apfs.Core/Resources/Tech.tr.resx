@@ -900,11 +900,17 @@
   <data name="Fs.DeleteFailed" xml:space="preserve">
     <value>"{0}" silinemedi: {1}</value>
   </data>
+  <data name="Fs.DriveEnumerationFailed" xml:space="preserve">
+    <value>Windows sürücü harfleri listelenemedi (Win32 hatası {0}: {1})</value>
+  </data>
   <data name="Fs.EntryUnreadable" xml:space="preserve">
     <value>"{0}" okunamadı: {1}</value>
   </data>
   <data name="Fs.MountFailed" xml:space="preserve">
     <value>sürücü bağlanamadı (NTSTATUS 0x{0:X8}); harf kullanımda olabilir</value>
+  </data>
+  <data name="Fs.NoFreeDriveLetter" xml:space="preserve">
+    <value>boş sürücü harfi yok (F: ile T: arası)</value>
   </data>
   <data name="Fs.RootDirectory" xml:space="preserve">
     <value>kök klasör</value>
