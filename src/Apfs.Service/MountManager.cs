@@ -9,6 +9,7 @@ using Apfs.Partitions;
 using Apfs.Volume;
 using Apfs.Windows;
 using Apfs.Windows.Ipc;
+using Apfs.Windows.Localization;
 using Apfs.Windows.Reporting;
 using Apfs.Write;
 
@@ -540,6 +541,8 @@ internal sealed class MountManager : IDisposable
     /// öbür bölümlere dokunulmaz). Açarken: bölümün birimleri ayrılır, bölüm diskten yeniden açılıp yazma kapısından geçirilir;
     /// geçerse yazma izniyle açılıp yazılabilir bağlanır, geçmezse salt okunur yeniden bağlanır ve neden karta yazılır.
     /// Kapatırken: sürücü ayrılır, son değişiklikler kaydedilir (blok 0 dahil), bölüm salt okunur yeniden bağlanır.
+    /// Geçiş (<c>Switching</c>) denetimi bölüm denetiminden ÖNCE (Unlock'taki sıra): geçiş sürerken bölüm ne salt okunur ne
+    /// yazılabilir listededir; ikinci istek "böyle bir bölüm yok" değil "önceki istek henüz bitmedi" almalı (1.7.1).
     /// </summary>
     public UnlockResponse SetWritable(string diskKey, int container, bool enable, bool force)
     {
@@ -548,6 +551,7 @@ internal sealed class MountManager : IDisposable
         {
             disk = _disks.GetValueOrDefault(diskKey);
             if (disk is null) return new UnlockResponse(false, WinText.U("Disk.Gone"));
+            if (disk.Switching.Contains(container)) return new UnlockResponse(false, WinText.U("Write.PreviousRequestPending"));
             if (!disk.Containers.ContainsKey(container) && !disk.Writes.ContainsKey(container))
                 return new UnlockResponse(false, WinText.U("Write.NoSuchPartition"));
             bool writable = disk.Writes.ContainsKey(container);
@@ -1032,10 +1036,13 @@ internal sealed class MountManager : IDisposable
     private void OnFileError(string description, string volumeName, string volumeKey, string msg) =>
         AddNotice("uyarı", $"{description} \"{volumeName}\": {msg}", throttleKey: msg, queueKey: volumeKey, queueWindow: FileErrorNoticeWindow);
 
+    /// <summary>
+    /// Disk başlığı (tepsi, menü, bildirimler). Boyut birim satırı ve Gezgin gibi ikili birimle, tek biçimleyiciden
+    /// (<see cref="SizeText"/>; 1.7.1'e dek ondalıktı: 1 TB disk "1000,2 GB", birim satırı "931 GB").
+    /// </summary>
     private static string DescribeDisk(string key, IBlockDevice device)
     {
-        double gb = device.Length / 1e9;
-        string size = gb >= 1 ? $"{gb:0.#} GB" : $"{device.Length / 1e6:0.#} MB";
+        string size = SizeText.Format(device.Length);
         return key.StartsWith("PhysicalDrive", StringComparison.OrdinalIgnoreCase) ? WinText.U("Disk.PhysicalName", key[13..], size) : $"{Path.GetFileName(key)} ({size})";
     }
 
