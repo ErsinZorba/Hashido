@@ -19,7 +19,7 @@ public sealed class ApfsMount : IDisposable
     public ApfsFileSystem FileSystem { get; }
     public string MountPoint { get; }
 
-    /// <param name="mountPoint">"X:" biçiminde sürücü harfi; null ise boştaki ilk harf (Z'den geriye) kullanılır.</param>
+    /// <param name="mountPoint">"X:" biçiminde sürücü harfi; null ise <see cref="DriveLetterAllocator"/> seçer (T'den F'ye geriye).</param>
     public static ApfsMount Mount(ApfsVolume volume, string? mountPoint, Action<string>? onError = null)
     {
         var c = volume.Container;
@@ -28,27 +28,19 @@ public sealed class ApfsMount : IDisposable
         var fs = new ApfsFileSystem(volume, total, c.FreeBytes);
         if (onError is not null) fs.Error += onError;
 
-        var host = new FileSystemHost(fs);
-        int status;
+        FileSystemHost host;
         try
         {
-            status = host.Mount(mountPoint, null, false, 0);
+            host = DriveLetterAllocator.MountHost(fs, mountPoint);
         }
         catch (DllNotFoundException e)
         {
-            host.Dispose();
             throw new ApfsException(ApfsErrorCode.Unsupported, CoreText.U("Mount.WinFspMissing"), e);
         }
         catch (TypeInitializationException e)
         {
-            host.Dispose();
             throw new ApfsException(ApfsErrorCode.Unsupported,
                 CoreText.U("Mount.WinFspNotLoaded", e.InnerException?.Message ?? e.Message), e);
-        }
-        if (status != 0)
-        {
-            host.Dispose();
-            throw new ApfsException(ApfsErrorCode.IoError, CoreText.T("Fs.MountFailed", status));
         }
         return new ApfsMount(host, fs, host.MountPoint());
     }

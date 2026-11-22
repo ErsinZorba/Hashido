@@ -48,6 +48,12 @@
   <data name="Action.Exit" xml:space="preserve">
     <value>Quitter</value>
   </data>
+  <data name="Action.Forget" xml:space="preserve">
+    <value>Oublier</value>
+  </data>
+  <data name="Action.Install" xml:space="preserve">
+    <value>Installer</value>
+  </data>
   <data name="Action.OK" xml:space="preserve">
     <value>OK</value>
   </data>
@@ -179,6 +185,9 @@
   <data name="Error.Unknown" xml:space="preserve">
     <value>Erreur inconnue.</value>
   </data>
+  <data name="Hello.Unlock" xml:space="preserve">
+    <value>Déverrouiller avec le mot de passe enregistré : {0}</value>
+  </data>
   <data name="Language.Windows" xml:space="preserve">
     <value>Langue de Windows</value>
   </data>
@@ -255,7 +264,19 @@
     <value>Ce volume est chiffré. Pour l'ouvrir, saisissez le mot de passe que vous utilisez sur le Mac.</value>
   </data>
   <data name="Password.Reassurance" xml:space="preserve">
-    <value>Le disque est uniquement lu ; le mot de passe n'est enregistré nulle part.</value>
+    <value>Le disque est uniquement lu ; le mot de passe n'est enregistré que si vous le demandez.</value>
+  </data>
+  <data name="Password.Remember" xml:space="preserve">
+    <value>Mémoriser sur cet ordinateur</value>
+  </data>
+  <data name="Password.RememberHello" xml:space="preserve">
+    <value>Quand le disque est branché, il s'ouvre avec Windows Hello.</value>
+  </data>
+  <data name="Password.RememberNoHello" xml:space="preserve">
+    <value>Toute personne qui se connecte avec ce compte peut ouvrir le disque sans le mot de passe.</value>
+  </data>
+  <data name="Password.SavedInvalid" xml:space="preserve">
+    <value>Le mot de passe enregistré ne fonctionne plus.</value>
   </data>
   <data name="Password.Show" xml:space="preserve">
     <value>Afficher le mot de passe</value>
@@ -297,7 +318,13 @@
     <value>Apparence</value>
   </data>
   <data name="Settings.AppearanceNote" xml:space="preserve">
-    <value>La nouvelle apparence s'applique au redémarrage du programme.</value>
+    <value>Le nouveau style s'applique au redémarrage du programme.</value>
+  </data>
+  <data name="Settings.CheckFailed" xml:space="preserve">
+    <value>Impossible de rechercher les mises à jour. Réessayez plus tard.</value>
+  </data>
+  <data name="Settings.CheckNow" xml:space="preserve">
+    <value>Vérifier maintenant</value>
   </data>
   <data name="Settings.Design" xml:space="preserve">
     <value>Style</value>
@@ -307,6 +334,30 @@
   </data>
   <data name="Settings.LanguageNote" xml:space="preserve">
     <value>La nouvelle langue s'applique au redémarrage du programme.</value>
+  </data>
+  <data name="Settings.NotificationsHeading" xml:space="preserve">
+    <value>Notifications</value>
+  </data>
+  <data name="Settings.NotifyAll" xml:space="preserve">
+    <value>Toutes les notifications</value>
+  </data>
+  <data name="Settings.NotifyImportant" xml:space="preserve">
+    <value>Seulement les notifications importantes</value>
+  </data>
+  <data name="Settings.NotifyImportantNote" xml:space="preserve">
+    <value>Les avertissements et le résultat des actions que vous lancez, comme "Éjecter sans risque", restent affichés.</value>
+  </data>
+  <data name="Settings.NotifyOff" xml:space="preserve">
+    <value>Désactiver complètement les notifications</value>
+  </data>
+  <data name="Settings.NotifyOffNote" xml:space="preserve">
+    <value>Les avertissements et le résultat de vos actions ne sont pas affichés non plus ; seul l'avis juste avant la demande d'autorisation de Windows pour installer une mise à jour reste. Tout reste consigné dans le journal.</value>
+  </data>
+  <data name="Settings.PasswordsHeading" xml:space="preserve">
+    <value>Mots de passe mémorisés</value>
+  </data>
+  <data name="Settings.PasswordsNote" xml:space="preserve">
+    <value>"Oublier" supprime le mot de passe immédiatement.</value>
   </data>
   <data name="Settings.Reports" xml:space="preserve">
     <value>Envoyer des rapports anonymes sur les erreurs, les plantages et les opérations réussies</value>
@@ -322,6 +373,12 @@
   </data>
   <data name="Settings.Title" xml:space="preserve">
     <value>Paramètres de {0}</value>
+  </data>
+  <data name="Settings.UpToDate" xml:space="preserve">
+    <value>{0} est à jour.</value>
+  </data>
+  <data name="Settings.UpdateAutoInstall" xml:space="preserve">
+    <value>Télécharger et installer automatiquement les mises à jour</value>
   </data>
   <data name="Settings.UpdateNotify" xml:space="preserve">
     <value>M'avertir lorsqu'une nouvelle version est publiée</value>
@@ -378,10 +435,25 @@
     <value>L'écriture est autorisée sur cette partition ; ce volume reste donc verrouillé et intact. Pour le déverrouiller, choisissez d'abord "Revenir en lecture seule".</value>
   </data>
   <data name="Update.Available" xml:space="preserve">
-    <value>La version {0} est disponible. Cliquez pour ouvrir la page de téléchargement.</value>
+    <value>La version {0} est disponible. Cliquez pour ouvrir {1}.</value>
+  </data>
+  <data name="Update.ConfirmHeading" xml:space="preserve">
+    <value>Installer {0} {1} ?</value>
+  </data>
+  <data name="Update.ConfirmText" xml:space="preserve">
+    <value>Les disques Mac connectés sont d'abord éjectés sans risque. Windows demandera l'autorisation d'installer.</value>
+  </data>
+  <data name="Update.Downloading" xml:space="preserve">
+    <value>Téléchargement de la version {0}… {1} %</value>
+  </data>
+  <data name="Update.Installing" xml:space="preserve">
+    <value>Installation de {0} {1}. Windows va demander l'autorisation.</value>
   </data>
   <data name="Update.Link" xml:space="preserve">
     <value>Version {0} disponible</value>
+  </data>
+  <data name="Update.Updated" xml:space="preserve">
+    <value>{0} a été mis à jour vers la version {1}.</value>
   </data>
   <data name="Volume.DefaultName" xml:space="preserve">
     <value>volume {0}</value>

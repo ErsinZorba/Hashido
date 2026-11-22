@@ -48,6 +48,12 @@
   <data name="Action.Exit" xml:space="preserve">
     <value>Exit</value>
   </data>
+  <data name="Action.Forget" xml:space="preserve">
+    <value>Forget</value>
+  </data>
+  <data name="Action.Install" xml:space="preserve">
+    <value>Install</value>
+  </data>
   <data name="Action.OK" xml:space="preserve">
     <value>OK</value>
   </data>
@@ -179,6 +185,9 @@
   <data name="Error.Unknown" xml:space="preserve">
     <value>Unknown error.</value>
   </data>
+  <data name="Hello.Unlock" xml:space="preserve">
+    <value>Unlock with the saved password: {0}</value>
+  </data>
   <data name="Language.Windows" xml:space="preserve">
     <value>Windows language</value>
   </data>
@@ -255,7 +264,19 @@
     <value>This volume is encrypted. To open it, enter the password you use on the Mac.</value>
   </data>
   <data name="Password.Reassurance" xml:space="preserve">
-    <value>The disk is only read; the password is not saved anywhere.</value>
+    <value>The disk is only read; the password is saved only if you ask.</value>
+  </data>
+  <data name="Password.Remember" xml:space="preserve">
+    <value>Remember on this computer</value>
+  </data>
+  <data name="Password.RememberHello" xml:space="preserve">
+    <value>When the disk is connected, it opens with Windows Hello.</value>
+  </data>
+  <data name="Password.RememberNoHello" xml:space="preserve">
+    <value>Anyone who signs in with this account can open the disk without the password.</value>
+  </data>
+  <data name="Password.SavedInvalid" xml:space="preserve">
+    <value>The saved password no longer works.</value>
   </data>
   <data name="Password.Show" xml:space="preserve">
     <value>Show password</value>
@@ -297,7 +318,13 @@
     <value>Appearance</value>
   </data>
   <data name="Settings.AppearanceNote" xml:space="preserve">
-    <value>The program restarts to apply a new appearance.</value>
+    <value>The program restarts to apply a new design.</value>
+  </data>
+  <data name="Settings.CheckFailed" xml:space="preserve">
+    <value>Could not check for updates. Try again later.</value>
+  </data>
+  <data name="Settings.CheckNow" xml:space="preserve">
+    <value>Check now</value>
   </data>
   <data name="Settings.Design" xml:space="preserve">
     <value>Design</value>
@@ -307,6 +334,30 @@
   </data>
   <data name="Settings.LanguageNote" xml:space="preserve">
     <value>A new language takes effect after the program restarts.</value>
+  </data>
+  <data name="Settings.NotificationsHeading" xml:space="preserve">
+    <value>Notifications</value>
+  </data>
+  <data name="Settings.NotifyAll" xml:space="preserve">
+    <value>All notifications</value>
+  </data>
+  <data name="Settings.NotifyImportant" xml:space="preserve">
+    <value>Only important notifications</value>
+  </data>
+  <data name="Settings.NotifyImportantNote" xml:space="preserve">
+    <value>Warnings and the results of what you start yourself, such as "Safely eject", are still shown.</value>
+  </data>
+  <data name="Settings.NotifyOff" xml:space="preserve">
+    <value>Turn off notifications completely</value>
+  </data>
+  <data name="Settings.NotifyOffNote" xml:space="preserve">
+    <value>Warnings and the results of what you start are not shown either; only the notice just before Windows asks permission to install an update remains. Everything is still written to the log.</value>
+  </data>
+  <data name="Settings.PasswordsHeading" xml:space="preserve">
+    <value>Remembered passwords</value>
+  </data>
+  <data name="Settings.PasswordsNote" xml:space="preserve">
+    <value>"Forget" deletes the password right away.</value>
   </data>
   <data name="Settings.Reports" xml:space="preserve">
     <value>Send anonymous reports about errors, crashes and successful operations</value>
@@ -322,6 +373,12 @@
   </data>
   <data name="Settings.Title" xml:space="preserve">
     <value>{0} settings</value>
+  </data>
+  <data name="Settings.UpToDate" xml:space="preserve">
+    <value>{0} is up to date.</value>
+  </data>
+  <data name="Settings.UpdateAutoInstall" xml:space="preserve">
+    <value>Download and install updates automatically</value>
   </data>
   <data name="Settings.UpdateNotify" xml:space="preserve">
     <value>Tell me when a new version is released</value>
@@ -378,10 +435,25 @@
     <value>Writing is allowed on this partition, so this volume stays locked and untouched. To unlock it, first choose "Back to read-only".</value>
   </data>
   <data name="Update.Available" xml:space="preserve">
-    <value>Version {0} is available. Click to open the download page.</value>
+    <value>Version {0} is available. Click to open {1}.</value>
+  </data>
+  <data name="Update.ConfirmHeading" xml:space="preserve">
+    <value>Install {0} {1}?</value>
+  </data>
+  <data name="Update.ConfirmText" xml:space="preserve">
+    <value>Attached Mac disks are safely ejected first. Windows will ask for permission to install.</value>
+  </data>
+  <data name="Update.Downloading" xml:space="preserve">
+    <value>Downloading version {0}… {1}%</value>
+  </data>
+  <data name="Update.Installing" xml:space="preserve">
+    <value>Installing {0} {1}. Windows will ask for permission.</value>
   </data>
   <data name="Update.Link" xml:space="preserve">
     <value>Version {0} is available</value>
+  </data>
+  <data name="Update.Updated" xml:space="preserve">
+    <value>{0} has been updated to version {1}.</value>
   </data>
   <data name="Volume.DefaultName" xml:space="preserve">
     <value>volume {0}</value>

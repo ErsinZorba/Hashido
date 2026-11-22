@@ -48,6 +48,12 @@
   <data name="Action.Exit" xml:space="preserve">
     <value>退出</value>
   </data>
+  <data name="Action.Forget" xml:space="preserve">
+    <value>忘记</value>
+  </data>
+  <data name="Action.Install" xml:space="preserve">
+    <value>安装</value>
+  </data>
   <data name="Action.OK" xml:space="preserve">
     <value>确定</value>
   </data>
@@ -179,6 +185,9 @@
   <data name="Error.Unknown" xml:space="preserve">
     <value>未知错误。</value>
   </data>
+  <data name="Hello.Unlock" xml:space="preserve">
+    <value>使用保存的密码解锁：{0}</value>
+  </data>
   <data name="Language.Windows" xml:space="preserve">
     <value>Windows 显示语言</value>
   </data>
@@ -255,7 +264,19 @@
     <value>此卷已加密。要打开它，请输入你在 Mac 上使用的密码。</value>
   </data>
   <data name="Password.Reassurance" xml:space="preserve">
-    <value>只会读取磁盘；密码不会保存在任何地方。</value>
+    <value>只会读取磁盘；只有在您要求时才会保存密码。</value>
+  </data>
+  <data name="Password.Remember" xml:space="preserve">
+    <value>在此电脑上记住</value>
+  </data>
+  <data name="Password.RememberHello" xml:space="preserve">
+    <value>连接磁盘时，将通过 Windows Hello 打开。</value>
+  </data>
+  <data name="Password.RememberNoHello" xml:space="preserve">
+    <value>使用此帐户登录的任何人都可以不输入密码打开磁盘。</value>
+  </data>
+  <data name="Password.SavedInvalid" xml:space="preserve">
+    <value>保存的密码已失效。</value>
   </data>
   <data name="Password.Show" xml:space="preserve">
     <value>显示密码</value>
@@ -297,7 +318,13 @@
     <value>外观</value>
   </data>
   <data name="Settings.AppearanceNote" xml:space="preserve">
-    <value>新外观将在程序重新启动后生效。</value>
+    <value>新设计将在程序重新启动后生效。</value>
+  </data>
+  <data name="Settings.CheckFailed" xml:space="preserve">
+    <value>无法检查更新。请稍后再试。</value>
+  </data>
+  <data name="Settings.CheckNow" xml:space="preserve">
+    <value>立即检查</value>
   </data>
   <data name="Settings.Design" xml:space="preserve">
     <value>设计</value>
@@ -307,6 +334,30 @@
   </data>
   <data name="Settings.LanguageNote" xml:space="preserve">
     <value>新语言将在程序重新启动后生效。</value>
+  </data>
+  <data name="Settings.NotificationsHeading" xml:space="preserve">
+    <value>通知</value>
+  </data>
+  <data name="Settings.NotifyAll" xml:space="preserve">
+    <value>所有通知</value>
+  </data>
+  <data name="Settings.NotifyImportant" xml:space="preserve">
+    <value>仅重要通知</value>
+  </data>
+  <data name="Settings.NotifyImportantNote" xml:space="preserve">
+    <value>警告以及你自己发起的操作的结果（如"安全弹出"）仍会显示。</value>
+  </data>
+  <data name="Settings.NotifyOff" xml:space="preserve">
+    <value>完全关闭通知</value>
+  </data>
+  <data name="Settings.NotifyOffNote" xml:space="preserve">
+    <value>警告和你的操作结果也不会显示；只有安装更新时 Windows 请求权限之前的提示仍会显示。所有内容仍会写入日志。</value>
+  </data>
+  <data name="Settings.PasswordsHeading" xml:space="preserve">
+    <value>记住的密码</value>
+  </data>
+  <data name="Settings.PasswordsNote" xml:space="preserve">
+    <value>"忘记" 会立即删除密码。</value>
   </data>
   <data name="Settings.Reports" xml:space="preserve">
     <value>发送有关错误、崩溃和成功操作的匿名报告</value>
@@ -322,6 +373,12 @@
   </data>
   <data name="Settings.Title" xml:space="preserve">
     <value>{0} 设置</value>
+  </data>
+  <data name="Settings.UpToDate" xml:space="preserve">
+    <value>{0} 已是最新版本。</value>
+  </data>
+  <data name="Settings.UpdateAutoInstall" xml:space="preserve">
+    <value>自动下载并安装更新</value>
   </data>
   <data name="Settings.UpdateNotify" xml:space="preserve">
     <value>有新版本发布时通知我</value>
@@ -378,10 +435,25 @@
     <value>此分区已允许写入，因此该卷保持锁定且不会被改动。要解锁它，请先选择 "恢复只读"。</value>
   </data>
   <data name="Update.Available" xml:space="preserve">
-    <value>版本 {0} 已发布。单击可打开下载页面。</value>
+    <value>版本 {0} 已发布。单击可打开 {1}。</value>
+  </data>
+  <data name="Update.ConfirmHeading" xml:space="preserve">
+    <value>要安装 {0} {1} 吗?</value>
+  </data>
+  <data name="Update.ConfirmText" xml:space="preserve">
+    <value>将先安全弹出已连接的 Mac 磁盘。Windows 会请求安装许可。</value>
+  </data>
+  <data name="Update.Downloading" xml:space="preserve">
+    <value>正在下载版本 {0}… {1}%</value>
+  </data>
+  <data name="Update.Installing" xml:space="preserve">
+    <value>正在安装 {0} {1}。Windows 将请求许可。</value>
   </data>
   <data name="Update.Link" xml:space="preserve">
     <value>版本 {0} 已发布</value>
+  </data>
+  <data name="Update.Updated" xml:space="preserve">
+    <value>{0} 已更新到版本 {1}。</value>
   </data>
   <data name="Volume.DefaultName" xml:space="preserve">
     <value>卷 {0}</value>

@@ -903,6 +903,9 @@
   <data name="Fs.EntryUnreadable" xml:space="preserve">
     <value>"{0}" okunamadı: {1}</value>
   </data>
+  <data name="Fs.NoFreeDriveLetter" xml:space="preserve">
+    <value>boş sürücü harfi yok (F: – Z: arası hepsi kullanımda)</value>
+  </data>
   <data name="Fs.MountFailed" xml:space="preserve">
     <value>sürücü bağlanamadı (NTSTATUS 0x{0:X8}); harf kullanımda olabilir</value>
   </data>
@@ -1355,6 +1358,9 @@
   </data>
   <data name="Write.ChangedSinceGrant" xml:space="preserve">
     <value>disk yazma izni verildikten sonra değişmiş; yeniden denetlenmeli</value>
+  </data>
+  <data name="Write.SessionFaulted" xml:space="preserve">
+    <value>bu yazma oturumunun önceki bir kaydı başarısız oldu; oturum artık yazamaz (disk son başarılı kayıttaki hâlinde kalır)</value>
   </data>
   <data name="Write.CheckpointDataAreaFull" xml:space="preserve">
     <value>checkpoint veri alanı yetersiz</value>

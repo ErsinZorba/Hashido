@@ -273,6 +273,15 @@ Seçenekler: --volume N (birim sırası, varsayılan 0), --partition N (APFS bö
   <data name="Ipc.MessageTooLong" xml:space="preserve">
     <value>ileti çok uzun</value>
   </data>
+  <data name="Password.SaveFailed" xml:space="preserve">
+    <value>{0}: parola kaydedilemedi ({1}).</value>
+  </data>
+  <data name="Password.SavedRemoved" xml:space="preserve">
+    <value>{0}: kayıtlı parola artık geçerli değil; silindi.</value>
+  </data>
+  <data name="Password.SavedUnlocked" xml:space="preserve">
+    <value>{0}: kayıtlı parolayla açıldı.</value>
+  </data>
   <data name="Raw.DiskClosed" xml:space="preserve">
     <value>disk kapatıldı</value>
   </data>
@@ -390,10 +399,46 @@ Seçenekler: --volume N (birim sırası, varsayılan 0), --partition N (APFS bö
   <data name="Svc.WriteNotEnabled" xml:space="preserve">
     <value>{0}: bölüm {1} yazmaya açılmadı: {2}</value>
   </data>
+  <data name="Svc.WriteSessionFaulted" xml:space="preserve">
+    <value>{0}: bölüm {1}: yazma oturumunun kaydı başarısız oldu; oturum kaydedilmeden bırakılıyor, bölüm yeniden salt okunur bağlanıyor: {2}</value>
+  </data>
   <data name="Svc.WriteSessionAbandoned" xml:space="preserve">
     <value>{0}: bölüm {1} yazma oturumu kaydedilmeden bırakıldı (son kayıt xid {2}).</value>
   </data>
   <data name="Svc.WriteSessionClosed" xml:space="preserve">
     <value>{0}: bölüm {1} yazma oturumu kapatıldı (son kayıt xid {2}).</value>
+  </data>
+  <data name="Update.BadHash" xml:space="preserve">
+    <value>Güncelleme reddedildi: SHA-256 özeti Release'tekiyle aynı değil.</value>
+  </data>
+  <data name="Update.BadSize" xml:space="preserve">
+    <value>Güncelleme reddedildi: boyut {0} bayt, beklenen {1}.</value>
+  </data>
+  <data name="Update.BadVersion" xml:space="preserve">
+    <value>Güncelleme reddedildi: dosyanın sürümü {0}, beklenen {1}.</value>
+  </data>
+  <data name="Update.Declined" xml:space="preserve">
+    <value>Güncelleme {0}: setup {1} koduyla bitti; 24 saat kendiliğinden önerilmez.</value>
+  </data>
+  <data name="Update.DownloadFailed" xml:space="preserve">
+    <value>Güncelleme indirilemedi: {0}</value>
+  </data>
+  <data name="Update.HttpStatus" xml:space="preserve">
+    <value>Güncelleme indirilemedi: sunucu {0} yanıtı verdi.</value>
+  </data>
+  <data name="Update.NoSetup" xml:space="preserve">
+    <value>{0} sürümü: Release'te doğrulanabilir setup dosyası yok.</value>
+  </data>
+  <data name="Update.NotApplied" xml:space="preserve">
+    <value>{0} güncellemesi uygulanmadı (kurulu sürüm {1}); 24 saat kendiliğinden önerilmez.</value>
+  </data>
+  <data name="Update.Stalled" xml:space="preserve">
+    <value>Güncelleme indirmesi durdu: {0} sn ilerleme yok.</value>
+  </data>
+  <data name="Update.StartFailed" xml:space="preserve">
+    <value>Güncelleme {0}: setup başlatılamadı: {1}</value>
+  </data>
+  <data name="Update.Started" xml:space="preserve">
+    <value>Güncelleme {0}: setup başlatıldı.</value>
   </data>
 </root>

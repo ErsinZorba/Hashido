@@ -48,6 +48,12 @@
   <data name="Action.Exit" xml:space="preserve">
     <value>Salir</value>
   </data>
+  <data name="Action.Forget" xml:space="preserve">
+    <value>Olvidar</value>
+  </data>
+  <data name="Action.Install" xml:space="preserve">
+    <value>Instalar</value>
+  </data>
   <data name="Action.OK" xml:space="preserve">
     <value>Aceptar</value>
   </data>
@@ -179,6 +185,9 @@
   <data name="Error.Unknown" xml:space="preserve">
     <value>Error desconocido.</value>
   </data>
+  <data name="Hello.Unlock" xml:space="preserve">
+    <value>Desbloquear con la contraseña guardada: {0}</value>
+  </data>
   <data name="Language.Windows" xml:space="preserve">
     <value>Idioma de Windows</value>
   </data>
@@ -255,7 +264,19 @@
     <value>Este volumen está cifrado. Para abrirlo, escriba la contraseña que usa en el Mac.</value>
   </data>
   <data name="Password.Reassurance" xml:space="preserve">
-    <value>El disco solo se lee; la contraseña no se guarda en ningún sitio.</value>
+    <value>El disco solo se lee; la contraseña solo se guarda si usted lo pide.</value>
+  </data>
+  <data name="Password.Remember" xml:space="preserve">
+    <value>Recordar en este equipo</value>
+  </data>
+  <data name="Password.RememberHello" xml:space="preserve">
+    <value>Al conectar el disco, se abre con Windows Hello.</value>
+  </data>
+  <data name="Password.RememberNoHello" xml:space="preserve">
+    <value>Cualquiera que inicie sesión con esta cuenta puede abrir el disco sin la contraseña.</value>
+  </data>
+  <data name="Password.SavedInvalid" xml:space="preserve">
+    <value>La contraseña guardada ya no funciona.</value>
   </data>
   <data name="Password.Show" xml:space="preserve">
     <value>Mostrar la contraseña</value>
@@ -297,7 +318,13 @@
     <value>Apariencia</value>
   </data>
   <data name="Settings.AppearanceNote" xml:space="preserve">
-    <value>La nueva apariencia se aplicará cuando se reinicie el programa.</value>
+    <value>El nuevo diseño se aplicará cuando se reinicie el programa.</value>
+  </data>
+  <data name="Settings.CheckFailed" xml:space="preserve">
+    <value>No se pudieron buscar actualizaciones. Inténtelo de nuevo más tarde.</value>
+  </data>
+  <data name="Settings.CheckNow" xml:space="preserve">
+    <value>Comprobar ahora</value>
   </data>
   <data name="Settings.Design" xml:space="preserve">
     <value>Diseño</value>
@@ -307,6 +334,30 @@
   </data>
   <data name="Settings.LanguageNote" xml:space="preserve">
     <value>El nuevo idioma se aplicará cuando se reinicie el programa.</value>
+  </data>
+  <data name="Settings.NotificationsHeading" xml:space="preserve">
+    <value>Notificaciones</value>
+  </data>
+  <data name="Settings.NotifyAll" xml:space="preserve">
+    <value>Todas las notificaciones</value>
+  </data>
+  <data name="Settings.NotifyImportant" xml:space="preserve">
+    <value>Solo las notificaciones importantes</value>
+  </data>
+  <data name="Settings.NotifyImportantNote" xml:space="preserve">
+    <value>Las advertencias y el resultado de las acciones que usted inicia, como "Expulsar con seguridad", se siguen mostrando.</value>
+  </data>
+  <data name="Settings.NotifyOff" xml:space="preserve">
+    <value>Desactivar por completo las notificaciones</value>
+  </data>
+  <data name="Settings.NotifyOffNote" xml:space="preserve">
+    <value>Tampoco se muestran las advertencias ni el resultado de sus acciones; solo queda el aviso justo antes de que Windows pida permiso para instalar una actualización. Todo se sigue anotando en el registro.</value>
+  </data>
+  <data name="Settings.PasswordsHeading" xml:space="preserve">
+    <value>Contraseñas recordadas</value>
+  </data>
+  <data name="Settings.PasswordsNote" xml:space="preserve">
+    <value>"Olvidar" borra la contraseña de inmediato.</value>
   </data>
   <data name="Settings.Reports" xml:space="preserve">
     <value>Enviar informes anónimos sobre errores, bloqueos y operaciones realizadas correctamente</value>
@@ -322,6 +373,12 @@
   </data>
   <data name="Settings.Title" xml:space="preserve">
     <value>Configuración de {0}</value>
+  </data>
+  <data name="Settings.UpToDate" xml:space="preserve">
+    <value>{0} está actualizado.</value>
+  </data>
+  <data name="Settings.UpdateAutoInstall" xml:space="preserve">
+    <value>Descargar e instalar las actualizaciones automáticamente</value>
   </data>
   <data name="Settings.UpdateNotify" xml:space="preserve">
     <value>Avisarme cuando se publique una nueva versión</value>
@@ -378,10 +435,25 @@
     <value>La escritura está permitida en esta partición, así que este volumen sigue bloqueado y sin cambios. Para desbloquearlo, elija primero "Volver a solo lectura".</value>
   </data>
   <data name="Update.Available" xml:space="preserve">
-    <value>La versión {0} ya está disponible. Haga clic para abrir la página de descarga.</value>
+    <value>La versión {0} ya está disponible. Haga clic para abrir {1}.</value>
+  </data>
+  <data name="Update.ConfirmHeading" xml:space="preserve">
+    <value>¿Instalar {0} {1}?</value>
+  </data>
+  <data name="Update.ConfirmText" xml:space="preserve">
+    <value>Primero se expulsan con seguridad los discos de Mac conectados. Windows pedirá permiso para instalar.</value>
+  </data>
+  <data name="Update.Downloading" xml:space="preserve">
+    <value>Descargando la versión {0}… {1} %</value>
+  </data>
+  <data name="Update.Installing" xml:space="preserve">
+    <value>Instalando {0} {1}. Windows pedirá permiso.</value>
   </data>
   <data name="Update.Link" xml:space="preserve">
     <value>Versión {0} disponible</value>
+  </data>
+  <data name="Update.Updated" xml:space="preserve">
+    <value>{0} se actualizó a la versión {1}.</value>
   </data>
   <data name="Volume.DefaultName" xml:space="preserve">
     <value>volumen {0}</value>

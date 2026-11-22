@@ -1,7 +1,7 @@
 # Privacy statement / Gizlilik açıklaması
 
-Last updated: 2026-11-08. The English text is binding; the Turkish translation is for information only.
-Son güncelleme: 2026-11-08. Bağlayıcı olan İngilizce metindir; Türkçe çeviri bilgi amaçlıdır.
+Last updated: 2026-11-17. The English text is binding; the Turkish translation is for information only.
+Son güncelleme: 2026-11-17. Bağlayıcı olan İngilizce metindir; Türkçe çeviri bilgi amaçlıdır.
 
 The same text is in the README ([English](../README.md#privacy), [Türkçe](../README.tr.md#gizlilik)).
 
@@ -39,8 +39,15 @@ as sent, under **Settings › Show what was sent**.
 **Your rights.** Because reports contain no identifier, nobody (including the developer) can tell which reports came from you,
 so individual reports cannot be found or deleted on request. Turning reports off stops all future reports.
 
-**Update check.** Unless you turn it off in Settings, the program asks GitHub (`api.github.com`) once a day whether a newer
-version exists. Nothing about you or your disks is sent; GitHub sees the request as described in GitHub's privacy statement.
+**Update check and updates.** Unless you turn it off in Settings › Updates, the program asks GitHub (`api.github.com`) whether
+a newer version exists: when it starts or its window opens (usually at most once an hour), once a day while it runs, and
+when you click "Check now".
+Nothing about you or your disks is sent; GitHub sees the request as described in GitHub's privacy statement. If
+"Download and install updates automatically" is on (the default), the new setup file is downloaded from the project's
+GitHub release (`github.com`), checked against the SHA-256 checksum GitHub publishes for that file and rejected if it does not
+match, and installed only while no Mac disk is attached and only after you allow it in Windows' permission prompt. The
+downloaded file is kept in `%LOCALAPPDATA%\APFS for Windows\updates` until the update is installed. Turning the option off
+leaves only the notification.
 
 **Contact.** Questions and requests: [GitHub Issues](https://github.com/ErsinZorba/Hashido/issues). Changes to this
 statement are visible in the repository history.
@@ -78,8 +85,13 @@ programının kendi çökme raporları ise `%LOCALAPPDATA%\APFS for Windows\repo
 **Haklarınız.** Raporlar hiçbir kimlik taşımadığı için hiç kimse (geliştirici dahil) hangi raporun sizden geldiğini bilemez; bu
 yüzden tek tek raporlar istek üzerine bulunamaz ya da silinemez. Raporları kapatmak bundan sonraki bütün raporları durdurur.
 
-**Güncelleme denetimi.** Ayarlar'dan kapatmadığınız sürece program günde bir kez GitHub'a (`api.github.com`) yeni sürüm olup
-olmadığını sorar. Size ya da disklerinize dair hiçbir şey gönderilmez; GitHub isteği kendi gizlilik açıklamasındaki gibi görür.
+**Güncelleme denetimi ve güncellemeler.** Ayarlar › Güncellemeler'den kapatmadığınız sürece program GitHub'a
+(`api.github.com`) yeni sürüm olup olmadığını sorar: açılınca ya da penceresi açılınca (genellikle en fazla saatte bir),
+çalışırken günde bir kez ve "Şimdi denetle"ye tıkladığınızda. Size ya da disklerinize dair hiçbir şey gönderilmez; GitHub isteği kendi gizlilik açıklamasındaki
+gibi görür. "Güncellemeleri kendiliğinden indir ve kur" açıksa (varsayılan), yeni kurulum dosyası projenin GitHub
+sürümünden (`github.com`) indirilir, GitHub'ın o dosya için yayımladığı SHA-256 sağlama değeriyle karşılaştırılır, tutmazsa
+reddedilir; yalnız takılı Mac diski yokken ve Windows'un izin penceresinde siz onaylayınca kurulur. İndirilen dosya
+güncelleme kurulana dek `%LOCALAPPDATA%\APFS for Windows\updates` klasöründe durur. Seçeneği kapatırsanız yalnız bildirim kalır.
 
 **İletişim.** Sorular ve istekler: [GitHub Issues](https://github.com/ErsinZorba/Hashido/issues). Bu açıklamadaki
 değişiklikler depo geçmişinde görünür.

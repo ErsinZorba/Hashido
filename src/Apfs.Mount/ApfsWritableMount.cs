@@ -30,29 +30,30 @@ public sealed class ApfsWritableMount : IDisposable
     /// <param name="closeSession">true ise ayırırken oturum da kapatılır (tek birimli kullanım); false ise oturumu çağıran kapatır.</param>
     /// <param name="onChangeLost">Değişiklik kaybı (<see cref="ApfsWritableFileSystem.ChangeLost"/>); verilmezse
     /// <paramref name="onError"/>'a gider.</param>
+    /// <param name="onFaulted">Oturumun commit'i yarıda kaldı (<see cref="ApfsWritableFileSystem.Faulted"/>, oturum başına bir kez);
+    /// verilirse bu hata <paramref name="onChangeLost"/>'a gitmez. Bir WinFsp geri çağrısının içinden gelir: dinleyici sürücü
+    /// AYIRMAMALI (kilitlenir), işi başka bir iş parçacığına bırakmalı.</param>
     public static ApfsWritableMount Mount(WriteSession session, int volumeIndex, string? mountPoint, Action<string>? onError = null, bool closeSession = true,
-        Action<string>? onChangeLost = null)
+        Action<string>? onChangeLost = null, Action<string>? onFaulted = null)
     {
         var fs = new ApfsWritableFileSystem(session, volumeIndex);
         if (onError is not null) fs.Error += onError;
         if ((onChangeLost ?? onError) is { } lost) fs.ChangeLost += lost;
-        var host = new FileSystemHost(fs);
-        int status;
+        if (onFaulted is not null) fs.Faulted += onFaulted;
+        FileSystemHost host;
         try
         {
-            status = host.Mount(mountPoint, null, false, 0);
+            host = DriveLetterAllocator.MountHost(fs, mountPoint); // null: T'den F'ye geriye (düz "X:", Geri Dönüşüm Kutusu yok)
         }
         catch (Exception e) when (e is DllNotFoundException or TypeInitializationException)
         {
-            host.Dispose();
             fs.Dispose();
             throw new ApfsException(ApfsErrorCode.Unsupported, CoreText.T("Fs.WinFspMissing"), e);
         }
-        if (status != 0)
+        catch
         {
-            host.Dispose();
             fs.Dispose();
-            throw new ApfsException(ApfsErrorCode.IoError, CoreText.T("Fs.MountFailed", status));
+            throw;
         }
         return new ApfsWritableMount(host, fs, session, host.MountPoint(), closeSession);
     }

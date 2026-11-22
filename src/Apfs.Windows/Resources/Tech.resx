@@ -273,6 +273,15 @@ Encrypted volumes: --password-prompt (asks for the password) or --password-stdin
   <data name="Ipc.MessageTooLong" xml:space="preserve">
     <value>message too long</value>
   </data>
+  <data name="Password.SaveFailed" xml:space="preserve">
+    <value>{0}: the password could not be saved ({1}).</value>
+  </data>
+  <data name="Password.SavedRemoved" xml:space="preserve">
+    <value>{0}: the saved password no longer works; it was deleted.</value>
+  </data>
+  <data name="Password.SavedUnlocked" xml:space="preserve">
+    <value>{0}: unlocked with the saved password.</value>
+  </data>
   <data name="Raw.DiskClosed" xml:space="preserve">
     <value>disk closed</value>
   </data>
@@ -390,10 +399,46 @@ Encrypted volumes: --password-prompt (asks for the password) or --password-stdin
   <data name="Svc.WriteNotEnabled" xml:space="preserve">
     <value>{0}: partition {1} was not opened for writing: {2}</value>
   </data>
+  <data name="Svc.WriteSessionFaulted" xml:space="preserve">
+    <value>{0}: partition {1}: saving the write session failed; the session is abandoned without saving and the partition is mounted read-only again: {2}</value>
+  </data>
   <data name="Svc.WriteSessionAbandoned" xml:space="preserve">
     <value>{0}: partition {1} write session abandoned without saving (last commit xid {2}).</value>
   </data>
   <data name="Svc.WriteSessionClosed" xml:space="preserve">
     <value>{0}: partition {1} write session closed (last commit xid {2}).</value>
+  </data>
+  <data name="Update.BadHash" xml:space="preserve">
+    <value>Update rejected: the SHA-256 checksum does not match the release.</value>
+  </data>
+  <data name="Update.BadSize" xml:space="preserve">
+    <value>Update rejected: size {0} bytes, expected {1}.</value>
+  </data>
+  <data name="Update.BadVersion" xml:space="preserve">
+    <value>Update rejected: the file's version is {0}, expected {1}.</value>
+  </data>
+  <data name="Update.Declined" xml:space="preserve">
+    <value>Update {0}: setup ended with code {1}; it is not offered automatically for 24 hours.</value>
+  </data>
+  <data name="Update.DownloadFailed" xml:space="preserve">
+    <value>Update download failed: {0}</value>
+  </data>
+  <data name="Update.HttpStatus" xml:space="preserve">
+    <value>Update download failed: the server answered {0}.</value>
+  </data>
+  <data name="Update.NoSetup" xml:space="preserve">
+    <value>Version {0}: the release has no verifiable setup file.</value>
+  </data>
+  <data name="Update.NotApplied" xml:space="preserve">
+    <value>Update {0} was not applied (installed version {1}); it is not offered automatically for 24 hours.</value>
+  </data>
+  <data name="Update.Stalled" xml:space="preserve">
+    <value>Update download stopped: no progress for {0} s.</value>
+  </data>
+  <data name="Update.StartFailed" xml:space="preserve">
+    <value>Update {0}: setup could not be started: {1}</value>
+  </data>
+  <data name="Update.Started" xml:space="preserve">
+    <value>Update {0}: setup started.</value>
   </data>
 </root>

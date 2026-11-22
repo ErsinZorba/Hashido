@@ -12,8 +12,10 @@ namespace Apfs.Windows.Ipc;
 /// <param name="Writable">Birim yazılabilir bağlı (deneysel yazma açık).</param>
 /// <param name="Container">Birimin APFS bölümünün disk içindeki sırası (yazma ve kilit açma bölüm başınadır).</param>
 /// <param name="WriteBlockReason">Bu bölüm için son "yazmaya izin ver" denemesi reddedildiyse nedeni.</param>
+/// <param name="Uuid">Şifreli birimin APFS UUID'si (kilitliyken de bilinir; tepsi kayıtlı parolayı buna bağlar). Şifresiz birimde ve
+/// eski hizmette null.</param>
 public sealed record VolumeStatus(int Index, string Name, string State, string? MountPoint, string? Hint, string? Message, bool Writable = false,
-    int Container = 0, string? WriteBlockReason = null)
+    int Container = 0, string? WriteBlockReason = null, string? Uuid = null)
 {
     public const string Mounted = "bağlı";
     public const string NeedsPassword = "parola-gerekli";
@@ -27,12 +29,16 @@ public sealed record VolumeStatus(int Index, string Name, string State, string? 
 public sealed record DiskStatus(string Id, string Device, string Description, List<VolumeStatus> Volumes, bool Writable = false, string? WriteBlockReason = null);
 
 /// <summary>Kullanıcıya gösterilecek bildirim. Parola veya dosya içeriği asla içermez.</summary>
-public sealed record Notice(long Id, string Level, string Text, DateTime Time);
+/// <param name="Requested">Kullanıcının istediği işin sonucu (Güvenle çıkar, yazmaya aç/kapat; 1.8.0): tepsi "yalnız önemli
+/// bildirimler"de de gösterir. Eski hizmette yok → false.</param>
+public sealed record Notice(long Id, string Level, string Text, DateTime Time, bool Requested = false);
 
 public sealed record StatusResponse(List<DiskStatus> Disks, List<Notice> Notices, long LastNoticeId);
 
 /// <param name="Busy">Yalnızca "eject": diskte açık dosya/kopyalama var, hiçbir şey yapılmadı; kullanıcı onaylarsa Force ile tekrar.</param>
-public sealed record UnlockResponse(bool Ok, string Message, bool Busy = false);
+/// <param name="Code">Yalnızca "unlock" hatası: <c>ApfsErrorCode</c> adı (ör. "WrongPassword"; tepsi kayıtlı parolayı buna göre siler).
+/// Hizmete ulaşılamadıysa ya da birim beklemiyorsa null.</param>
+public sealed record UnlockResponse(bool Ok, string Message, bool Busy = false, string? Code = null);
 
 /// <summary>
 /// "reports-pull" yanıtı: hizmet kuyruğundaki olaylar (bir sayfa, ≤ ~48 KiB). <paramref name="More"/>: sayfa sınırı yüzünden
@@ -59,7 +65,10 @@ public sealed record Request(string Op, long Since = 0, string? Disk = null, int
 public static class PipeProtocol
 {
     /// <summary>Kanal adı. Yalnızca geliştirme modunda (`--console --pipe ad`) değiştirilir; kurulu hizmet ile çakışmasın diye.</summary>
-    public static string PipeName { get; set; } = "APFSforWindows";
+    public static string PipeName { get; set; } = DefaultPipeName;
+
+    /// <summary>Kurulu hizmetin kanal adı (teknik kimlik, eski adla).</summary>
+    public const string DefaultPipeName = "APFSforWindows";
     public const int MaxMessageBytes = 64 * 1024;
 
     /// <summary>"reports-pull" sayfasındaki olayların toplam boyu (yanıt kanal sınırının altında kalsın).</summary>

@@ -3,7 +3,7 @@
 ; WinFsp yoksa (veya 2.1'den eskiyse) içindeki resmi WinFsp kurulum paketini sessizce kurar.
 
 #ifndef AppVersion
-  #define AppVersion "1.7.1"
+  #define AppVersion "1.8.0"
 #endif
 ; Görünen ad: src/Apfs.Windows/Branding.cs ProductName ile aynı olmalı (BrandingTests). Metinler adı {#AppName} ile alır.
 #define AppName "Hashido"
@@ -44,6 +44,9 @@ ArchitecturesInstallIn64BitMode=x64compatible
 MinVersion=10.0.17763
 ; Tepsiyi ve hizmeti PrepareToInstall kendisi durdurur.
 CloseApplications=no
+; Aynı anda tek kurulum (1.8.0: tepsinin başlattığı güncelleme, başka oturumdaki güncelleme ya da elle kurulum üst üste
+; binmesin). Global\ öbür oturumları da kapsar. Kaldırıcı bu kilide bakmaz (Inno); güncellemeyi yalnız tepsi başlatır.
+SetupMutex=HashidoSetup,Global\HashidoSetup
 ; Kaldırma, kaldıran kullanıcının rapor onayını (HKCU) ve tepsinin rapor kuyruğunu ({localappdata}) siler. Yönetici kurulumunda
 ; bunlar UAC'yi onaylayan hesabındır (tek kullanıcılı makinede aynı hesap; başka profiller temizlenmez — bilinen sınır).
 UsedUserAreasWarning=no
@@ -131,6 +134,8 @@ Type: files; Name: "{autoprograms}\APFS for Windows.lnk"
 Type: filesandordirs; Name: "{commonappdata}\{#DataDirName}\reports"
 ; Tepsinin gönderilmemiş raporları ve gönderilenler listesi (sent.jsonl). Aynı klasördeki tepsi günlüğü kalır.
 Type: filesandordirs; Name: "{localappdata}\{#DataDirName}\reports"
+; Tepsinin indirdiği güncelleme setup'ları (1.8.0).
+Type: filesandordirs; Name: "{localappdata}\{#DataDirName}\updates"
 
 [Icons]
 Name: "{autoprograms}\{#AppName}"; Filename: "{app}\apfs-tray.exe"; Parameters: "--show"; Comment: "{cm:ServiceDescription}"
@@ -144,6 +149,8 @@ Filename: "{app}\apfs-tray.exe"; Parameters: "--show"; Description: "{cm:LaunchA
 
 [UninstallRun]
 Filename: "{sys}\taskkill.exe"; Parameters: "/F /IM apfs-tray.exe"; Flags: runhidden; RunOnceId: "KillTray"
+; "Bu bilgisayarda hatırla" kayıtları (Windows Kimlik Bilgisi Yöneticisi, kaldıran kullanıcınınki; parolaPlan 2.4)
+Filename: "{app}\apfs-tray.exe"; Parameters: "--forget-passwords"; Flags: runhidden; RunOnceId: "ForgetPasswords"
 Filename: "{sys}\net.exe"; Parameters: "stop {#ServiceName}"; Flags: runhidden; RunOnceId: "StopService"
 Filename: "{sys}\sc.exe"; Parameters: "delete {#ServiceName}"; Flags: runhidden; RunOnceId: "DeleteService"
 Filename: "{app}\apfs.exe"; Parameters: "unregister"; Flags: runhidden; RunOnceId: "Unregister"
@@ -154,6 +161,13 @@ Filename: "{sys}\taskkill.exe"; Parameters: "/F /IM apfs.exe"; Flags: runhidden;
 var
   NeedWinFsp: Boolean;
   RestartNeeded: Boolean;
+  TrayStopped: Boolean;
+
+{ Tepsinin başlattığı güncelleme (1.8.0): Hashido-Setup-<sürüm>.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /HASHIDOUPDATE=1 }
+function UpdateMode: Boolean;
+begin
+  Result := ExpandConstant('{param:HASHIDOUPDATE|0}') = '1';
+end;
 
 { WinFsp yoksa veya bin\winfsp-x64.dll sürümü 2.1'den eskiyse true. (Kayıt defterinde sürüm değeri yok, yalnızca InstallDir.) }
 function DetectNeedsWinFsp: Boolean;
@@ -186,10 +200,23 @@ end;
 { Eski sürüm (veya install.ps1 kurulumu) çalışıyorsa dosyalar kilitli olmasın: tepsiyi kapat, hizmeti durdur (net stop bekler). }
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 begin
+  TrayStopped := True;
   Run(ExpandConstant('{sys}\taskkill.exe'), '/F /IM apfs-tray.exe');
   Run(ExpandConstant('{sys}\net.exe'), 'stop {#ServiceName}');
   Run(ExpandConstant('{sys}\taskkill.exe'), '/F /IM apfs.exe');
   Result := '';
+end;
+
+{ Güncelleme kipinde, kurulum başarılı da olsa yarıda da kalsa: hizmet yeniden başlar (zaten çalışıyorsa net start zararsız,
+  kod 2) ve tepsi kullanıcının kendi oturumunda (yükseltilmemiş) --updated ile yeniden açılır. Tepsi PrepareToInstall'da
+  kapatılmadıysa (kurulum oraya varmadı) hiçbir şey yapılmaz: tepsi zaten açık. }
+procedure DeinitializeSetup;
+var
+  Code: Integer;
+begin
+  if not (UpdateMode and TrayStopped) then Exit;
+  Run(ExpandConstant('{sys}\net.exe'), 'start {#ServiceName}');
+  ExecAsOriginalUser(ExpandConstant('{app}\apfs-tray.exe'), '--updated', '', SW_SHOWNORMAL, ewNoWait, Code);
 end;
 
 procedure InstallService;

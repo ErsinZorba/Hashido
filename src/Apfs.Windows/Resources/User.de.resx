@@ -48,6 +48,12 @@
   <data name="Action.Exit" xml:space="preserve">
     <value>Beenden</value>
   </data>
+  <data name="Action.Forget" xml:space="preserve">
+    <value>Vergessen</value>
+  </data>
+  <data name="Action.Install" xml:space="preserve">
+    <value>Installieren</value>
+  </data>
   <data name="Action.OK" xml:space="preserve">
     <value>OK</value>
   </data>
@@ -179,6 +185,9 @@
   <data name="Error.Unknown" xml:space="preserve">
     <value>Unbekannter Fehler.</value>
   </data>
+  <data name="Hello.Unlock" xml:space="preserve">
+    <value>Mit dem gespeicherten Passwort entsperren: {0}</value>
+  </data>
   <data name="Language.Windows" xml:space="preserve">
     <value>Windows-Sprache</value>
   </data>
@@ -255,7 +264,19 @@
     <value>Dieses Volume ist verschlüsselt. Um es zu öffnen, geben Sie das Passwort ein, das Sie auf dem Mac verwenden.</value>
   </data>
   <data name="Password.Reassurance" xml:space="preserve">
-    <value>Der Datenträger wird nur gelesen; das Passwort wird nirgends gespeichert.</value>
+    <value>Der Datenträger wird nur gelesen; das Passwort wird nur gespeichert, wenn Sie es wünschen.</value>
+  </data>
+  <data name="Password.Remember" xml:space="preserve">
+    <value>Auf diesem Computer merken</value>
+  </data>
+  <data name="Password.RememberHello" xml:space="preserve">
+    <value>Wenn der Datenträger angeschlossen wird, wird er mit Windows Hello geöffnet.</value>
+  </data>
+  <data name="Password.RememberNoHello" xml:space="preserve">
+    <value>Jeder, der sich mit diesem Konto anmeldet, kann den Datenträger ohne Passwort öffnen.</value>
+  </data>
+  <data name="Password.SavedInvalid" xml:space="preserve">
+    <value>Das gespeicherte Passwort funktioniert nicht mehr.</value>
   </data>
   <data name="Password.Show" xml:space="preserve">
     <value>Passwort anzeigen</value>
@@ -297,7 +318,13 @@
     <value>Darstellung</value>
   </data>
   <data name="Settings.AppearanceNote" xml:space="preserve">
-    <value>Eine neue Darstellung gilt nach einem Neustart des Programms.</value>
+    <value>Ein neues Design gilt nach einem Neustart des Programms.</value>
+  </data>
+  <data name="Settings.CheckFailed" xml:space="preserve">
+    <value>Die Suche nach Updates ist fehlgeschlagen. Versuchen Sie es später erneut.</value>
+  </data>
+  <data name="Settings.CheckNow" xml:space="preserve">
+    <value>Jetzt prüfen</value>
   </data>
   <data name="Settings.Design" xml:space="preserve">
     <value>Design</value>
@@ -307,6 +334,30 @@
   </data>
   <data name="Settings.LanguageNote" xml:space="preserve">
     <value>Eine neue Sprache gilt nach einem Neustart des Programms.</value>
+  </data>
+  <data name="Settings.NotificationsHeading" xml:space="preserve">
+    <value>Benachrichtigungen</value>
+  </data>
+  <data name="Settings.NotifyAll" xml:space="preserve">
+    <value>Alle Benachrichtigungen</value>
+  </data>
+  <data name="Settings.NotifyImportant" xml:space="preserve">
+    <value>Nur wichtige Benachrichtigungen</value>
+  </data>
+  <data name="Settings.NotifyImportantNote" xml:space="preserve">
+    <value>Warnungen und die Ergebnisse von Aktionen, die Sie selbst starten, etwa "Sicher auswerfen", werden weiterhin angezeigt.</value>
+  </data>
+  <data name="Settings.NotifyOff" xml:space="preserve">
+    <value>Benachrichtigungen ganz ausschalten</value>
+  </data>
+  <data name="Settings.NotifyOffNote" xml:space="preserve">
+    <value>Auch Warnungen und die Ergebnisse Ihrer Aktionen werden nicht angezeigt; nur der Hinweis direkt vor der Windows-Berechtigungsabfrage beim Installieren eines Updates bleibt. Alles wird weiterhin ins Protokoll geschrieben.</value>
+  </data>
+  <data name="Settings.PasswordsHeading" xml:space="preserve">
+    <value>Gemerkte Passwörter</value>
+  </data>
+  <data name="Settings.PasswordsNote" xml:space="preserve">
+    <value>"Vergessen" löscht das Passwort sofort.</value>
   </data>
   <data name="Settings.Reports" xml:space="preserve">
     <value>Anonyme Berichte über Fehler, Abstürze und erfolgreiche Vorgänge senden</value>
@@ -322,6 +373,12 @@
   </data>
   <data name="Settings.Title" xml:space="preserve">
     <value>{0} – Einstellungen</value>
+  </data>
+  <data name="Settings.UpToDate" xml:space="preserve">
+    <value>{0} ist auf dem neuesten Stand.</value>
+  </data>
+  <data name="Settings.UpdateAutoInstall" xml:space="preserve">
+    <value>Updates automatisch herunterladen und installieren</value>
   </data>
   <data name="Settings.UpdateNotify" xml:space="preserve">
     <value>Mich benachrichtigen, wenn eine neue Version erscheint</value>
@@ -378,10 +435,25 @@
     <value>Auf dieser Partition ist Schreiben erlaubt, daher bleibt dieses Volume gesperrt und unverändert. Um es zu entsperren, wählen Sie zuerst "Schreibschutz aktivieren".</value>
   </data>
   <data name="Update.Available" xml:space="preserve">
-    <value>Version {0} ist verfügbar. Klicken Sie hier, um die Downloadseite zu öffnen.</value>
+    <value>Version {0} ist verfügbar. Klicken Sie hier, um {1} zu öffnen.</value>
+  </data>
+  <data name="Update.ConfirmHeading" xml:space="preserve">
+    <value>{0} {1} installieren?</value>
+  </data>
+  <data name="Update.ConfirmText" xml:space="preserve">
+    <value>Angeschlossene Mac-Datenträger werden zuerst sicher ausgeworfen. Windows fragt nach der Berechtigung zur Installation.</value>
+  </data>
+  <data name="Update.Downloading" xml:space="preserve">
+    <value>Version {0} wird heruntergeladen… {1} %</value>
+  </data>
+  <data name="Update.Installing" xml:space="preserve">
+    <value>{0} {1} wird installiert. Windows fragt nach der Berechtigung.</value>
   </data>
   <data name="Update.Link" xml:space="preserve">
     <value>Version {0} ist verfügbar</value>
+  </data>
+  <data name="Update.Updated" xml:space="preserve">
+    <value>{0} wurde auf Version {1} aktualisiert.</value>
   </data>
   <data name="Volume.DefaultName" xml:space="preserve">
     <value>Volume {0}</value>

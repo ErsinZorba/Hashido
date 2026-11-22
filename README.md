@@ -19,7 +19,7 @@ Plug the disk in and within a few seconds it shows up in File Explorer with a dr
 | Automatic mounting | A background service finds APFS disks and mounts them |
 | Simple interface | A main window and a small panel in the notification area: disks, "Open", "Unlock", "Safely eject" |
 | Multiple volumes | Each user volume gets its own drive letter; macOS internal volumes (Preboot, Recovery…) are hidden |
-| Encrypted volumes (experimental) | The tray icon asks for the password (with its hint); the password is never saved |
+| Encrypted volumes (experimental) | The tray icon asks for the password (with its hint); it is saved only if you choose "Remember on this computer" |
 | Compressed files | zlib, LZVN, LZFSE (macOS transparent compression) |
 | Unicode names | Accented and non-Latin names; the Mac's NFD form; characters forbidden on Windows (`: ? *` …) |
 | Large files | Over 4 GB, fragmented and sparse files |
@@ -27,7 +27,7 @@ Plug the disk in and within a few seconds it shows up in File Explorer with a dr
 | 10 interface languages | English, Türkçe, Deutsch, Français, Español, Português (Brasil), Italiano, 日本語, 简体中文, 한국어 |
 
 ## Installation
-Run `Hashido-Setup-1.7.1.exe` and follow the wizard (Next › Install › Finish). Windows 10/11 (64-bit) is all you need;
+Run `Hashido-Setup-1.8.0.exe` and follow the wizard (Next › Install › Finish). Windows 10/11 (64-bit) is all you need;
 nothing else has to be installed: .NET comes with the program, and if the [WinFsp](https://winfsp.dev) driver is missing the wizard
 installs it too. After installation, **Hashido** is in the Start menu and the tray icon starts automatically at every sign-in.
 
@@ -39,7 +39,9 @@ installs it too. After installation, **Hashido** is in the Start menu and the tr
 To uninstall: **Settings › Apps › Installed apps › Hashido › Uninstall**. Uninstalling writes nothing to your disks;
 the log (`C:\ProgramData\APFS for Windows\log.txt`) is kept for you to inspect, and WinFsp is not removed. Unsent reports and
 the list of sent ones (`C:\ProgramData\APFS for Windows\reports`, `%LOCALAPPDATA%\APFS for Windows\reports`) and your answer to the
-automatic-reports question are deleted, so a reinstall asks again; your language, appearance and update-notification settings are kept.
+automatic-reports question are deleted, so a reinstall asks again; passwords saved with "Remember on this computer" are
+deleted for the account that uninstalls; downloaded updates (`%LOCALAPPDATA%\APFS for Windows\updates`)
+are deleted too; your language, appearance, notification and update settings are kept.
 
 ## Usage
 - **Main window** (Start menu, or "Open main window" in the tray menu): each attached Mac disk is listed with its name and
@@ -50,11 +52,24 @@ automatic-reports question are deleted, so a reinstall asks again; your language
 - **Tray panel**: left-click the Hashido icon (the red seal) next to the clock; the same actions in a small panel. The right-click
   menu has "Open main window", "safely eject" for each disk, "Scan again", "Open log" and "Exit".
 - **Appearance:** two designs, Windows 11 (Windows' own look and accent color; the default) and Hashido (paper and ink), each light
-  or dark. Choose them under Settings (the gear icon) › Appearance; the program restarts to apply them. With the theme set to "Match
-  Windows" (the default), the program follows Windows' app mode (Settings › Personalization › Colors) and, when you switch it,
-  restarts itself in the new mode as soon as nothing is in progress.
+  or dark. Choose them under Settings (the gear icon) › Appearance; changing the design restarts the program, light and dark switch at once. With the
+  theme set to "Match Windows" (the default), the program follows Windows' app mode (Settings › Personalization › Colors) and
+  switches as soon as you change it.
 - **Encrypted volumes:** **Unlock** asks for the password you use on the Mac, with its hint. The password is sent only to the
-  local service and is never saved; it is asked again after a restart.
+  local service and is saved only if you tick **Remember on this computer**: it is then kept in Windows Credential Manager for
+  your Windows account on this computer, and the volume opens by itself when the disk is connected — after a Windows Hello check
+  if Windows Hello is set up; without Windows Hello, anyone who signs in with your account can open it. If the password was
+  changed on the Mac, the saved one is deleted and you are asked again. A saved password never allows writing.
+  **Settings › Remembered passwords › Forget** deletes it. Without it, the password is asked again after a restart.
+- **Updates:** when a new version is released, the program downloads it and installs it while no Mac disk is attached; Windows
+  asks for your permission once. A link at the bottom of the main window also offers it ("Install" safely ejects the disks
+  first). Settings › Updates turns automatic installation off (then you are only notified) and has "Check now".
+- **Notifications:** Settings › Notifications (click it to see the choices) decides which messages appear next to the clock:
+  **All notifications** (the default); **Only important notifications** (warnings and the results of what you start yourself,
+  such as "You can unplug the cable now" after **Safely eject**; not "mounted as E:" when a disk is connected); or **Turn off
+  notifications completely** (not even warnings; only the notice just before Windows asks permission to install an update
+  remains). Everything is still written to the log. Windows (password, confirmation and
+  error windows) are not notifications and always open.
 
 <p align="center"><img src="docs/images/en/designs.png" width="720" alt="The main window in the Windows 11 design (top) and the Hashido design (bottom), light and dark"></p>
 <p align="center"><img src="docs/images/en/password.png" width="400" alt="Password window for the encrypted volume Archive, with its hint"></p>
@@ -165,7 +180,7 @@ repair, formatting; snapshots and the Time Machine structure; Fusion Drive; the 
 HFS+; hardware encryption of Apple Silicon/T2 internal disks.
 
 ## Privacy
-Last updated: 2026-11-08. This statement is binding in English; translations are for information only. The same text is in [worker/PRIVACY.md](worker/PRIVACY.md).
+Last updated: 2026-11-17. This statement is binding in English; translations are for information only. The same text is in [worker/PRIVACY.md](worker/PRIVACY.md).
 
 **Automatic reports are off until you say yes.** The first time the program starts it asks once whether it may send anonymous
 reports. Until you answer "Yes, send", nothing is collected or sent. You can change your choice at any time in **Settings**;
@@ -199,8 +214,15 @@ as sent, under **Settings › Show what was sent**.
 **Your rights.** Because reports contain no identifier, nobody (including the developer) can tell which reports came from you,
 so individual reports cannot be found or deleted on request. Turning reports off stops all future reports.
 
-**Update check.** Unless you turn it off in Settings, the program asks GitHub (`api.github.com`) once a day whether a newer
-version exists. Nothing about you or your disks is sent; GitHub sees the request as described in GitHub's privacy statement.
+**Update check and updates.** Unless you turn it off in Settings › Updates, the program asks GitHub (`api.github.com`) whether
+a newer version exists: when it starts or its window opens (usually at most once an hour), once a day while it runs, and
+when you click "Check now".
+Nothing about you or your disks is sent; GitHub sees the request as described in GitHub's privacy statement. If
+"Download and install updates automatically" is on (the default), the new setup file is downloaded from the project's
+GitHub release (`github.com`), checked against the SHA-256 checksum GitHub publishes for that file and rejected if it does not
+match, and installed only while no Mac disk is attached and only after you allow it in Windows' permission prompt. The
+downloaded file is kept in `%LOCALAPPDATA%\APFS for Windows\updates` until the update is installed. Turning the option off
+leaves only the notification.
 
 **Contact.** Questions and requests: [GitHub Issues](https://github.com/ErsinZorba/Hashido/issues). Changes to this
 statement are visible in the repository history.

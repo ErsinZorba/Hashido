@@ -48,6 +48,53 @@ public static class UserSettings
         set => Write(UpdateUrlValue, value);
     }
 
+    private const string UpdateAutoInstallValue = "UpdateAutoInstall";   // DWORD 1/0; yok = açık (1.8.0)
+    private const string UpdateDeclinedVersionValue = "UpdateDeclinedVersion"; // metin, reddedilen/uygulanamayan sürüm
+    private const string UpdateDeclinedUtcValue = "UpdateDeclinedUtc";         // metin, ISO 8601 UTC
+
+    /// <summary>
+    /// Güncellemeleri kendiliğinden indir ve kur (1.8.0; varsayılan açık, kullanıcı kararı 2026-11-17). Yalnız
+    /// <see cref="UpdateNotify"/> da açıkken geçerlidir (Ayarlar'da ona bağlı).
+    /// </summary>
+    public static bool UpdateAutoInstall
+    {
+        get => ReadInt(UpdateAutoInstallValue) is not 0;
+        set => Write(UpdateAutoInstallValue, value ? 1 : 0);
+    }
+
+    /// <summary>Kendiliğinden kurulumu reddedilen (izin verilmedi, setup hata verdi) ya da uygulanamayan son sürüm.</summary>
+    public static string? UpdateDeclinedVersion
+    {
+        get => ReadString(UpdateDeclinedVersionValue);
+        set => Write(UpdateDeclinedVersionValue, value);
+    }
+
+    /// <summary><see cref="UpdateDeclinedVersion"/>'ın kaydedildiği an (24 saat o sürüm kendiliğinden önerilmez).</summary>
+    public static DateTime? UpdateDeclinedUtc
+    {
+        get => ReadString(UpdateDeclinedUtcValue) is { } s && DateTime.TryParse(s, CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal | DateTimeStyles.AssumeUniversal, out var t) ? t : null;
+        set => Write(UpdateDeclinedUtcValue, value?.ToUniversalTime().ToString("o", CultureInfo.InvariantCulture));
+    }
+
+    private const string NotificationsValue = "Notifications"; // metin: "all" | "important" | "off" (1.8.0); yok = all
+
+    /// <summary>
+    /// Tepsi balonları (1.8.0, kullanıcı kararı 2026-11-22: "tam kontrol"): hepsi (varsayılan), yalnız önemliler (uyarı/hata ve
+    /// kullanıcının başlattığı işin sonucu) ya da hiçbiri. Değer yoksa ya da bilinmiyorsa → hepsi. Karar <see cref="Tray.TrayModel.ShowsNotice"/>.
+    /// </summary>
+    public static NotificationMode Notifications
+    {
+        get => ParseNotifications(ReadString(NotificationsValue));
+        set => Write(NotificationsValue, value switch { NotificationMode.Important => "important", NotificationMode.Off => "off", _ => "all" });
+    }
+
+    private static NotificationMode ParseNotifications(string? s) => s?.Trim().ToLowerInvariant() switch
+    {
+        "important" => NotificationMode.Important,
+        "off" => NotificationMode.Off,
+        _ => NotificationMode.All,
+    };
+
     private const string TrayHintShownValue = "TrayHintShown"; // DWORD 1; yok = gösterilmedi
 
     /// <summary>
@@ -163,3 +210,6 @@ public enum AppDesign { Brand, Windows }
 
 /// <summary>Tepsinin teması: Windows'un uygulama modunu izle, ya da hep açık / hep koyu.</summary>
 public enum ThemeMode { System, Light, Dark }
+
+/// <summary>Hangi tepsi balonları gösterilir (1.8.0): hepsi, yalnız önemliler, hiçbiri.</summary>
+public enum NotificationMode { All, Important, Off }

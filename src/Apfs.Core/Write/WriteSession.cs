@@ -209,6 +209,7 @@ public sealed class WriteSession : IDisposable
     /// </summary>
     internal void WriteData(VolumeWriter owner, ulong paddr, ReadOnlySpan<byte> data, ulong cryptoId)
     {
+        ThrowIfFaulted(); // yarım kalmış alan yöneticisinin "boş" saydığı blok son sağlam checkpoint'e ait olabilir
         uint bs = _reader.BlockSize;
         var crypto = owner.Crypto;
         if (data.Length % bs != 0) throw new ArgumentException(CoreText.T("Write.DataNotBlockMultiple"));
@@ -231,10 +232,38 @@ public sealed class WriteSession : IDisposable
     /// <summary>İşlem içinde yazılacak fiziksel blok (ilk bariyerden önce yazılır).</summary>
     internal void QueueWrite(ulong paddr, byte[] block) => _pendingWrites.Add((paddr, block));
 
-    /// <summary>Açık işlemi kalıcı yapar ve yenisini başlatır.</summary>
+    /// <summary>
+    /// Bir commit yarıda kaldı (herhangi bir istisna): bellekteki durum yarım (birimler yeni yerlerine taşındı, eski bloklar
+    /// bırakıldı, kuyruk temizlenmedi) ve hiçbir zaman yeniden diske gidemez. Arızalı oturum aygıta TEK BAYT yazmaz:
+    /// <see cref="Commit"/>, <see cref="Close"/> ve veri yazımı istisna atar; disk son başarılı commit'teki hâlinde kalır
+    /// (yeni süper blok en son, bariyerden sonra yazıldığı için o checkpoint sağlamdır). Tek doğru davranış oturumu
+    /// kaydetmeden bırakmak (<see cref="Dispose"/>).
+    /// </summary>
+    public bool IsFaulted { get; private set; }
+
+    private void ThrowIfFaulted()
+    {
+        if (IsFaulted) throw new ApfsException(ApfsErrorCode.IoError, CoreText.T("Write.SessionFaulted"));
+    }
+
+    /// <summary>Açık işlemi kalıcı yapar ve yenisini başlatır. Başarısız olursa oturum arızalı olur (<see cref="IsFaulted"/>).</summary>
     public void Commit()
     {
         ObjectDisposedException.ThrowIf(_closed, this);
+        ThrowIfFaulted();
+        try
+        {
+            CommitCore();
+        }
+        catch
+        {
+            IsFaulted = true;
+            throw;
+        }
+    }
+
+    private void CommitCore()
+    {
         ulong xid = _txXid;
         uint bs = _reader.BlockSize;
 
@@ -357,6 +386,7 @@ public sealed class WriteSession : IDisposable
     public void Close()
     {
         if (_closed) return;
+        ThrowIfFaulted();
         Commit();
         var copy = (byte[])_nx.Clone();
         _device.Write(0, copy);

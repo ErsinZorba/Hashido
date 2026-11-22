@@ -48,6 +48,12 @@
   <data name="Action.Exit" xml:space="preserve">
     <value>Çıkış</value>
   </data>
+  <data name="Action.Forget" xml:space="preserve">
+    <value>Unut</value>
+  </data>
+  <data name="Action.Install" xml:space="preserve">
+    <value>Kur</value>
+  </data>
   <data name="Action.OK" xml:space="preserve">
     <value>Tamam</value>
   </data>
@@ -179,6 +185,9 @@
   <data name="Error.Unknown" xml:space="preserve">
     <value>Bilinmeyen hata.</value>
   </data>
+  <data name="Hello.Unlock" xml:space="preserve">
+    <value>Kayıtlı parolayla açılacak: {0}</value>
+  </data>
   <data name="Language.Windows" xml:space="preserve">
     <value>Windows dili</value>
   </data>
@@ -255,7 +264,19 @@
     <value>Bu birim şifreli. Açmak için Mac'te kullandığınız parolayı girin.</value>
   </data>
   <data name="Password.Reassurance" xml:space="preserve">
-    <value>Disk yalnızca okunur; parola hiçbir yere kaydedilmez.</value>
+    <value>Disk yalnızca okunur; parola siz istemedikçe kaydedilmez.</value>
+  </data>
+  <data name="Password.Remember" xml:space="preserve">
+    <value>Bu bilgisayarda hatırla</value>
+  </data>
+  <data name="Password.RememberHello" xml:space="preserve">
+    <value>Disk takılınca Windows Hello ile açılır.</value>
+  </data>
+  <data name="Password.RememberNoHello" xml:space="preserve">
+    <value>Bu hesapla oturum açan herkes diski parolasız açabilir.</value>
+  </data>
+  <data name="Password.SavedInvalid" xml:space="preserve">
+    <value>Kayıtlı parola artık geçerli değil.</value>
   </data>
   <data name="Password.Show" xml:space="preserve">
     <value>Parolayı göster</value>
@@ -297,7 +318,13 @@
     <value>Görünüm</value>
   </data>
   <data name="Settings.AppearanceNote" xml:space="preserve">
-    <value>Yeni görünüm için program yeniden açılır.</value>
+    <value>Yeni tasarım için program yeniden açılır.</value>
+  </data>
+  <data name="Settings.CheckFailed" xml:space="preserve">
+    <value>Güncellemeler denetlenemedi. Daha sonra yeniden deneyin.</value>
+  </data>
+  <data name="Settings.CheckNow" xml:space="preserve">
+    <value>Şimdi denetle</value>
   </data>
   <data name="Settings.Design" xml:space="preserve">
     <value>Tasarım</value>
@@ -307,6 +334,30 @@
   </data>
   <data name="Settings.LanguageNote" xml:space="preserve">
     <value>Yeni dil, program yeniden açılınca geçerli olur.</value>
+  </data>
+  <data name="Settings.NotificationsHeading" xml:space="preserve">
+    <value>Bildirimler</value>
+  </data>
+  <data name="Settings.NotifyAll" xml:space="preserve">
+    <value>Tüm bildirimler</value>
+  </data>
+  <data name="Settings.NotifyImportant" xml:space="preserve">
+    <value>Yalnız önemli bildirimler</value>
+  </data>
+  <data name="Settings.NotifyImportantNote" xml:space="preserve">
+    <value>Uyarılar ve sizin başlattığınız işlerin sonucu ("Güvenle çıkar" gibi) yine gösterilir.</value>
+  </data>
+  <data name="Settings.NotifyOff" xml:space="preserve">
+    <value>Bildirimleri tamamen kapat</value>
+  </data>
+  <data name="Settings.NotifyOffNote" xml:space="preserve">
+    <value>Uyarılar ve sizin başlattığınız işlerin sonucu da gösterilmez; yalnız güncelleme kurulurken Windows izin penceresinden hemen önceki haber kalır. Olanlar yine günlüğe yazılır.</value>
+  </data>
+  <data name="Settings.PasswordsHeading" xml:space="preserve">
+    <value>Hatırlanan parolalar</value>
+  </data>
+  <data name="Settings.PasswordsNote" xml:space="preserve">
+    <value>"Unut" parolayı hemen siler.</value>
   </data>
   <data name="Settings.Reports" xml:space="preserve">
     <value>Hatalar, çökmeler ve başarılı işlemler hakkında anonim rapor gönder</value>
@@ -322,6 +373,12 @@
   </data>
   <data name="Settings.Title" xml:space="preserve">
     <value>{0} ayarları</value>
+  </data>
+  <data name="Settings.UpToDate" xml:space="preserve">
+    <value>{0} güncel.</value>
+  </data>
+  <data name="Settings.UpdateAutoInstall" xml:space="preserve">
+    <value>Güncellemeleri kendiliğinden indir ve kur</value>
   </data>
   <data name="Settings.UpdateNotify" xml:space="preserve">
     <value>Yeni sürüm çıkınca haber ver</value>
@@ -378,10 +435,25 @@
     <value>Bu bölüm yazmaya açık; bu birim kilitli ve dokunulmadan kalıyor. Kilidini açmak için önce "Salt okunura dön"ü seçin.</value>
   </data>
   <data name="Update.Available" xml:space="preserve">
-    <value>{0} sürümü çıktı. İndirme sayfasını açmak için tıklayın.</value>
+    <value>{0} sürümü çıktı. {1} penceresini açmak için tıklayın.</value>
+  </data>
+  <data name="Update.ConfirmHeading" xml:space="preserve">
+    <value>{0} {1} kurulsun mu?</value>
+  </data>
+  <data name="Update.ConfirmText" xml:space="preserve">
+    <value>Takılı Mac diskleri önce güvenle çıkarılır. Windows kurulum için izin isteyecek.</value>
+  </data>
+  <data name="Update.Downloading" xml:space="preserve">
+    <value>{0} sürümü indiriliyor… %{1}</value>
+  </data>
+  <data name="Update.Installing" xml:space="preserve">
+    <value>{0} {1} kuruluyor; Windows izin isteyecek.</value>
   </data>
   <data name="Update.Link" xml:space="preserve">
     <value>{0} sürümü çıktı</value>
+  </data>
+  <data name="Update.Updated" xml:space="preserve">
+    <value>{0} {1} sürümüne güncellendi.</value>
   </data>
   <data name="Volume.DefaultName" xml:space="preserve">
     <value>birim {0}</value>

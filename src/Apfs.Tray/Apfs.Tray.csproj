@@ -1,17 +1,24 @@
 <Project Sdk="Microsoft.NET.Sdk">
+  <!-- Tepsi programı (wpfPlan Parça 2, 1.8.0): WPF + .NET 10 Fluent teması (ThemeMode). NuGet paketi YOK: WPF .NET'in parçası
+       (Microsoft.WindowsDesktop.App çalışma zamanı, MIT). WinUI hâli kıyas kopyası olarak tests/Apfs.Tray.WinUI'de (setup'a girmez).
+       Arayüz koddan kurulur (XAML yok): App.xaml olmadığından WPF kendi Main'ini üretmez, Main bizim (Program.cs). -->
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0-windows</TargetFramework>
-    <UseWindowsForms>true</UseWindowsForms>
+    <UseWPF>true</UseWPF>
     <AssemblyName>apfs-tray</AssemblyName>
     <!-- Dosya açıklaması (FileDescription): Windows bildirimlerinde gönderen uygulamanın adı olarak görünür -->
     <AssemblyTitle>Hashido</AssemblyTitle>
     <RootNamespace>Apfs.Tray</RootNamespace>
-    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
     <ApplicationIcon>app.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <!-- Application.ThemeMode (Fluent teması) .NET 10'da deneysel işaretli (WPF0001). Bilerek kullanılır: Windows 11 görünümü,
+         açık/koyu çalışırken değişebilsin (Ek A R2). Bastırılan tek uyarı budur. -->
+    <NoWarn>$(NoWarn);WPF0001</NoWarn>
   </PropertyGroup>
   <ItemGroup>
-    <EmbeddedResource Include="app.ico" LogicalName="app.ico" />
+    <!-- Simge çalışma anında dosyadan okunur (tepsi simgesi, pencere simgesi, mühür) -->
+    <Content Include="app.ico" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Apfs.Windows\Apfs.Windows.csproj" />

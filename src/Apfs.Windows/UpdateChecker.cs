@@ -3,12 +3,30 @@ using System.Text.Json;
 
 namespace Apfs.Windows;
 
-/// <summary>Yayımlanmış daha yeni bir sürüm: numara ve GitHub Release sayfası (yalnız https://github.com/ adresi kabul edilir).</summary>
-public sealed record UpdateInfo(Version Version, Uri ReleasePage);
+/// <summary>
+/// Yayımlanmış daha yeni bir sürüm: numara, GitHub Release sayfası (yalnız https://github.com/ adresi kabul edilir) ve —
+/// Release'te kurallara uyan bir setup dosyası varsa — onun adresi, boyutu ve SHA-256'sı (1.8.0; yoksa yalnız bağlantı).
+/// </summary>
+public sealed record UpdateInfo(Version Version, Uri ReleasePage, UpdateSetup? Setup = null);
+
+/// <summary>Denetimin sonucu: sunucu geçerli yanıt verdi mi, verdiyse daha yeni sürüm (yoksa null = güncel).</summary>
+public sealed record UpdateCheckResult(bool Answered, UpdateInfo? Update);
 
 /// <summary>
-/// "Yeni sürüm var" denetimi: GitHub'ın herkese açık API'sinde son Release (taslak ve ön sürüm hariç). Hiçbir şey indirilmez;
-/// istekte genel bir User-Agent dışında bilgi yoktur (e-posta, kimlik, cihaz bilgisi gönderilmez). Her hata "yeni sürüm yok"
+/// Release'teki setup dosyası (1.8.0): <see cref="UpdateChecker"/> yalnız açık deponun o sürüm etiketindeki
+/// <c>Hashido-Setup-&lt;sürüm&gt;.exe</c> dosyasını, GitHub'ın verdiği <c>digest</c> (sha256) ve boyutla kabul eder.
+/// </summary>
+public sealed record UpdateSetup(Uri Url, string FileName, long Size, byte[] Sha256)
+{
+    /// <summary>Kabul edilen boyut aralığı (bugünkü setup ~38 MB).</summary>
+    public const long MinSize = 1L << 20, MaxSize = 200L << 20;
+
+    public static string FileNameFor(Version v) => $"Hashido-Setup-{v.ToString(3)}.exe";
+}
+
+/// <summary>
+/// "Yeni sürüm var" denetimi: GitHub'ın herkese açık API'sinde son Release (taslak ve ön sürüm hariç). Burada hiçbir şey
+/// indirilmez (setup'ı <see cref="UpdateDownloader"/> indirir ve doğrular); istekte genel bir User-Agent dışında bilgi yoktur (e-posta, kimlik, cihaz bilgisi gönderilmez). Her hata "yeni sürüm yok"
 /// sayılır. Günde bir kez ve sürüm başına bir bildirim kuralı <see cref="ShouldCheck"/> / <see cref="ShouldNotify"/>'da.
 /// </summary>
 public sealed class UpdateChecker : IDisposable
@@ -40,7 +58,16 @@ public sealed class UpdateChecker : IDisposable
     }
 
     /// <summary>Son Release <paramref name="current"/>'tan yeniyse onu, değilse (ya da herhangi bir hatada) null.</summary>
-    public async Task<UpdateInfo?> CheckAsync(Version current, CancellationToken ct = default)
+    public async Task<UpdateInfo?> CheckAsync(Version current, CancellationToken ct = default) => (await QueryAsync(current, ct)).Update;
+
+    /// <summary>
+    /// <see cref="CheckAsync"/> gibi, ama "güncel" ile "denetlenemedi"yi ayırır (Ayarlar › Şimdi denetle, 1.8.0): sunucu
+    /// geçerli bir Release yanıtı verdiyse <see cref="UpdateCheckResult.Answered"/> true.
+    /// </summary>
+    public async Task<UpdateCheckResult> QueryAsync(Version current, CancellationToken ct = default) =>
+        await QueryCoreAsync(current, ct) is { } r ? r : new UpdateCheckResult(false, null);
+
+    private async Task<UpdateCheckResult?> QueryCoreAsync(Version current, CancellationToken ct)
     {
         try
         {
@@ -56,7 +83,7 @@ public sealed class UpdateChecker : IDisposable
             if (!Version.TryParse(t.TrimStart('v', 'V'), out var version) || version.Build < 0) return null;
             if (!r.TryGetProperty("html_url", out var url) || !Uri.TryCreate(url.GetString(), UriKind.Absolute, out var page)
                 || page.Scheme != Uri.UriSchemeHttps || page.Host != "github.com") return null;
-            return Normalize(version) > Normalize(current) ? new UpdateInfo(version, page) : null;
+            return new UpdateCheckResult(true, Normalize(version) > Normalize(current) ? new UpdateInfo(version, page, FindSetup(r, version)) : null);
         }
         catch (Exception e) when (e is HttpRequestException or TaskCanceledException or IOException or JsonException or InvalidOperationException)
         {
@@ -64,8 +91,45 @@ public sealed class UpdateChecker : IDisposable
         }
     }
 
+    /// <summary>Açık deponun Release dosyalarının adres öneki (etiket ve dosya adı eklenir).</summary>
+    public const string DownloadPrefix = "https://github.com/ErsinZorba/Hashido/releases/download/";
+
+    /// <summary>
+    /// Release'in <c>assets</c> listesinden bu sürümün setup'ı: ad <c>Hashido-Setup-&lt;sürüm&gt;.exe</c>, adres tam olarak
+    /// <c>https://github.com/ErsinZorba/Hashido/releases/download/v&lt;sürüm&gt;/&lt;ad&gt;</c>, boyut 1–200 MB, <c>digest</c>
+    /// <c>sha256:&lt;64 hex&gt;</c>. Biri tutmazsa null (o sürüm için yalnız Release bağlantısı gösterilir, kendiliğinden kurulmaz).
+    /// Geliştirme ve testler: API adresi loopback ise (<c>APFS_UPDATE_URL=http://127.0.0.1:…</c>) dosya aynı kökenden olabilir.
+    /// </summary>
+    private UpdateSetup? FindSetup(JsonElement release, Version version)
+    {
+        if (!release.TryGetProperty("assets", out var assets) || assets.ValueKind != JsonValueKind.Array) return null;
+        string name = UpdateSetup.FileNameFor(version);
+        foreach (var a in assets.EnumerateArray())
+        {
+            if (a.ValueKind != JsonValueKind.Object || !a.TryGetProperty("name", out var n) || n.GetString() != name) continue;
+            if (!a.TryGetProperty("browser_download_url", out var u) || !Uri.TryCreate(u.GetString(), UriKind.Absolute, out var url)
+                || !AllowedSetupUrl(url, version, name)) return null;
+            if (!a.TryGetProperty("size", out var sz) || !sz.TryGetInt64(out long size) || size < UpdateSetup.MinSize || size > UpdateSetup.MaxSize) return null;
+            if (!a.TryGetProperty("digest", out var d) || d.GetString() is not { } digest || !digest.StartsWith("sha256:", StringComparison.Ordinal)) return null;
+            string hex = digest["sha256:".Length..];
+            if (hex.Length != 64 || !hex.All(Uri.IsHexDigit)) return null;
+            return new UpdateSetup(url, name, size, Convert.FromHexString(hex));
+        }
+        return null;
+    }
+
+    private bool AllowedSetupUrl(Uri url, Version version, string name)
+    {
+        if (url.AbsoluteUri == $"{DownloadPrefix}v{version.ToString(3)}/{name}") return true;
+        return IsLoopback(_api) && url.Scheme == _api.Scheme && url.Host == _api.Host && url.Port == _api.Port
+            && url.AbsolutePath.EndsWith("/" + name, StringComparison.Ordinal);
+    }
+
+    /// <summary>Yerel deneme sunucusu (yalnız http://localhost / 127.0.0.1 / [::1]).</summary>
+    internal static bool IsLoopback(Uri u) => u.Scheme == Uri.UriSchemeHttp && u.IsLoopback;
+
     /// <summary>1.4 ile 1.4.0 eşit sayılsın (Revision yok sayılır).</summary>
-    private static Version Normalize(Version v) => new(v.Major, Math.Max(0, v.Minor), Math.Max(0, v.Build));
+    public static Version Normalize(Version v) => new(v.Major, Math.Max(0, v.Minor), Math.Max(0, v.Build));
 
     /// <summary>Günde bir kez: son denemeden bu yana <see cref="CheckInterval"/> geçtiyse (saat geri alındıysa da) denenir.</summary>
     public static bool ShouldCheck(DateTime? lastCheckUtc, DateTime nowUtc) =>

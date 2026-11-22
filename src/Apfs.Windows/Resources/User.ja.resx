@@ -48,6 +48,12 @@
   <data name="Action.Exit" xml:space="preserve">
     <value>終了</value>
   </data>
+  <data name="Action.Forget" xml:space="preserve">
+    <value>削除</value>
+  </data>
+  <data name="Action.Install" xml:space="preserve">
+    <value>インストール</value>
+  </data>
   <data name="Action.OK" xml:space="preserve">
     <value>OK</value>
   </data>
@@ -179,6 +185,9 @@
   <data name="Error.Unknown" xml:space="preserve">
     <value>不明なエラーです。</value>
   </data>
+  <data name="Hello.Unlock" xml:space="preserve">
+    <value>保存されたパスワードでロック解除: {0}</value>
+  </data>
   <data name="Language.Windows" xml:space="preserve">
     <value>Windows の言語</value>
   </data>
@@ -255,7 +264,19 @@
     <value>このボリュームは暗号化されています。開くには、Mac で使用しているパスワードを入力してください。</value>
   </data>
   <data name="Password.Reassurance" xml:space="preserve">
-    <value>ディスクは読み取られるだけです。パスワードはどこにも保存されません。</value>
+    <value>ディスクは読み取られるだけです。パスワードは、指定した場合にのみ保存されます。</value>
+  </data>
+  <data name="Password.Remember" xml:space="preserve">
+    <value>このコンピューターに記憶する</value>
+  </data>
+  <data name="Password.RememberHello" xml:space="preserve">
+    <value>ディスクを接続すると、Windows Hello で開きます。</value>
+  </data>
+  <data name="Password.RememberNoHello" xml:space="preserve">
+    <value>このアカウントでサインインした人は誰でも、パスワードなしでディスクを開けます。</value>
+  </data>
+  <data name="Password.SavedInvalid" xml:space="preserve">
+    <value>保存されたパスワードは使えなくなりました。</value>
   </data>
   <data name="Password.Show" xml:space="preserve">
     <value>パスワードを表示</value>
@@ -297,7 +318,13 @@
     <value>外観</value>
   </data>
   <data name="Settings.AppearanceNote" xml:space="preserve">
-    <value>新しい外観は、プログラムを再起動すると反映されます。</value>
+    <value>新しいデザインは、プログラムを再起動すると反映されます。</value>
+  </data>
+  <data name="Settings.CheckFailed" xml:space="preserve">
+    <value>更新を確認できませんでした。しばらくしてからもう一度お試しください。</value>
+  </data>
+  <data name="Settings.CheckNow" xml:space="preserve">
+    <value>今すぐ確認</value>
   </data>
   <data name="Settings.Design" xml:space="preserve">
     <value>デザイン</value>
@@ -307,6 +334,30 @@
   </data>
   <data name="Settings.LanguageNote" xml:space="preserve">
     <value>新しい言語は、プログラムを再起動すると反映されます。</value>
+  </data>
+  <data name="Settings.NotificationsHeading" xml:space="preserve">
+    <value>通知</value>
+  </data>
+  <data name="Settings.NotifyAll" xml:space="preserve">
+    <value>すべての通知</value>
+  </data>
+  <data name="Settings.NotifyImportant" xml:space="preserve">
+    <value>重要な通知のみ</value>
+  </data>
+  <data name="Settings.NotifyImportantNote" xml:space="preserve">
+    <value>警告と、ご自身で始めた操作の結果（"安全に取り出す" など）は引き続き表示されます。</value>
+  </data>
+  <data name="Settings.NotifyOff" xml:space="preserve">
+    <value>通知を完全にオフにする</value>
+  </data>
+  <data name="Settings.NotifyOffNote" xml:space="preserve">
+    <value>警告や操作の結果も表示されません。更新をインストールするときに Windows が許可を求める直前のお知らせだけは表示されます。すべて引き続きログに記録されます。</value>
+  </data>
+  <data name="Settings.PasswordsHeading" xml:space="preserve">
+    <value>記憶したパスワード</value>
+  </data>
+  <data name="Settings.PasswordsNote" xml:space="preserve">
+    <value>"削除" を選ぶと、パスワードはすぐに削除されます。</value>
   </data>
   <data name="Settings.Reports" xml:space="preserve">
     <value>エラー、クラッシュ、成功した操作について匿名のレポートを送信する</value>
@@ -322,6 +373,12 @@
   </data>
   <data name="Settings.Title" xml:space="preserve">
     <value>{0} の設定</value>
+  </data>
+  <data name="Settings.UpToDate" xml:space="preserve">
+    <value>{0} は最新です。</value>
+  </data>
+  <data name="Settings.UpdateAutoInstall" xml:space="preserve">
+    <value>更新プログラムを自動的にダウンロードしてインストールする</value>
   </data>
   <data name="Settings.UpdateNotify" xml:space="preserve">
     <value>新しいバージョンが公開されたら知らせる</value>
@@ -378,10 +435,25 @@
     <value>このパーティションは書き込みが許可されているため、このボリュームはロックされたまま変更されません。ロックを解除するには、先に "読み取り専用に戻す" を選択してください。</value>
   </data>
   <data name="Update.Available" xml:space="preserve">
-    <value>バージョン {0} が公開されました。クリックするとダウンロード ページが開きます。</value>
+    <value>バージョン {0} が公開されました。クリックすると {1} が開きます。</value>
+  </data>
+  <data name="Update.ConfirmHeading" xml:space="preserve">
+    <value>{0} {1} をインストールしますか?</value>
+  </data>
+  <data name="Update.ConfirmText" xml:space="preserve">
+    <value>接続されている Mac のディスクは先に安全に取り出されます。インストールには Windows の許可が求められます。</value>
+  </data>
+  <data name="Update.Downloading" xml:space="preserve">
+    <value>バージョン {0} をダウンロードしています… {1}%</value>
+  </data>
+  <data name="Update.Installing" xml:space="preserve">
+    <value>{0} {1} をインストールしています。Windows の許可が求められます。</value>
   </data>
   <data name="Update.Link" xml:space="preserve">
     <value>バージョン {0} が公開されました</value>
+  </data>
+  <data name="Update.Updated" xml:space="preserve">
+    <value>{0} はバージョン {1} に更新されました。</value>
   </data>
   <data name="Volume.DefaultName" xml:space="preserve">
     <value>ボリューム {0}</value>
