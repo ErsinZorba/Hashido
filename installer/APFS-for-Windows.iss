@@ -149,7 +149,7 @@ Filename: "{app}\apfs-tray.exe"; Parameters: "--show"; Description: "{cm:LaunchA
 
 [UninstallRun]
 Filename: "{sys}\taskkill.exe"; Parameters: "/F /IM apfs-tray.exe"; Flags: runhidden; RunOnceId: "KillTray"
-; "Bu bilgisayarda hatırla" kayıtları (Windows Kimlik Bilgisi Yöneticisi, kaldıran kullanıcınınki; parolaPlan 2.4)
+; "Bu bilgisayarda hatırla" kayıtları (Windows Kimlik Bilgileri Yöneticisi, kaldıran kullanıcınınki; parolaPlan 2.4)
 Filename: "{app}\apfs-tray.exe"; Parameters: "--forget-passwords"; Flags: runhidden; RunOnceId: "ForgetPasswords"
 Filename: "{sys}\net.exe"; Parameters: "stop {#ServiceName}"; Flags: runhidden; RunOnceId: "StopService"
 Filename: "{sys}\sc.exe"; Parameters: "delete {#ServiceName}"; Flags: runhidden; RunOnceId: "DeleteService"

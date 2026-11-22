@@ -57,7 +57,7 @@ de silinir; dil, görünüm, bildirim ve güncelleme ayarlarınız kalır.
   değiştirdiğinizde hemen ona geçer.
 - **Şifreli birimler:** **Kilidi aç**, Mac'te kullandığınız parolayı ipucuyla birlikte sorar. Parola yalnız bilgisayardaki hizmete
   gönderilir ve yalnız **Bu bilgisayarda hatırla** işaretlenirse kaydedilir: o zaman bu bilgisayarda Windows hesabınıza ait
-  Windows Kimlik Bilgisi Yöneticisi'nde durur ve disk takılınca birim kendiliğinden açılır — Windows Hello kuruluysa önce Windows
+  Windows Kimlik Bilgileri Yöneticisi'nde durur ve disk takılınca birim kendiliğinden açılır — Windows Hello kuruluysa önce Windows
   Hello onayıyla; Windows Hello yoksa hesabınızla oturum açan herkes açabilir. Parola Mac'te değiştiyse kayıtlı olan silinir ve
   yeniden sorulur. Kayıtlı parola yazma iznini hiçbir zaman açmaz. **Ayarlar › Hatırlanan parolalar › Unut** kaydı siler.
   Kaydedilmeyen parola yeniden başlatmadan sonra yeniden sorulur.

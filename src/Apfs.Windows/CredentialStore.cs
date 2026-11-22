@@ -8,9 +8,9 @@ namespace Apfs.Windows;
 public sealed record RememberedVolume(string Uuid, string Name);
 
 /// <summary>
-/// "Bu bilgisayarda hatırla" (parolaPlan 1.3): şifreli birimin parolası Windows Kimlik Bilgisi Yöneticisi'nde, birim UUID'sine
+/// "Bu bilgisayarda hatırla" (parolaPlan 1.3): şifreli birimin parolası Windows Kimlik Bilgileri Yöneticisi'nde, birim UUID'sine
 /// bağlı genel (generic) kayıt olarak durur. Kasa Windows'undur (kullanıcı başına, DPAPI ile şifreli, <c>CRED_PERSIST_LOCAL_MACHINE</c>
-/// = dolaşmaz); kullanıcı kayıtları Windows'un kendi Kimlik Bilgisi Yöneticisi'nde de görüp silebilir. Yalnız tepsi kullanır (hizmet
+/// = dolaşmaz); kullanıcı kayıtları Windows'un kendi Kimlik Bilgileri Yöneticisi'nde de görüp silebilir. Yalnız tepsi kullanır (hizmet
 /// SYSTEM'dir, kullanıcının kasasını görmez). Hedef adı SABİT önekli (<see cref="Prefix"/>): ürün adından türetilmez, ad değişse de
 /// kayıtlar sahipsiz kalmaz. Parola hiçbir günlüğe yazılmaz; okunan bayt dizisi kullanılınca sıfırlanır.
 /// </summary>
