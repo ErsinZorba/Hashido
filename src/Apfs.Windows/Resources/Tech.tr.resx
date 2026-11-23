@@ -273,6 +273,18 @@ Seçenekler: --volume N (birim sırası, varsayılan 0), --partition N (APFS bö
   <data name="Ipc.MessageTooLong" xml:space="preserve">
     <value>ileti çok uzun</value>
   </data>
+  <data name="DataDir.DepthLimit" xml:space="preserve">
+    <value>{0}: derinlik sınırı</value>
+  </data>
+  <data name="DataDir.ItemLimit" xml:space="preserve">
+    <value>{0}: öğe sınırı</value>
+  </data>
+  <data name="DataDir.StillLink" xml:space="preserve">
+    <value>{0}: bağ silindikten sonra yine bağ (3 deneme)</value>
+  </data>
+  <data name="Ipc.UntrustedServer" xml:space="preserve">
+    <value>{0} kanalının sunucusu kurulu hizmet değil (hizmetlerin oturumunda çalışmıyor); hiçbir şey gönderilmedi</value>
+  </data>
   <data name="Password.SaveFailed" xml:space="preserve">
     <value>{0}: parola kaydedilemedi ({1}).</value>
   </data>
@@ -350,6 +362,15 @@ Seçenekler: --volume N (birim sırası, varsayılan 0), --partition N (APFS bö
   </data>
   <data name="Svc.PipeError" xml:space="preserve">
     <value>kanal hatası: {0}</value>
+  </data>
+  <data name="Svc.DataDirLinksRemoved" xml:space="preserve">
+    <value>veri klasörü: oraya ait olmayan {0} bağ ya da sabit bağlı dosya silindi (klasör her açılışta güvenceye alınır).</value>
+  </data>
+  <data name="Svc.DataDirSecureFailed" xml:space="preserve">
+    <value>veri klasörü tam güvenceye alınamadı: {0}</value>
+  </data>
+  <data name="Svc.PipeNameTaken" xml:space="preserve">
+    <value>{0} kanal adı başka bir sürecin elinde; o bırakana dek tepsi bağlanamaz. 5 saniyede bir yeniden deneniyor.</value>
   </data>
   <data name="Svc.ReportDropped" xml:space="preserve">
     <value>"{0}" rapor olayı kuyruğa alınmadı (şemaya uymuyor: {1}).</value>

@@ -273,6 +273,18 @@ Encrypted volumes: --password-prompt (asks for the password) or --password-stdin
   <data name="Ipc.MessageTooLong" xml:space="preserve">
     <value>message too long</value>
   </data>
+  <data name="DataDir.DepthLimit" xml:space="preserve">
+    <value>{0}: depth limit reached</value>
+  </data>
+  <data name="DataDir.ItemLimit" xml:space="preserve">
+    <value>{0}: item limit reached</value>
+  </data>
+  <data name="DataDir.StillLink" xml:space="preserve">
+    <value>{0}: still a link after removing it (3 attempts)</value>
+  </data>
+  <data name="Ipc.UntrustedServer" xml:space="preserve">
+    <value>the server of pipe {0} is not the installed service (it is not running in the services session); nothing was sent</value>
+  </data>
   <data name="Password.SaveFailed" xml:space="preserve">
     <value>{0}: the password could not be saved ({1}).</value>
   </data>
@@ -350,6 +362,15 @@ Encrypted volumes: --password-prompt (asks for the password) or --password-stdin
   </data>
   <data name="Svc.PipeError" xml:space="preserve">
     <value>pipe error: {0}</value>
+  </data>
+  <data name="Svc.DataDirLinksRemoved" xml:space="preserve">
+    <value>data folder: {0} link(s) or hard-linked file(s) that did not belong there were removed (the folder is secured at every start).</value>
+  </data>
+  <data name="Svc.DataDirSecureFailed" xml:space="preserve">
+    <value>data folder could not be fully secured: {0}</value>
+  </data>
+  <data name="Svc.PipeNameTaken" xml:space="preserve">
+    <value>pipe name {0} is held by another process; the tray cannot connect until it is released. Retrying every 5 seconds.</value>
   </data>
   <data name="Svc.ReportDropped" xml:space="preserve">
     <value>Report event "{0}" was not queued (does not match the schema: {1}).</value>

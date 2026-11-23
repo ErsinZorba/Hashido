@@ -42,6 +42,9 @@
   <data name="BTree.RootNotMarked" xml:space="preserve">
     <value>B-ağacı kökü kök olarak işaretlenmemiş (blok {0})</value>
   </data>
+  <data name="BTree.SharedChild" xml:space="preserve">
+    <value>B-ağacı düğümüne bir taramada iki kez inildi (paylaşılan çocuk, blok {0})</value>
+  </data>
   <data name="BTree.TooDeep" xml:space="preserve">
     <value>B-ağacı çok derin (döngü olabilir)</value>
   </data>
@@ -95,6 +98,9 @@
   </data>
   <data name="Check.DirChildCount" xml:space="preserve">
     <value>{0}: klasör {1} çocuk sayısı {2}, girdiler {3}</value>
+  </data>
+  <data name="Check.DirParentChain" xml:space="preserve">
+    <value>{0}: klasör {1}: üst zinciri köke varmıyor (parent_id {2})</value>
   </data>
   <data name="Check.DirMultiplyReferenced" xml:space="preserve">
     <value>{0}: klasör {1} {2} yerden gösteriliyor</value>
@@ -1283,6 +1289,9 @@
   </data>
   <data name="VolWriter.OmapDeleted" xml:space="preserve">
     <value>nesne {0} silinmiş işaretli</value>
+  </data>
+  <data name="VolWriter.ParentChainLoop" xml:space="preserve">
+    <value>klasörün üst zinciri köke varmıyor (inode {0})</value>
   </data>
   <data name="VolWriter.PerFileKeys" xml:space="preserve">
     <value>dosya başına anahtarlı şifreli birime yazılmaz</value>

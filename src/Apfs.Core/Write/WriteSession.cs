@@ -241,7 +241,24 @@ public sealed class WriteSession : IDisposable
     /// </summary>
     public bool IsFaulted { get; private set; }
 
-    private void ThrowIfFaulted()
+    /// <summary>
+    /// Oturumu arızalı yapan ilk istisna (yoksa null). Sürücü kendisine gelen istisnayı bununla karşılaştırarak, değiştiren bir işlemin
+    /// değişiklik evresinde çıkan arızayı oturum başına BİR kez bildirir (1.8.1).
+    /// </summary>
+    public Exception? FaultCause { get; private set; }
+
+    /// <summary>
+    /// Oturumu arızalı yapar (ilk neden saklanır): commit yarıda kaldı ya da değiştiren bir işlem değişiklik evresinde düştü
+    /// (<c>VolumeWriter.Mutate</c>; 1.8.1). Bellekteki birim yarım olabilir; bundan sonra aygıta tek bayt yazılmaz.
+    /// </summary>
+    internal void Fault(Exception e)
+    {
+        if (IsFaulted) return;
+        FaultCause = e;
+        IsFaulted = true;
+    }
+
+    internal void ThrowIfFaulted()
     {
         if (IsFaulted) throw new ApfsException(ApfsErrorCode.IoError, CoreText.T("Write.SessionFaulted"));
     }
@@ -255,9 +272,9 @@ public sealed class WriteSession : IDisposable
         {
             CommitCore();
         }
-        catch
+        catch (Exception e)
         {
-            IsFaulted = true;
+            Fault(e);
             throw;
         }
     }

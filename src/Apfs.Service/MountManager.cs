@@ -90,8 +90,8 @@ internal sealed class MountManager : IDisposable
         /// <summary>Yazma tanıtıcısının güvenli kaldırma kaydı (her açık tanıtıcı izlenir; hepsi aynı ReleaseDisk'e gider).</summary>
         public DeviceNotifications.Registration? RemovalWatch { get; set; }
         /// <summary>
-        /// Oturumun bir commit'i yarıda kaldı (<see cref="WriteSession.IsFaulted"/>; sürücünün <c>Faulted</c> olayı, oturum başına
-        /// bir kez): hatanın iletisi. Doluysa oturum kaydedilmeden bırakılmalı (<see cref="HandleFault"/>).
+        /// Oturumun bir commit'i ya da (1.8.1) değiştiren bir işlemi yarıda kaldı (<see cref="WriteSession.IsFaulted"/>; sürücünün
+        /// <c>Faulted</c> olayı, oturum başına bir kez): hatanın iletisi. Doluysa oturum kaydedilmeden bırakılmalı (<see cref="HandleFault"/>).
         /// </summary>
         public volatile string? FaultMessage;
     }
@@ -1077,13 +1077,14 @@ internal sealed class MountManager : IDisposable
         {
             var disks = _disks.Values.Select(d => new DiskStatus(d.Key, d.Key, d.Description,
                 d.Volumes.OrderBy(v => v.ContainerIndex).ThenBy(v => v.Index)
-                    .Select(v => new VolumeStatus(v.Index, v.Name, v.State, v.Mount?.MountPoint ?? v.WritableMount?.MountPoint, v.Hint, v.Message,
+                    .Select(v => new VolumeStatus(v.Index, v.Name, v.State, v.Mount?.MountPoint ?? v.WritableMount?.MountPoint, PipeProtocol.ClampHint(v.Hint), v.Message,
                         Writable: v.WritableMount is not null, Container: v.ContainerIndex,
                         WriteBlockReason: d.WriteBlockReasons.GetValueOrDefault(v.ContainerIndex),
                         Uuid: v.Uuid?.ToString())).ToList(),
                 Writable: d.Writes.Count > 0,
                 WriteBlockReason: d.WriteBlockReasons.OrderBy(r => r.Key).Select(r => r.Value).FirstOrDefault())).ToList();
-            return new StatusResponse(disks, _notices.Where(n => n.Id > since).ToList(), _noticeId);
+            // Bildirimler bayt bütçesiyle (en yeniler kalır; LastNoticeId değişmez): yanıt 64 KiB'ı aşınca tepsi çöküyordu
+            return new StatusResponse(disks, PipeProtocol.NewestWithinBudget(_notices.Where(n => n.Id > since).ToList()), _noticeId);
         }
     }
 

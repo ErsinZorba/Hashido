@@ -1,3 +1,4 @@
+using System.Runtime.ExceptionServices;
 using Apfs.Container;
 using Apfs.IO;
 using Apfs.Util;
@@ -22,14 +23,23 @@ public static class PartitionLocator
             return [new ApfsPartition(0, device.Length, 0, CoreText.U("Partition.Unpartitioned"))];
 
         // GPT başlığı 1. LBA'dadır; sektör boyutu 512 veya 4096 olabilir.
+        bool? protectiveMbr = null;
+        Exception? readError = null;
+        string? problem = null;
         foreach (int sector in new[] { device.SectorSize, 512, 4096 }.Distinct())
         {
             if (device.Length < sector * 2L) continue;
-            var header = new byte[sector];
-            device.Read(sector, header);
-            if (!header.AsSpan(0, 8).SequenceEqual(GptSignature)) continue;
-            return ParseGpt(device, header, sector);
+            var primary = new byte[sector];
+            bool hasPrimary = TryRead(device, sector, primary, ref readError) && HasGptSignature(primary);
+            // Birincil imza kayıpsa, MBR'ye çevrilmiş disklerde kalmış eski bir GPT yedeğini kullanma.
+            if (!hasPrimary && !(protectiveMbr ??= HasProtectiveMbr(device, ref readError))) continue;
+
+            var partitions = ParseGpt(device, hasPrimary ? primary : null, sector, ref readError, out string candidateProblem);
+            if (partitions is not null) return partitions;
+            problem ??= candidateProblem;
         }
+        if (readError is not null) ExceptionDispatchInfo.Throw(readError);
+        if (problem is not null) throw ApfsException.Corrupt(problem);
         return [];
     }
 
@@ -60,34 +70,68 @@ public static class PartitionLocator
         return Bin.U32(head, 32) == ApfsConstants.NxMagic;
     }
 
+    private static bool HasGptSignature(ReadOnlySpan<byte> header) => header[..8].SequenceEqual(GptSignature);
+
+    private static bool HasProtectiveMbr(IBlockDevice device, ref Exception? readError)
+    {
+        Span<byte> mbr = stackalloc byte[512];
+        if (!TryRead(device, 0, mbr, ref readError) || Bin.U16(mbr, 510) != 0xAA55) return false;
+        for (int offset = 446; offset < 510; offset += 16)
+            if (mbr[offset + 4] == 0xEE && Bin.U32(mbr, offset + 8) == 1) return true;
+        return false;
+    }
+
+    private static bool TryRead(IBlockDevice device, long offset, Span<byte> buffer, ref Exception? readError)
+    {
+        try
+        {
+            device.Read(offset, buffer);
+            return true;
+        }
+        catch (Exception e) when (e is IOException or ApfsException { Code: ApfsErrorCode.IoError })
+        {
+            readError ??= e;
+            return false;
+        }
+    }
+
     /// <summary>
-    /// GPT'yi (açık depo bildirimi #3, 1.8.0) Windows/macOS gibi doğrular: başlık boyutu, başlık CRC'si, kendi konumu, kullanılabilir
-    /// aralık, girdi tablosunun yeri ve CRC'si. Birincil başlık geçerliyse yedeğe hiç bakılmaz (yedeğin yeri/CRC'si bugün açılan bir
-    /// diski kapatmasın: ör. büyütülmüş görüntüde yedek sonda değildir). Birincil geçersizse yedek başlık (birincilin
-    /// <c>AlternateLBA</c>'sı diskin içindeyse orası, değilse son sektör) kullanılır; ikisi de geçersizse ret. Girdilerde taşmasız
-    /// aritmetik: diskin dışına taşan ya da tersine dönmüş bölüm atlanır.
+    /// GPT'yi (açık depo bildirimi #3, 1.8.0; PR #5) Windows/macOS gibi doğrular: başlık boyutu, başlık CRC'si, kendi konumu,
+    /// kullanılabilir aralık (FirstUsable ≥ 2), girdi tablosunun yeri (birincilde FirstUsable'dan önce, yedekte LastUsable ile yedek
+    /// başlık arasında) ve CRC'si. Birincil başlık geçerliyse yedeğe hiç bakılmaz (yedeğin yeri/CRC'si bugün açılan bir diski
+    /// kapatmasın: ör. büyütülmüş görüntüde yedek sonda değildir). Birincil geçersiz, okunamıyor ya da imzası yoksa (bu son
+    /// durumda yalnız koruyucu MBR varsa; çağıran denetler) yedek başlık (birincilin <c>AlternateLBA</c>'sı diskin içindeyse
+    /// orası, değilse son sektör) kullanılır; ikisi de olmazsa <c>null</c>. LastUsable'ın disk sonuyla ilişkisi BİLEREK
+    /// denetlenmez (kesilmiş görüntü / olduğundan küçük görünen disk kapanmasın); diskin dışına taşan girdiyi
+    /// <see cref="ParseEntries"/> atlar.
     /// </summary>
-    private static List<ApfsPartition> ParseGpt(IBlockDevice device, byte[] primary, int sector)
+    private static List<ApfsPartition>? ParseGpt(IBlockDevice device, byte[]? primary, int sector,
+        ref Exception? readError, out string problem)
     {
         long sectors = device.Length / sector;
-        if (TryReadTable(device, primary, sector, 1, out var table, out string? problem))
+        problem = CoreText.T("Partition.GptHeaderInvalid");
+        if (primary is not null && TryReadTable(device, primary, sector, 1, ref readError, out var table, out problem))
             return ParseEntries(device, primary, table, sector);
 
-        ulong alt = Bin.U64(primary, 32);
+        ulong alt = primary is null ? 0 : Bin.U64(primary, 32);
         long backupLba = alt > 1 && alt < (ulong)sectors ? (long)alt : sectors - 1;
         foreach (long lba in new[] { backupLba, sectors - 1 }.Distinct())
         {
             if (lba <= 1) continue;
             var backup = new byte[sector];
-            device.Read(lba * sector, backup);
-            if (backup.AsSpan(0, 8).SequenceEqual(GptSignature) && TryReadTable(device, backup, sector, lba, out table, out _))
+            if (TryRead(device, lba * sector, backup, ref readError) && HasGptSignature(backup)
+                && TryReadTable(device, backup, sector, lba, ref readError, out table, out _))
                 return ParseEntries(device, backup, table, sector);
         }
-        throw ApfsException.Corrupt(problem!);
+        return null;
     }
 
-    /// <summary>Başlığı doğrular ve girdi tablosunu okur; geçersizse <paramref name="problem"/> nedenin metnidir.</summary>
-    private static bool TryReadTable(IBlockDevice device, byte[] header, int sector, long expectedLba, out byte[] table, out string? problem)
+    /// <summary>
+    /// Başlığı doğrular ve girdi tablosunu okur; geçersizse <paramref name="problem"/> nedenin metnidir. Okuma hatası
+    /// <paramref name="readError"/>'a (ilki) yazılır; hiçbir yol açılmazsa <see cref="FindApfsPartitions"/> onu yeniden atar.
+    /// </summary>
+    private static bool TryReadTable(IBlockDevice device, byte[] header, int sector, long expectedLba,
+        ref Exception? readError, out byte[] table, out string problem)
     {
         table = [];
         problem = CoreText.T("Partition.GptHeaderInvalid");
@@ -100,7 +144,7 @@ public static class PartitionLocator
         if (GptCrc32.Compute(copy) != headerCrc) return false;
         if (Bin.U64(header, 24) != (ulong)expectedLba) return false;
         ulong firstUsable = Bin.U64(header, 40), lastUsable = Bin.U64(header, 48);
-        if (firstUsable > lastUsable) return false;
+        if (firstUsable < 2 || firstUsable > lastUsable) return false;
 
         ulong entriesLba = Bin.U64(header, 72);
         uint count = Bin.U32(header, 80);
@@ -108,19 +152,20 @@ public static class PartitionLocator
         if (entrySize < 128 || entrySize > 4096 || entrySize % 8 != 0 || count == 0 || count > MaxPartitionEntries) return false;
 
         long tableLength = (long)count * entrySize; // ≤ 4 MiB
-        if (entriesLba < 2 || entriesLba >= (ulong)sectors || (long)entriesLba * sector > device.Length - tableLength)
+        ulong tableSectors = (ulong)((tableLength + sector - 1) / sector);
+        if (entriesLba < 2 || entriesLba >= (ulong)sectors || tableSectors > (ulong)sectors - entriesLba)
         {
             problem = CoreText.T("Partition.GptOutsideDisk");
             return false;
         }
-        table = new byte[tableLength];
-        device.Read((long)entriesLba * sector, table);
-        if (GptCrc32.Compute(table) != Bin.U32(header, 88))
-        {
-            table = [];
+        ulong tableEnd = entriesLba + tableSectors;
+        if (expectedLba == 1 ? tableEnd > firstUsable : entriesLba <= lastUsable || tableEnd > (ulong)expectedLba)
             return false;
-        }
-        problem = null;
+
+        var entries = new byte[tableLength];
+        if (!TryRead(device, (long)entriesLba * sector, entries, ref readError)
+            || GptCrc32.Compute(entries) != Bin.U32(header, 88)) return false;
+        table = entries;
         return true;
     }
 
@@ -128,8 +173,10 @@ public static class PartitionLocator
     {
         uint count = Bin.U32(header, 80);
         uint entrySize = Bin.U32(header, 84);
+        ulong firstUsable = Bin.U64(header, 40), lastUsable = Bin.U64(header, 48);
         ulong sectors = (ulong)(device.Length / sector);
         var result = new List<ApfsPartition>();
+        var taken = new List<(ulong First, ulong Last)>();
         for (int i = 0; i < count; i++)
         {
             var entry = table.AsSpan((int)(i * entrySize), (int)entrySize);
@@ -137,8 +184,13 @@ public static class PartitionLocator
             if (type != ApfsPartitionType) continue;
             ulong first = Bin.U64(entry, 32);
             ulong last = Bin.U64(entry, 40);
-            // Taşmasız: önce sektör sayısıyla karşılaştırılır, sonra çarpılır (diskin dışına taşan ya da ters bölüm: atla)
-            if (last < first || last >= sectors) continue;
+            // Taşmasız: önce kullanılabilir aralık ve sektör sayısıyla karşılaştırılır, sonra çarpılır (aralık dışı, diskin
+            // dışına taşan ya da ters bölüm: atla; yazıcı GPT yapılarını ezemesin)
+            if (first < firstUsable || last < first || last > lastUsable || last >= sectors) continue;
+            // Önceki bir APFS girdisiyle örtüşen (kopya ya da kısmen üst üste) girdi atlanır, yalnız ilki alınır: aynı kapsayıcı iki
+            // bölüm olup iki ayrı yazma oturumuyla aynı alan yöneticisinden blok ayırmasın (1.8.1: sessiz veri kaybı)
+            if (taken.Exists(t => first <= t.Last && t.First <= last)) continue;
+            taken.Add((first, last));
             long offset = (long)first * sector;
             long length = (long)(last - first + 1) * sector;
             string name = System.Text.Encoding.Unicode.GetString(entry.Slice(56, 72)).TrimEnd('\0');

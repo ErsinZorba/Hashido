@@ -42,6 +42,9 @@
   <data name="BTree.RootNotMarked" xml:space="preserve">
     <value>B-tree root is not marked as root (block {0})</value>
   </data>
+  <data name="BTree.SharedChild" xml:space="preserve">
+    <value>B-tree node reached twice in one scan (shared child, block {0})</value>
+  </data>
   <data name="BTree.TooDeep" xml:space="preserve">
     <value>B-tree too deep (possible loop)</value>
   </data>
@@ -95,6 +98,9 @@
   </data>
   <data name="Check.DirChildCount" xml:space="preserve">
     <value>{0}: directory {1} child count {2}, entries {3}</value>
+  </data>
+  <data name="Check.DirParentChain" xml:space="preserve">
+    <value>{0}: directory {1}: parent chain does not reach the root (parent_id {2})</value>
   </data>
   <data name="Check.DirMultiplyReferenced" xml:space="preserve">
     <value>{0}: directory {1} is referenced from {2} places</value>
@@ -1283,6 +1289,9 @@
   </data>
   <data name="VolWriter.OmapDeleted" xml:space="preserve">
     <value>object {0} is marked deleted</value>
+  </data>
+  <data name="VolWriter.ParentChainLoop" xml:space="preserve">
+    <value>directory parent chain does not reach the root (inode {0})</value>
   </data>
   <data name="VolWriter.PerFileKeys" xml:space="preserve">
     <value>cannot write to an encrypted volume with per-file keys</value>

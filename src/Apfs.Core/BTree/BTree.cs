@@ -8,7 +8,10 @@ public readonly record struct BTreeEntry(byte[] Key, byte[] Value);
 
 /// <summary>
 /// Salt okunur APFS B-ağacı (btree_node_phys_t). Hem fiziksel (omap) hem sanal (fs-tree) ağaçları okur.
-/// Güvenlik: düğüm seviyesi her inişte tam olarak bir azalmalıdır (döngü imkânsız), derinlik en fazla 16'dır.
+/// Güvenlik: düğüm seviyesi her inişte tam olarak bir azalmalıdır (döngü imkânsız), derinlik en fazla 16'dır. Bir tarama aynı
+/// düğüme (fiziksel adres) ikinci kez inmez: paylaşılan çocuk (DAG) bozuk veridir — yoksa her işaret çocuğu yeniden gezdirir ve
+/// düzey başına ~1000 işaretle tek çözümleme üstel büyür (1.8.1). Aynı oid'in farklı xid'li anahtarlarının birden
+/// çok çocuğa yayılması meşrudur; yasak olan aynı DÜĞÜME iki kez inmek.
 /// </summary>
 public sealed class BTree
 {
@@ -62,9 +65,21 @@ public sealed class BTree
     /// <param name="includeGhosts">Değeri olmayan (hayalet) kayıtlar da boş değerle döndürülsün mü (ör. alan yöneticisinin boş
     /// kuyruğunda tek bloklu kayıtlar böyle saklanır).</param>
     public IEnumerable<BTreeEntry> Scan(Func<ReadOnlySpan<byte>, int> compare, bool includeGhosts = false) =>
-        ScanNode(_rootPaddr, _rootEncrypted, ApfsConstants.TypeBTree, expectedLevel: -1, compare, depth: 0, includeGhosts);
+        ScanNode(_rootPaddr, _rootEncrypted, ApfsConstants.TypeBTree, expectedLevel: -1, compare, depth: 0, includeGhosts, visited: null);
 
-    private IEnumerable<BTreeEntry> ScanNode(ulong paddr, bool encrypted, uint objType, int expectedLevel, Func<ReadOnlySpan<byte>, int> compare, int depth, bool includeGhosts)
+    /// <summary>
+    /// Çocuğa inmeden önce: bu taramada aynı düğüme ikinci kez inilmez (<see cref="BTree"/> özeti). Küme kökün iç düğüm olduğu
+    /// taramada kurulur (tek yapraklı ağaçta ve yaprakta hiç ayrılmaz); kök de içindedir.
+    /// </summary>
+    private static void Visit(ref HashSet<ulong>? visited, ulong parentPaddr, ulong childPaddr)
+    {
+        visited ??= [parentPaddr];
+        if (!visited.Add(childPaddr)) throw ApfsException.Corrupt(CoreText.T("BTree.SharedChild", childPaddr));
+    }
+
+    // visited: yineleyici gövdesinde (her numaralandırmada yeniden) kökte null başlar; aynı Scan sonucunu iki kez gezmek ayrı küme kullanır
+    private IEnumerable<BTreeEntry> ScanNode(ulong paddr, bool encrypted, uint objType, int expectedLevel, Func<ReadOnlySpan<byte>, int> compare,
+        int depth, bool includeGhosts, HashSet<ulong>? visited)
     {
         if (depth > MaxDepth)
             throw ApfsException.Corrupt(CoreText.T("BTree.TooDeep"));
@@ -111,7 +126,8 @@ public sealed class BTree
             if (e.ValLen < 8) throw ApfsException.Corrupt(CoreText.T("BTree.InvalidIndexValue", paddr));
             ulong childOid = Bin.U64(data, e.ValOff);
             var (childPaddr, childEncrypted) = _resolveVirtual is null ? (childOid, false) : _resolveVirtual(childOid);
-            foreach (var r in ScanNode(childPaddr, childEncrypted, ApfsConstants.TypeBTreeNode, node.Level - 1, compare, depth + 1, includeGhosts))
+            Visit(ref visited, paddr, childPaddr);
+            foreach (var r in ScanNode(childPaddr, childEncrypted, ApfsConstants.TypeBTreeNode, node.Level - 1, compare, depth + 1, includeGhosts, visited))
                 yield return r;
         }
     }
@@ -121,12 +137,12 @@ public sealed class BTree
 
     /// <summary>
     /// Ağacın bütün düğümlerini (kök dahil) derinlik öncelikli gezer. Okuma yolunun kullandığı denetimlerin aynısı uygulanır
-    /// (seviye, yaprak bayrağı, alt tür, derinlik).
+    /// (seviye, yaprak bayrağı, alt tür, derinlik, paylaşılan çocuk).
     /// </summary>
     internal IEnumerable<NodeVisit> EnumerateNodes() =>
-        EnumerateNode(_rootPaddr, _rootEncrypted, ApfsConstants.TypeBTree, expectedLevel: -1, depth: 0);
+        EnumerateNode(_rootPaddr, _rootEncrypted, ApfsConstants.TypeBTree, expectedLevel: -1, depth: 0, visited: null);
 
-    private IEnumerable<NodeVisit> EnumerateNode(ulong paddr, bool encrypted, uint objType, int expectedLevel, int depth)
+    private IEnumerable<NodeVisit> EnumerateNode(ulong paddr, bool encrypted, uint objType, int expectedLevel, int depth, HashSet<ulong>? visited)
     {
         if (depth > MaxDepth)
             throw ApfsException.Corrupt(CoreText.T("BTree.TooDeep"));
@@ -148,7 +164,8 @@ public sealed class BTree
             if (e.ValLen < 8) throw ApfsException.Corrupt(CoreText.T("BTree.InvalidIndexValue", paddr));
             ulong childOid = Bin.U64(data, e.ValOff);
             var (childPaddr, childEncrypted) = _resolveVirtual is null ? (childOid, false) : _resolveVirtual(childOid);
-            foreach (var v in EnumerateNode(childPaddr, childEncrypted, ApfsConstants.TypeBTreeNode, node.Level - 1, depth + 1))
+            Visit(ref visited, paddr, childPaddr);
+            foreach (var v in EnumerateNode(childPaddr, childEncrypted, ApfsConstants.TypeBTreeNode, node.Level - 1, depth + 1, visited))
                 yield return v;
         }
     }

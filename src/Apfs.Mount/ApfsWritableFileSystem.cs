@@ -65,8 +65,9 @@ public sealed class ApfsWritableFileSystem : FileSystemBase, IDisposable
     public event Action<string>? ChangeLost;
 
     /// <summary>
-    /// Oturumun bir commit'i yarıda kaldı (<see cref="WriteSession.IsFaulted"/>): oturum bir daha yazmaz, tek doğru yol kaydetmeden
-    /// bırakmak. Oturum başına BİR kez gelir (commit'i ilk düşen sürücüden; çok birimde öbür sürücüler sessizce hata döner). Bir
+    /// Oturumun bir commit'i yarıda kaldı ya da değiştiren bir işlem değişiklik evresinde düştü (1.8.1; <see cref="WriteSession.IsFaulted"/>):
+    /// oturum bir daha yazmaz, tek doğru yol kaydetmeden bırakmak. Oturum başına BİR kez gelir (arızayı yaşayan sürücüden; çok birimde
+    /// öbür sürücüler sessizce hata döner). Bir
     /// dinleyici varsa bu hata <see cref="ChangeLost"/>'a GİTMEZ (çift uyarı olmasın); yoksa eskisi gibi ChangeLost. İleti hatanın
     /// kendisidir ("Değişiklikler diske yazılamadı" öneki yok).
     /// </summary>
@@ -127,6 +128,19 @@ public sealed class ApfsWritableFileSystem : FileSystemBase, IDisposable
 
     /// <summary>Oturum arızalıysa değiştiren çağrılar diske hiçbir şey vermeden bu durumla döner (_gate altında okunur).</summary>
     private bool IsFaulted => _session.IsFaulted;
+
+    /// <summary>
+    /// Değiştiren bir işlem değişiklik evresinde düşüp oturumu arızalı yaptıysa (<paramref name="ex"/> oturumun
+    /// <see cref="WriteSession.FaultCause"/>'u; 1.8.1): <see cref="Faulted"/> hatanın kendisiyle. Oturumu arızalı
+    /// yapan istisna tek bir çağrıdan çıkar → oturum başına BİR kez (çok birimde öbür sürücüler girişte arızayı görüp sessizce döner);
+    /// commit arızası bu yoldan gelmez (<see cref="CommitIfDirty"/> kendisi bildirir). Dinleyici yoksa false: eski yol (Error/ChangeLost).
+    /// </summary>
+    private bool ReportFault(Exception ex)
+    {
+        if (!ReferenceEquals(ex, _session.FaultCause) || Faulted is not { } faulted) return false;
+        faulted(ex.Message);
+        return true;
+    }
 
     public override int Init(object host0)
     {
@@ -339,7 +353,7 @@ public sealed class ApfsWritableFileSystem : FileSystemBase, IDisposable
             }
             catch (ApfsException e) when (e.Code is not ApfsErrorCode.IoError)
             {
-                ChangeLost?.Invoke(CoreText.T("Fs.DeleteFailed", fileName, e.Message));
+                if (!ReportFault(e)) ChangeLost?.Invoke(CoreText.T("Fs.DeleteFailed", fileName, e.Message));
             }
         }
     }
@@ -543,6 +557,7 @@ public sealed class ApfsWritableFileSystem : FileSystemBase, IDisposable
 
     public override int ExceptionHandler(Exception ex)
     {
+        if (ReportFault(ex)) return ApfsFileSystem.StatusDeviceNotConnected;
         if (ex is ApfsException ae)
         {
             if (ae.Code is not ApfsErrorCode.NotFound and not ApfsErrorCode.AlreadyExists) Error?.Invoke(ae.Message);

@@ -1,5 +1,7 @@
 using System.IO.Pipes;
+using System.Runtime.InteropServices;
 using System.Security.AccessControl;
+using Microsoft.Win32.SafeHandles;
 using System.Security.Principal;
 using System.Text;
 using System.Text.Json;
@@ -60,7 +62,8 @@ public sealed record Request(string Op, long Since = 0, string? Disk = null, int
 
 /// <summary>
 /// Adlandırılmış kanal: her bağlantıda tek satır JSON istek, tek satır JSON yanıt. Erişim listesi yalnızca SYSTEM, Yöneticiler ve
-/// etkileşimli (oturum açmış) kullanıcılara izin verir; ağdan bağlantı reddedilir. İstekler 64 KiB ile sınırlıdır.
+/// etkileşimli (oturum açmış) kullanıcılara izin verir; ağdan bağlantı reddedilir. İstekler 64 KiB, yanıtlar (istemci tarafı) 1 MiB ile
+/// sınırlıdır; hizmet "status" yanıtını yine de eski istemcinin 64 KiB'ına sığacak biçimde kırpar (1.8.1).
 /// </summary>
 public static class PipeProtocol
 {
@@ -71,6 +74,58 @@ public static class PipeProtocol
     public const string DefaultPipeName = "APFSforWindows";
     public const int MaxMessageBytes = 64 * 1024;
 
+    /// <summary>İstemcinin okuduğu YANIT satırının sınırı (1.8.1). İstekler <see cref="MaxMessageBytes"/>'ta kalır.</summary>
+    public const int MaxResponseBytes = 1024 * 1024;
+
+    /// <summary>"status" yanıtındaki bildirimlerin toplam JSON boyu (1.8.1): yanıt eski istemcinin 64 KiB'ına da sığsın.</summary>
+    public const int MaxNoticeBytes = 32 * 1024;
+
+    /// <summary>"status" yanıtındaki parola ipucunun en çok uzunluğu (karakter; 1.8.1).</summary>
+    public const int MaxHintChars = 256;
+
+    /// <summary>
+    /// Bildirimlerden JSON boyu (<see cref="Json"/> ile, ayırıcı virgüller dahil) bütçeye sığan EN YENİLERİ, sıralarını koruyarak
+    /// döndürür. Hizmetin "status" yanıtı için: kuyruktaki 200 bildirim uzun ve ASCII dışı metinle (Web JSON her birini
+    /// 6 baytlık kaçışla yazar) yanıtı 64 KiB'ın üstüne çıkarıyordu. Atılan eski bildirimleri tepsi ya zaten gördü ya da ilk
+    /// açılışta göstermez.
+    /// </summary>
+    public static List<Notice> NewestWithinBudget(IReadOnlyList<Notice> notices, int budget = MaxNoticeBytes)
+    {
+        int used = 2; // [ ]
+        int first = notices.Count;
+        while (first > 0)
+        {
+            int size = JsonSerializer.SerializeToUtf8Bytes(notices[first - 1], Json).Length + (first < notices.Count ? 1 : 0);
+            if (used + size > budget) break;
+            used += size;
+            first--;
+        }
+        return [.. notices.Skip(first)];
+    }
+
+    /// <summary>
+    /// İpucunu <see cref="MaxHintChars"/>'a kısaltır (düşmanca diskte keybag ipucu ~11 bin karakter olabiliyor). Vekil çifti
+    /// bölünmez.
+    /// </summary>
+    public static string? ClampHint(string? hint)
+    {
+        if (hint is null || hint.Length <= MaxHintChars) return hint;
+        int n = MaxHintChars;
+        if (char.IsHighSurrogate(hint[n - 1])) n--;
+        return hint[..n];
+    }
+
+    /// <summary>Test kancası: bu ad da varsayılan kanal gibi oturum denetiminden geçer (ortam değişkeni bilerek YOK).</summary>
+    internal static string? SessionCheckedPipe { get; set; }
+
+    /// <summary>
+    /// Bu kanal adında istemci sunucunun hizmetlerin oturumunda (0) olmasını şart koşar mı. Yalnız kurulu hizmetin adı:
+    /// geliştirme kanalının (<c>--pipe</c>) sunucusu kullanıcı oturumunda çalışır.
+    /// </summary>
+    public static bool RequiresServiceSession(string pipeName) =>
+        string.Equals(pipeName, DefaultPipeName, StringComparison.OrdinalIgnoreCase) // kanal adları büyük/küçük harf ayırmaz
+        || (SessionCheckedPipe is { } test && string.Equals(pipeName, test, StringComparison.OrdinalIgnoreCase));
+
     /// <summary>"reports-pull" sayfasındaki olayların toplam boyu (yanıt kanal sınırının altında kalsın).</summary>
     public const int MaxReportPageBytes = 48 * 1024;
 
@@ -79,7 +134,10 @@ public static class PipeProtocol
 
     public static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
-    public static NamedPipeServerStream CreateServer()
+    /// <param name="firstInstance">Kanalın ilk örneği (<see cref="PipeOptions.FirstPipeInstance"/>): ad başka bir sürecin
+    /// elindeyse <see cref="UnauthorizedAccessException"/>; hizmet gaspı böyle fark eder. Sonraki örnekler false (ilk örnek
+    /// bizde açıkken açılır).</param>
+    public static NamedPipeServerStream CreateServer(bool firstInstance = false)
     {
         var security = new PipeSecurity();
         security.AddAccessRule(new PipeAccessRule(new SecurityIdentifier(WellKnownSidType.LocalSystemSid, null), PipeAccessRights.FullControl, AccessControlType.Allow));
@@ -90,14 +148,17 @@ public static class PipeProtocol
         security.AddAccessRule(new PipeAccessRule(new SecurityIdentifier(WellKnownSidType.InteractiveSid, null), PipeAccessRights.ReadWrite, AccessControlType.Allow));
         security.AddAccessRule(new PipeAccessRule(new SecurityIdentifier(WellKnownSidType.NetworkSid, null), PipeAccessRights.FullControl, AccessControlType.Deny));
         return NamedPipeServerStreamAcl.Create(PipeName, PipeDirection.InOut, NamedPipeServerStream.MaxAllowedServerInstances,
-            PipeTransmissionMode.Byte, PipeOptions.Asynchronous, MaxMessageBytes, MaxMessageBytes, security);
+            PipeTransmissionMode.Byte, PipeOptions.Asynchronous | (firstInstance ? PipeOptions.FirstPipeInstance : 0),
+            MaxMessageBytes, MaxMessageBytes, security);
     }
 
-    public static async Task<string?> ReadLineAsync(Stream s, CancellationToken ct)
+    /// <param name="maxBytes">Satır sınırı: sunucu istekleri <see cref="MaxMessageBytes"/>'la, istemci yanıtları
+    /// <see cref="MaxResponseBytes"/>'la okur. Aşılırsa <see cref="InvalidDataException"/>.</param>
+    public static async Task<string?> ReadLineAsync(Stream s, CancellationToken ct, int maxBytes = MaxMessageBytes)
     {
         var buf = new List<byte>(256);
         var one = new byte[1];
-        while (buf.Count < MaxMessageBytes)
+        while (buf.Count < maxBytes)
         {
             int n = await s.ReadAsync(one, ct);
             if (n == 0) return buf.Count == 0 ? null : Encoding.UTF8.GetString([.. buf]);
@@ -121,8 +182,22 @@ public static class PipeProtocol
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         cts.CancelAfter(timeout);
         await client.ConnectAsync(cts.Token);
+        // Kurulu hizmetin kanalında sunucu oturum 0'da olmalı: hizmet dururken adı kapan kullanıcı süreci oturum 0'da
+        // çalışamaz. Denetlenemezse de güvenilmez sayılır; isteğin tek baytı gitmez.
+        if (RequiresServiceSession(PipeName) && !(GetNamedPipeServerSessionId(client.SafePipeHandle, out uint session) && session == 0))
+            throw new UntrustedServerException(WinText.T("Ipc.UntrustedServer", PipeName));
         await WriteLineAsync(client, request.Lang is null && ClientLanguage is not null ? request with { Lang = ClientLanguage } : request, cts.Token);
-        var line = await ReadLineAsync(client, cts.Token);
+        var line = await ReadLineAsync(client, cts.Token, MaxResponseBytes);
         return line is null ? default : JsonSerializer.Deserialize<T>(line, Json);
     }
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetNamedPipeServerSessionId(SafePipeHandle pipe, out uint serverSessionId);
 }
+
+/// <summary>
+/// Kanalın karşısındaki sunucu kurulu hizmet değil (1.8.1): varsayılan kanalda sunucu hizmetlerin oturumunda (0) olmalı.
+/// <see cref="IOException"/>: tepsi bunu "hizmete ulaşılamadı" sayar ve hiçbir şey göndermez.
+/// </summary>
+public sealed class UntrustedServerException(string message) : IOException(message);

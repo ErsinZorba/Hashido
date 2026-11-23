@@ -181,12 +181,18 @@ public sealed class ApfsContainer : IDisposable
     /// <summary>
     /// Alan yöneticisi geçici (ephemeral) bir nesnedir; yeri seçilen checkpoint'in eşleme bloklarındadır
     /// (checkpoint_map_phys_t → cpm_oid == nx_spaceman_oid → cpm_paddr). sm_dev[SD_MAIN].sm_free_count = ofset 72.
+    /// Halkanın boyu ve uzunluğu diskten gelir: halka ≤ <see cref="MaxDescRingBlocks"/> blok ve kapsayıcının içinde, uzunluk ≤
+    /// <see cref="MaxDescLen"/> olmalı; değilse null (birim sayaçları). Yoksa blok 0'ı bozuk büyük bir disk bütün aygıtı 4 KiB'lık
+    /// okumalarla taratıyordu (1.8.1; gerçek Mac diski: 280 blok, uzunluk 2). <see cref="Open"/>'ın aday taraması
+    /// bilerek değişmedi.
     /// </summary>
     private ulong? TryReadSpacemanFreeBlocks()
     {
         var sb = Superblock;
         uint ringSize = sb.XpDescBlocks & ~ApfsConstants.XpDescBlocksNonContiguous;
         if (sb.SpacemanOid == 0 || ringSize == 0 || (sb.XpDescBlocks & ApfsConstants.XpDescBlocksNonContiguous) != 0 || sb.XpDescLen > ringSize)
+            return null;
+        if (ringSize > MaxDescRingBlocks || sb.XpDescBase > sb.BlockCount || ringSize > sb.BlockCount - sb.XpDescBase || sb.XpDescLen > MaxDescLen)
             return null;
         try
         {
@@ -214,6 +220,12 @@ public sealed class ApfsContainer : IDisposable
         catch (ApfsException e) when (e.Code is not ApfsErrorCode.IoError) { }
         return null;
     }
+
+    /// <summary>Boş alan okumasının güvendiği en büyük tanımlayıcı halkası (açılışın aday taramasıyla aynı sınır).</summary>
+    private const uint MaxDescRingBlocks = 1_000_000;
+
+    /// <summary>Boş alan okumasının güvendiği en uzun checkpoint (tanımlayıcı blok sayısı; macOS'ta birkaç blok).</summary>
+    private const uint MaxDescLen = 4096;
 
     public void Dispose()
     {

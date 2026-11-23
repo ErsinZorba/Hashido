@@ -125,7 +125,10 @@ public sealed class AppController : IDisposable
             RaiseIfChanged();
             await AskPasswordsAsync(s, switchingAtStart);
         }
-        catch (Exception e) when (e is TimeoutException or IOException or OperationCanceledException or UnauthorizedAccessException)
+        // Aşırı uzun ya da bozuk yanıt (InvalidData/Json) da "hizmete ulaşılamadı": zamanlayıcı async void, dışarı çıkan istisna
+        // tepsiyi düşürüyordu
+        catch (Exception e) when (e is TimeoutException or IOException or OperationCanceledException or UnauthorizedAccessException
+            or InvalidDataException or JsonException)
         {
             ServiceDown = true;
             RaiseIfChanged();

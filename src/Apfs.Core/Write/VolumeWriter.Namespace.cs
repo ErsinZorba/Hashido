@@ -81,12 +81,17 @@ public sealed partial class VolumeWriter
     /// </summary>
     public void Delete(ulong parentId, string name)
     {
+        // Denetim (hiçbir şey değişmez; bkz. Mutate)
         var parent = RequireDirectory(parentId);
         var de = FindEntry(parentId, name) ?? throw new ApfsException(ApfsErrorCode.NotFound, name);
         var target = GetInode(de.FileId) ?? throw ApfsException.Corrupt(CoreText.T("VolWriter.EntryInodeMissing", de.Name));
         if (target.IsDirectory && target.ChildrenOrLinks != 0) throw new ApfsException(ApfsErrorCode.DirectoryNotEmpty, de.Name);
-
         var (key, val) = DrecRecord(parentId, de);
+        Mutate(() => DeleteCore(parentId, parent, de, target, key, val));
+    }
+
+    private void DeleteCore(ulong parentId, InodeRecord parent, DirEntry de, InodeRecord target, byte[] key, byte[] val)
+    {
         FsDelete(key);
         long now = NowNs();
         parent.ChildrenOrLinks--;
@@ -181,22 +186,45 @@ public sealed partial class VolumeWriter
         var ino = GetInode(de.FileId) ?? throw ApfsException.Corrupt(CoreText.T("VolWriter.EntryInodeMissing", de.Name));
 
         if (ino.IsDirectory)
+        {
+            // Hedefin üst zinciri en çok klasör sayısı + 2 (kök, özel klasör; sayaçta yoklar) adımda sanal üste varır; fazlası döngüdür:
+            // bozuk parent_id'li birimde yürüyüş sonsuza dönüp oturum kilidini tutuyordu (1.8.1; kapı artık reddeder)
+            ulong limit = Bin.U64(_apsb, 192) + 2, steps = 0;
             for (ulong p = dstParentId; p != Inode.RootDirParent && p != 0; p = GetInode(p)?.ParentId ?? 0)
+            {
                 if (p == de.FileId) throw new ApfsException(ApfsErrorCode.InvalidArgument, CoreText.T("VolWriter.MoveIntoSelf"));
+                if (++steps > limit) throw ApfsException.Corrupt(CoreText.T("VolWriter.ParentChainLoop", dstParentId));
+            }
+        }
 
         var existing = FindCollision(dstParentId, dstName);
         bool sameItem = existing is not null && existing.FileId == de.FileId && dstParentId == srcParentId;
-        if (existing is not null && !sameItem)
+        bool replaceExisting = existing is not null && !sameItem;
+        if (replaceExisting)
         {
             if (!replace) throw new ApfsException(ApfsErrorCode.AlreadyExists, dstName);
-            var other = GetInode(existing.FileId)!;
+            var other = GetInode(existing!.FileId) ?? throw ApfsException.Corrupt(CoreText.T("VolWriter.EntryInodeMissing", existing.Name));
             if (other.IsDirectory != ino.IsDirectory) throw new ApfsException(ApfsErrorCode.AlreadyExists, dstName);
-            Delete(dstParentId, existing.Name);
-            if (dstParentId == srcParentId) srcParent = GetInode(srcParentId)!;
+            // Delete'in denetimleri burada: değişiklik evresindeki Delete sıradan bir hatayla düşerse oturum arızalanırdı
+            if (other.IsDirectory && other.ChildrenOrLinks != 0) throw new ApfsException(ApfsErrorCode.DirectoryNotEmpty, existing.Name);
+            DrecRecord(dstParentId, existing);
         }
         if (sameItem && existing!.Name == dstName) return; // değişiklik yok
-
         var (oldKey, val) = DrecRecord(srcParentId, de);
+
+        Mutate(() =>
+        {
+            if (replaceExisting)
+            {
+                Delete(dstParentId, existing!.Name);
+                if (dstParentId == srcParentId) srcParent = GetInode(srcParentId)!;
+            }
+            RenameCore(srcParentId, srcParent, de, dstParentId, dstName, oldKey, val);
+        });
+    }
+
+    private void RenameCore(ulong srcParentId, InodeRecord srcParent, DirEntry de, ulong dstParentId, string dstName, byte[] oldKey, byte[] val)
+    {
         FsDelete(oldKey);
         FsPut(Records.DrecKey(dstParentId, dstName, Hashed, CaseInsensitive), val);
 
@@ -218,7 +246,7 @@ public sealed partial class VolumeWriter
         }
 
         // Inode'un adı/üstü; sert bağlantıda bu bağlantının kardeş kaydı
-        ino = GetInode(de.FileId)!;
+        var ino = GetInode(de.FileId)!;
         if (SiblingIdOf(val) is ulong sib)
         {
             FsPut(SiblingLinkKey(de.FileId, sib), SiblingLinkVal(dstParentId, dstName));
@@ -241,12 +269,15 @@ public sealed partial class VolumeWriter
     public void SetTimes(ulong id, long? createNs, long? modNs, long? changeNs, long? accessNs)
     {
         var ino = GetInode(id) ?? throw new ApfsException(ApfsErrorCode.NotFound, $"inode {id}");
-        if (createNs is long c) ino.CreateNs = c;
-        if (modNs is long m) ino.ModNs = m;
-        if (accessNs is long a) ino.AccessNs = a;
-        ino.ChangeNs = changeNs ?? NowNs();
-        PutInode(id, ino);
-        Touch();
+        Mutate(() =>
+        {
+            if (createNs is long c) ino.CreateNs = c;
+            if (modNs is long m) ino.ModNs = m;
+            if (accessNs is long a) ino.AccessNs = a;
+            ino.ChangeNs = changeNs ?? NowNs();
+            PutInode(id, ino);
+            Touch();
+        });
     }
 
     /// <summary>Gizli (UF_HIDDEN) bayrağını açar/kapatır.</summary>
@@ -255,10 +286,13 @@ public sealed partial class VolumeWriter
         var ino = GetInode(id) ?? throw new ApfsException(ApfsErrorCode.NotFound, $"inode {id}");
         uint flags = hidden ? ino.BsdFlags | UfHidden : ino.BsdFlags & ~UfHidden;
         if (flags == ino.BsdFlags) return;
-        ino.BsdFlags = flags;
-        ino.ChangeNs = NowNs();
-        PutInode(id, ino);
-        Touch();
+        Mutate(() =>
+        {
+            ino.BsdFlags = flags;
+            ino.ChangeNs = NowNs();
+            PutInode(id, ino);
+            Touch();
+        });
     }
 
     /// <summary>Dosyanın veri akışı paylaşılıyor mu (Mac'te çoğaltılmış/klon dosya).</summary>

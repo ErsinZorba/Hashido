@@ -453,6 +453,8 @@ public static class FullCheck
             if (ExpectedType(t.Inode) != de.Type) r.Error(CoreText.T("Check.EntryTypeMismatch", label, de.Name));
         }
 
+        CheckParentChains(inodes, label, r);
+
         long files = 0, dirs = 0, symlinks = 0, others = 0;
         var owners = new Dictionary<ulong, uint>();
         foreach (var (id, f) in inodes)
@@ -506,6 +508,55 @@ public static class FullCheck
             r.Error(CoreText.T("Check.Counters", label, v.NumFiles, v.NumDirectories, v.NumSymlinks, v.NumOtherFsObjects, files, dirs, symlinks, others));
         if (v.NextObjId <= maxId) r.Error(CoreText.T("Check.NextObjId", label, v.NextObjId, maxId));
         r.Info.Add(CoreText.T("Check.FsSummary", label, files, dirs, symlinks, extents.Count, phys.Count));
+    }
+
+    /// <summary>
+    /// Klasör üst zinciri (1.8.1): her klasörün inode parent_id'leri izlenince kök (2) ya da özel klasör (3) üzerinden
+    /// sanal üste (1) varılmalı; kökün ve özel klasörün üstü 1, başka hiçbir klasörünki 1 değil. Kökü kendini gösteren ya da iki
+    /// klasörü birbirinin üstü yapan birim önceden temiz geçiyor, yazıcının "kendi altına taşıma" yürüyüşü sonsuza dönüyordu
+    /// (apfsck: "Root inode record: bad parent id"). Sonuçlar belleklenir (O(n)); hata zincirin koptuğu klasörde BİR kez yazılır,
+    /// altındakiler ayrıca yazılmaz.
+    /// </summary>
+    private static void CheckParentChains(Dictionary<ulong, InodeFacts> inodes, string label, CheckReport r)
+    {
+        var ok = new Dictionary<ulong, bool>();
+        var path = new List<ulong>();
+        var onPath = new HashSet<ulong>();
+        foreach (var (start, facts) in inodes)
+        {
+            if (!facts.Inode.IsDirectory || ok.ContainsKey(start)) continue;
+            path.Clear();
+            onPath.Clear();
+            ulong id = start;
+            bool result;
+            while (true)
+            {
+                if (ok.TryGetValue(id, out result)) break;              // zincirin kalanı zaten biliniyor (kötüyse orada yazıldı)
+                if (!onPath.Add(id))                                     // döngü
+                {
+                    r.Error(CoreText.T("Check.DirParentChain", label, id, inodes[id].Inode.ParentId));
+                    result = false;
+                    break;
+                }
+                path.Add(id);
+                ulong parent = inodes[id].Inode.ParentId;
+                bool special = id is Inode.RootDirId or PrivateDirId;
+                if (special || parent == Inode.RootDirParent)
+                {
+                    result = special && parent == Inode.RootDirParent;   // yalnız kök ve özel klasör sanal üste bağlanır
+                    if (!result) r.Error(CoreText.T("Check.DirParentChain", label, id, parent));
+                    break;
+                }
+                if (!inodes.TryGetValue(parent, out var p) || !p.Inode.IsDirectory)
+                {
+                    r.Error(CoreText.T("Check.DirParentChain", label, id, parent));
+                    result = false;
+                    break;
+                }
+                id = parent;
+            }
+            foreach (ulong d in path) ok[d] = result;
+        }
     }
 
     /// <summary>CRYPTO_SW_ID: yazılım şifrelemeli birimin VEK'ine ayrılmış kimlik; veri extent'inin tweak'i olamaz.</summary>

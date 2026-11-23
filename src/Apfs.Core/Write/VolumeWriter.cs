@@ -174,6 +174,43 @@ public sealed partial class VolumeWriter
     private bool _dirtyEver;
     private void Touch() { _dirty = true; _dirtyEver = true; }
 
+    // ---- Değiştiren işlemler iki evrelidir (1.8.1) ----
+
+    private int _mutationDepth;
+
+    /// <summary>
+    /// Değiştiren işlemin İKİNCİ evresi. Değiştiren her genel işlem (<see cref="CreateFile"/>, <see cref="CreateDirectory"/>,
+    /// <see cref="Write"/>, <see cref="SetSize"/>, <see cref="Delete"/>, <see cref="Rename"/>, <see cref="SetTimes"/>,
+    /// <see cref="SetHidden"/>) önce yalnız OKUYAN denetimi yapar (ad, varlık, tür, salt okunur içerik, boş alan…): orada atılan
+    /// istisna hiçbir şeyi değiştirmemiştir, oturum sürer ("disk dolu", "ad var", "bulunamadı" sıradan hatadır). Değişikliği bunun
+    /// içinde yapar: burada atılan HER istisna bellekteki birimi yarım bırakmış olabilir (extent bağlandı ama akış bilgisi eski,
+    /// blok ayrıldı ama yazılamadı, silme yarıda) ve 5 sn'lik commit onu diske işlerdi → oturum arızalı olur
+    /// (<see cref="WriteSession.Fault"/>; var olan "kaydetmeden bırak" yolu, disk son commit'te kalır). Geri alma günlüğü bilerek
+    /// seçilmedi. İç içe çağrı (<see cref="Rename"/> içindeki <see cref="Delete"/>) dış evreye katılır: derinlik sayacı arızayı
+    /// yalnız en dıştaki evrenin, ilk istisnayla bildirmesini sağlar (iç işlemin denetiminde çıkan istisna da dıştakinin
+    /// değişikliğinden sonra geldiği için arızadır). Arızalı oturumda hiçbir değişiklik başlamaz.
+    /// </summary>
+    private T Mutate<T>(Func<T> change)
+    {
+        _s.ThrowIfFaulted();
+        bool outermost = _mutationDepth++ == 0;
+        try
+        {
+            return change();
+        }
+        catch (Exception e) when (outermost)
+        {
+            _s.Fault(e);
+            throw;
+        }
+        finally
+        {
+            _mutationDepth--;
+        }
+    }
+
+    private void Mutate(Action change) => Mutate(() => { change(); return 0; });
+
     // ---- Dosya sistemi ağacındaki her değişikliğin tek geçtiği yer: görüntünün önbelleği burada düşürülür ----
 
     private ApfsVolume? _view;
@@ -273,7 +310,11 @@ public sealed partial class VolumeWriter
         ValidateName(name);
         var parent = RequireDirectory(parentId);
         if (FindCollision(parentId, name) is not null) throw new ApfsException(ApfsErrorCode.AlreadyExists, name);
+        return Mutate(() => CreateNodeCore(parentId, parent, name, isDirectory));
+    }
 
+    private ulong CreateNodeCore(ulong parentId, InodeRecord parent, string name, bool isDirectory)
+    {
         long now = NowNs();
         ulong id = NextObjId();
         var ino = new InodeRecord

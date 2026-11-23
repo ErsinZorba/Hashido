@@ -13,23 +13,49 @@ internal sealed class PipeServer(MountManager manager, ReportRecorder reports) :
 
     public void Start() => _loop = Task.Run(() => LoopAsync(_cts.Token));
 
+    /// <summary>
+    /// Kanalın ilk örneği <c>FirstPipeInstance</c> ile açılır (1.8.1): hizmet dururken adı kapan bir süreç varsa açılmaz,
+    /// günlüğe bir kez <c>Svc.PipeNameTaken</c> yazılır ve 5 sn'de bir yeniden denenir (önceden sessizce onun ek örneği açılıyordu).
+    /// Sonraki örnek, bağlanan örnek işlenmeye verilmeden ÖNCE açılır: ad hiç boş kalmaz.
+    /// </summary>
     private async Task LoopAsync(CancellationToken ct)
     {
-        while (!ct.IsCancellationRequested)
+        System.IO.Pipes.NamedPipeServerStream? listening = null;
+        bool first = true, takenLogged = false;
+        try
         {
-            try
+            while (!ct.IsCancellationRequested)
             {
-                var server = PipeProtocol.CreateServer();
-                await server.WaitForConnectionAsync(ct);
-                _ = Task.Run(() => HandleAsync(server, ct), ct);
-            }
-            catch (OperationCanceledException) { break; }
-            catch (Exception e)
-            {
-                ServiceLog.Write(WinText.T("Svc.PipeError", e.Message));
-                await Task.Delay(1000, ct).ContinueWith(_ => { }, TaskScheduler.Default);
+                try
+                {
+                    if (listening is null)
+                    {
+                        listening = PipeProtocol.CreateServer(firstInstance: first);
+                        first = false;
+                    }
+                    await listening.WaitForConnectionAsync(ct);
+                    var connected = listening;
+                    listening = null;
+                    try { listening = PipeProtocol.CreateServer(); }
+                    finally { _ = Task.Run(() => HandleAsync(connected, ct), ct); }
+                }
+                catch (OperationCanceledException) { break; }
+                catch (UnauthorizedAccessException) when (first)
+                {
+                    if (!takenLogged) ServiceLog.Write(WinText.T("Svc.PipeNameTaken", PipeProtocol.PipeName));
+                    takenLogged = true;
+                    await Task.Delay(5000, ct).ContinueWith(_ => { }, TaskScheduler.Default);
+                }
+                catch (Exception e)
+                {
+                    ServiceLog.Write(WinText.T("Svc.PipeError", e.Message));
+                    listening?.Dispose();
+                    listening = null;
+                    await Task.Delay(1000, ct).ContinueWith(_ => { }, TaskScheduler.Default);
+                }
             }
         }
+        finally { listening?.Dispose(); }
     }
 
     private async Task HandleAsync(System.IO.Pipes.NamedPipeServerStream server, CancellationToken ct)

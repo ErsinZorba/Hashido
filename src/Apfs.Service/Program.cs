@@ -18,6 +18,17 @@ if (ServiceLog.EchoToConsole)
     if (Console.IsErrorRedirected) Console.SetError(new StreamWriter(Console.OpenStandardError(), utf8) { AutoFlush = true });
     if (Console.IsOutputRedirected) Console.SetOut(new StreamWriter(Console.OpenStandardOutput(), utf8) { AutoFlush = true });
 }
+// Kurulu hizmet (LocalSystem): günlük ve rapor klasörünü ilk yazmadan ÖNCE güvenceye al (1.8.1). Geliştirme kipinde dokunulmaz.
+if (!ServiceLog.EchoToConsole)
+{
+    using var me = System.Security.Principal.WindowsIdentity.GetCurrent();
+    if (me.IsSystem)
+    {
+        var secured = DataDirSecurity.SecureServiceDataDirectory();
+        if (secured.LinksRemoved > 0) ServiceLog.Write(WinText.T("Svc.DataDirLinksRemoved", secured.LinksRemoved));
+        if (secured.FirstError is not null) ServiceLog.Write(WinText.T("Svc.DataDirSecureFailed", secured.FirstError));
+    }
+}
 for (int i = 0; i < args.Length - 1; i++)
 {
     if (args[i] == "--image") images.Add(Path.GetFullPath(args[i + 1]));
