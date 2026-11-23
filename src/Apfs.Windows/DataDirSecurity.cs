@@ -124,7 +124,9 @@ public static class DataDirSecurity
         var dacl = new DiscretionaryAcl(isContainer, false, state.Full.Count + 1);
         foreach (var sid in state.Full)
             dacl.AddAccess(AccessControlType.Allow, sid, (int)FileSystemRights.FullControl, inherit, PropagationFlags.None);
-        dacl.AddAccess(AccessControlType.Allow, state.Readers, (int)FileSystemRights.ReadAndExecute, inherit, PropagationFlags.None);
+        // SYNCHRONIZE da: okuyan programlar (.NET, Not Defteri) onu da ister; yalnız ReadAndExecute ile "Günlüğü aç" reddedilir
+        dacl.AddAccess(AccessControlType.Allow, state.Readers, (int)(FileSystemRights.ReadAndExecute | FileSystemRights.Synchronize),
+            inherit, PropagationFlags.None);
         var sd = new CommonSecurityDescriptor(isContainer, false,
             ControlFlags.DiscretionaryAclPresent | ControlFlags.DiscretionaryAclProtected | ControlFlags.SelfRelative,
             state.Owner, null, null, dacl);
