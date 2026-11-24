@@ -64,9 +64,17 @@ public sealed class Checkpoint
             return;
         }
         if (descBlocks == 0 || _sb.XpDataBlocks == 0 || _sb.XpDescIndex >= descBlocks || _sb.XpDataIndex >= _sb.XpDataBlocks
-            || _sb.XpDescLen < 1 || _sb.XpDescLen > descBlocks || _sb.XpDataLen > _sb.XpDataBlocks
+            || _sb.XpDescLen < 1 || _sb.XpDescLen > descBlocks || _sb.XpDescLen > ApfsContainer.MaxDescLen || _sb.XpDataLen > _sb.XpDataBlocks
             || (_sb.XpDescIndex + _sb.XpDescLen) % descBlocks != _sb.XpDescNext
             || (_sb.XpDataIndex + _sb.XpDataLen) % _sb.XpDataBlocks != _sb.XpDataNext)
+        {
+            Problems = [CoreText.T("Cp.RingInconsistent")];
+            return;
+        }
+        // Halkalar aygıtın içinde; tanımlayıcı uzunluğu ≤ MaxDescLen ve eşlenen geçici nesneler ≤ veri halkası: bozuk
+        // süper blok denetimi aygıtın boyuyla sınırlı tutar (gerçek uzunluk 2–5)
+        if (_sb.XpDescBase > _reader.BlockCount || descBlocks > _reader.BlockCount - _sb.XpDescBase
+            || _sb.XpDataBase > _reader.BlockCount || _sb.XpDataBlocks > _reader.BlockCount - _sb.XpDataBase)
         {
             Problems = [CoreText.T("Cp.RingInconsistent")];
             return;
@@ -78,8 +86,9 @@ public sealed class Checkpoint
             problems.Add(CoreText.T("Cp.SuperblockNotAtEnd", _sb.Paddr, sbAt));
 
         uint dataIdx = _sb.XpDataIndex;
-        bool sawLast = false;
-        for (uint i = 0; i + 1 < _sb.XpDescLen; i++)
+        bool sawLast = false, overflow = false;
+        ulong mapped = 0;
+        for (uint i = 0; i + 1 < _sb.XpDescLen && !overflow; i++)
         {
             ulong paddr = DescBlock(_sb, _sb.XpDescIndex + i);
             maps.Add(paddr);
@@ -104,6 +113,8 @@ public sealed class Checkpoint
                     Bin.U64(b, e + 16), Bin.U64(b, e + 24), Bin.U64(b, e + 32));
                 if (Bin.U32(b, e + 12) != 0) problems.Add(CoreText.T("Cp.MappingPadding", m.Oid));
                 if (m.Size == 0 || m.Size % _reader.BlockSize != 0) { problems.Add(CoreText.T("Cp.MappingSize", m.Oid)); continue; }
+                mapped += m.Size / _reader.BlockSize;
+                if (mapped > _sb.XpDataBlocks) { overflow = true; break; } // halkayı bir kezden çok dolduramaz; aşağıda sorun
                 if (m.Paddr != DataBlock(_sb, dataIdx)) problems.Add(CoreText.T("Cp.MappingOrder", m.Oid));
                 if (!_byOid.TryAdd(m.Oid, m)) problems.Add(CoreText.T("Cp.MappingDuplicate", m.Oid));
                 mappings.Add(m);
@@ -111,7 +122,7 @@ public sealed class Checkpoint
             }
         }
         if (_sb.XpDescLen > 1 && !sawLast) problems.Add(CoreText.T("Cp.NoLastMapBlock"));
-        if (dataIdx != _sb.XpDataNext) problems.Add(CoreText.T("Cp.EphemeralOverlap"));
+        if (overflow || dataIdx != _sb.XpDataNext) problems.Add(CoreText.T("Cp.EphemeralOverlap"));
 
         // Her geçici nesne okunabilir, doğru türde ve checkpoint'in xid'inde olmalı
         foreach (var m in mappings)

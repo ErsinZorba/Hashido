@@ -91,7 +91,7 @@ public sealed class ReportUploader : IDisposable
         {
             ReportsResponse page;
             try { page = await source.PullAsync(after, ct); }
-            catch (Exception e) when (e is IOException or TimeoutException or OperationCanceledException or UnauthorizedAccessException or JsonException)
+            catch (Exception e) when (PipeProtocol.IsChannelFailure(e))
             {
                 return new UploadResult(sent + dropped == 0 ? UploadOutcome.Nothing : UploadOutcome.Sent, sent, dropped, pulls);
             }
@@ -110,7 +110,7 @@ public sealed class ReportUploader : IDisposable
                 }
                 dropped += batch.Invalid;
                 try { await source.AckAsync(batch.LastId, ct); }
-                catch (Exception e) when (e is IOException or TimeoutException or OperationCanceledException or UnauthorizedAccessException)
+                catch (Exception e) when (PipeProtocol.IsChannelFailure(e))
                 {
                     return new UploadResult(UploadOutcome.Failed, sent, dropped, pulls);
                 }

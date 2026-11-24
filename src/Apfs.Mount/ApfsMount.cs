@@ -20,13 +20,15 @@ public sealed class ApfsMount : IDisposable
     public string MountPoint { get; }
 
     /// <param name="mountPoint">"X:" biçiminde sürücü harfi; null ise <see cref="DriveLetterAllocator"/> seçer (T'den F'ye geriye).</param>
-    public static ApfsMount Mount(ApfsVolume volume, string? mountPoint, Action<string>? onError = null)
+    /// <param name="onLog">Yalnız günlüğe gidecek bilgi (<see cref="ApfsFileSystem.Log"/>; bildirim değil).</param>
+    public static ApfsMount Mount(ApfsVolume volume, string? mountPoint, Action<string>? onError = null, Action<string>? onLog = null)
     {
         var c = volume.Container;
         // APFS birimleri kapsayıcının alanını paylaşır: her birimde toplam = kapsayıcı boyutu, boş = kapsayıcıdaki boş alan.
         long total = (long)c.Superblock.BlockCount * c.BlockSize;
         var fs = new ApfsFileSystem(volume, total, c.FreeBytes);
         if (onError is not null) fs.Error += onError;
+        if (onLog is not null) fs.Log += onLog;
 
         FileSystemHost host;
         try

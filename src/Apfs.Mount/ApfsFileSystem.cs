@@ -46,6 +46,14 @@ public sealed class ApfsFileSystem : FileSystemBase
     /// <summary>Kullanıcıya gösterilecek Türkçe hata mesajları (örneğin bozuk bir dosya okunduğunda).</summary>
     public event Action<string>? Error;
 
+    /// <summary>
+    /// Yalnız günlüğe giden bilgi (bildirim değil): bir klasörde Windows'ta aynı ada düşen Mac adları ek alarak gösteriliyor (
+    /// sürücü başına bir kez).
+    /// </summary>
+    public event Action<string>? Log;
+
+    private int _namesLogged; // ek alan adlar günlüğe bir kez
+
     public ApfsFileSystem(ApfsVolume volume, long totalBytes, long freeBytes)
     {
         _volume = volume;
@@ -70,6 +78,30 @@ public sealed class ApfsFileSystem : FileSystemBase
     /// "Güvenle çıkar" bunu sorar; doluysa kullanıcıya kopyalamanın yarıda kalacağı söylenir.
     /// </summary>
     public bool IsBusy => OpenFileCount > 0 || Environment.TickCount64 - Interlocked.Read(ref _lastReadTicks) < 3000;
+
+    private long _lastOpenTicks = long.MinValue / 2;
+
+    /// <summary>Son okumanın ya da dosya açılışının anı (<see cref="Environment.TickCount64"/>); Güvenle çıkar'ın ikinci bakışı için.</summary>
+    public long LastIoTicks => Math.Max(Interlocked.Read(ref _lastReadTicks), Interlocked.Read(ref _lastOpenTicks));
+
+    private int _refuseOpens, _opening;
+
+    /// <summary>
+    /// Ayırma kararı verildi (1.8.2): yeni açılışlar "aygıt bağlı değil" ile reddedilir. Karar ile ayırma arasında başlayan
+    /// kopyalama yarıda kesilmesin, hiç başlamasın. Çıkarma vazgeçilirse geri alınır. Yazma tam bariyerlidir: ardından okunan
+    /// <see cref="OpeningCount"/> sıfırsa bundan sonraki her açılış reddi görür.
+    /// </summary>
+    public bool RefuseOpens
+    {
+        get => Volatile.Read(ref _refuseOpens) != 0;
+        set => Interlocked.Exchange(ref _refuseOpens, value ? 1 : 0);
+    }
+
+    /// <summary>
+    /// Şu anda süren açılış sayısı (red denetiminden ÖNCE artar, açılış bitince azalır). Güvenle çıkar reddi açtıktan sonra bunun
+    /// sıfırlanmasını bekler: denetimi geçmiş ama açık dosya sayacına henüz eklenmemiş açılış kaçmasın.
+    /// </summary>
+    public int OpeningCount => Volatile.Read(ref _opening);
 
     /// <summary>ReadOnlyVolume bayrağının çekirdeğe iletilip iletilmediği.</summary>
     public bool KernelReadOnlyFlagSet { get; private set; }
@@ -155,17 +187,36 @@ public sealed class ApfsFileSystem : FileSystemBase
         out object fileNode, out object fileDesc, out FileInfo fileInfo, out string normalizedName)
     {
         long t = Stats.Start();
+        Interlocked.Increment(ref _opening);
         try
         {
+            if (Volatile.Read(ref _refuseOpens) != 0)
+            {
+                fileNode = null!;
+                fileDesc = null!;
+                fileInfo = default;
+                normalizedName = null!;
+                return StatusDeviceNotConnected;
+            }
             var node = Resolve(fileName, out var normalized);
             fileNode = node;
             fileDesc = new OpenHandle(node.IsDirectory);
-            if (!node.IsDirectory) Interlocked.Increment(ref _openFiles);
+            if (!node.IsDirectory)
+            {
+                Interlocked.Increment(ref _openFiles);
+                // Dosya açılışı da etkinlik (yalnız Güvenle çıkar'ın ikinci bakışı için; IsBusy değişmez): önbellekten okunan dosyanın okuması
+                // buraya hiç gelmez, açılışı gelir
+                Interlocked.Exchange(ref _lastOpenTicks, Environment.TickCount64);
+            }
             fileInfo = node.Info;
             normalizedName = SameLengthOrNull(normalized, fileName);
             return StatusSuccess;
         }
-        finally { Stats.Stop("Open", t); }
+        finally
+        {
+            Interlocked.Decrement(ref _opening);
+            Stats.Stop("Open", t);
+        }
     }
 
     public override void Close(object fileNode, object fileDesc)
@@ -259,9 +310,7 @@ public sealed class ApfsFileSystem : FileSystemBase
         {
             // Liste açık tanıtıcı başına bir kez kurulur; büyük klasörlerde WinFsp ReadDirectory'yi birden çok kez çağırır.
             var entries = node.SortedChildren ??= SortChildren(node.GetChildren(this));
-            IEnumerable<(string Name, FileInfo Info)> seq = entries;
-            if (marker is not null) seq = seq.Where(e => DirOrder.Compare(e.Name, marker) > 0);
-            en = seq.GetEnumerator();
+            en = EntriesAfter(entries, marker);
             context = en;
         }
         if (en.MoveNext())
@@ -277,7 +326,8 @@ public sealed class ApfsFileSystem : FileSystemBase
     public override int GetDirInfoByName(object parentNode, object fileDesc, string fileName, out string normalizedName, out FileInfo fileInfo)
     {
         var parent = (Node)parentNode;
-        var entry = _volume.FindEntry(parent.Inode.Id, WindowsNames.FromWindows(fileName));
+        var dir = _volume.GetDirectory(parent.Inode.Id);
+        var entry = WindowsNameMap.Find(dir, fileName, out _);
         if (entry is null)
         {
             normalizedName = null!;
@@ -285,7 +335,7 @@ public sealed class ApfsFileSystem : FileSystemBase
             return StatusObjectNameNotFound;
         }
         var child = MakeNode(_volume.GetInode(entry.FileId), entry.Name);
-        normalizedName = SameLengthOrNull(WindowsNames.ToWindows(entry.Name), fileName);
+        normalizedName = SameLengthOrNull(WindowsNameMap.Display(dir, entry), fileName);
         fileInfo = child.Info;
         return StatusSuccess;
     }
@@ -373,10 +423,9 @@ public sealed class ApfsFileSystem : FileSystemBase
     /// </summary>
     private Node Resolve(string fileName, out string normalizedPath)
     {
-        var parts = fileName.Split('\\', StringSplitOptions.RemoveEmptyEntries).Select(WindowsNames.FromWindows).ToList();
-        var inode = _volume.LookupComponents(parts, out var actual);
-        normalizedPath = "\\" + string.Join('\\', actual.Select(WindowsNames.ToWindows));
-        return MakeNode(inode, actual.Count > 0 ? actual[^1] : "");
+        var inode = WindowsPath.Resolve(_volume, WindowsPath.Split(fileName), out var shown, out string name, out _);
+        normalizedPath = "\\" + string.Join('\\', shown);
+        return MakeNode(inode, name);
     }
 
     private Node MakeNode(Inode inode, string name)
@@ -404,6 +453,26 @@ public sealed class ApfsFileSystem : FileSystemBase
     internal static string SameLengthOrNull(string actual, string requested) =>
         actual.Length == requested.Length ? actual : null!;
 
+    /// <summary>
+    /// <see cref="DirOrder"/>'la sıralı listede işaretten (WinFsp'nin bildirdiği, son verilen ad) SONRAKİ girdiler. winfsp.net
+    /// bağlamı her ReadDirectory çağrısında sıfırlar ve Windows klasörü birkaç düzine girdilik parçalarla ister: işaret ikili
+    /// aramayla bulunur (doğrusal süzme 600.000 dosyalı klasörde O(n²) idi). Sonuç süzmeyle birebir. İki sürücü de kullanır.
+    /// </summary>
+    internal static IEnumerator<(string Name, FileInfo Info)> EntriesAfter(List<(string Name, FileInfo Info)> sorted, string? marker)
+    {
+        int lo = 0;
+        if (marker is not null)
+        {
+            int hi = sorted.Count;
+            while (lo < hi)
+            {
+                int mid = lo + (hi - lo) / 2;
+                if (DirOrder.Compare(sorted[mid].Name, marker) > 0) hi = mid; else lo = mid + 1;
+            }
+        }
+        for (int i = lo; i < sorted.Count; i++) yield return sorted[i];
+    }
+
     private static List<(string Name, FileInfo Info)> SortChildren(IEnumerable<(string Name, FileInfo Info)> children)
     {
         var list = children.ToList();
@@ -411,8 +480,15 @@ public sealed class ApfsFileSystem : FileSystemBase
         return list;
     }
 
-    internal static long ToFileTime(long unixNs) =>
-        unixNs <= 0 ? 116444736000000000L : unixNs / 100 + 116444736000000000L;
+    /// <summary>Windows FILETIME'ında 1970-01-01 (100 ns adımları, 1601'den beri).</summary>
+    internal const long UnixEpochFileTime = 116444736000000000L;
+
+    /// <summary>
+    /// APFS zaman damgası → FILETIME. APFS'te zaman 1970'ten beri İŞARETLİ 64 bit nanosaniyedir (macOS ve linux-apfs-rw böyle
+    /// okur; aralık 1677-09-21 … 2262-04-11): 1970 öncesi negatiftir (önceden 1970 gösteriliyordu). Her değer geçerli bir
+    /// FILETIME'a düşer.
+    /// </summary>
+    internal static long ToFileTime(long unixNs) => unixNs / 100 + UnixEpochFileTime;
 
     /// <summary>Açık tanıtıcı (WinFsp FileDesc): her Open için yeni bir nesne.</summary>
     private sealed class OpenHandle(bool isDirectory)
@@ -473,7 +549,9 @@ public sealed class ApfsFileSystem : FileSystemBase
                 var parent = fs._volume.TryGetInode(Inode.ParentId);
                 yield return ("..", parent is null ? Info : fs.MakeNode(parent, "..").Info);
             }
-            foreach (var e in fs._volume.ListDirectory(Inode.Id))
+            var dir = fs._volume.GetDirectory(Inode.Id);
+            bool odd = false;
+            foreach (var e in dir.Entries)
             {
                 Node child;
                 try
@@ -486,8 +564,10 @@ public sealed class ApfsFileSystem : FileSystemBase
                     fs.Error?.Invoke(CoreText.T("Fs.EntryUnreadable", e.Name, ex.Message));
                     continue;
                 }
-                yield return (WindowsNames.ToWindows(e.Name), child.Info);
+                odd |= WindowsNameMap.IsOdd(e.Name);
+                yield return (WindowsNameMap.Display(dir, e), child.Info);
             }
+            if (odd && WindowsPath.SuffixedNotice(dir, ref fs._namesLogged) is { } notice) fs.Log?.Invoke(notice);
         }
     }
 }

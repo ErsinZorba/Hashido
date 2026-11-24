@@ -56,8 +56,9 @@ public static class Lzfse
                 {
                     int n = (int)U32(src, s + 4);
                     s += 8;
-                    if (!(n >= 0 && s + n <= src.Length)) throw Corrupt(CoreText.T("Lzfse.RawBlockOutOfStream"));
-                    if (!(d + n <= dst.Length)) throw Corrupt(CoreText.T("Lzfse.OutputExceedsExpected"));
+                    // Sınırlar taşmasız (n ≈ int.MaxValue'da s + n eksiye dönüp denetimi geçiyordu)
+                    if (!(n >= 0 && n <= src.Length - s)) throw Corrupt(CoreText.T("Lzfse.RawBlockOutOfStream"));
+                    if (!(n <= dst.Length - d)) throw Corrupt(CoreText.T("Lzfse.OutputExceedsExpected"));
                     src.Slice(s, n).CopyTo(dst[d..]);
                     s += n; d += n;
                     break;
@@ -67,8 +68,8 @@ public static class Lzfse
                     int raw = (int)U32(src, s + 4);
                     int payload = (int)U32(src, s + 8);
                     s += 12;
-                    if (!(raw >= 0 && payload >= 0 && s + payload <= src.Length)) throw Corrupt(CoreText.T("Lzfse.LzvnBlockOutOfStream"));
-                    if (!(d + raw <= dst.Length)) throw Corrupt(CoreText.T("Lzfse.OutputExceedsExpected"));
+                    if (!(raw >= 0 && payload >= 0 && payload <= src.Length - s)) throw Corrupt(CoreText.T("Lzfse.LzvnBlockOutOfStream"));
+                    if (!(raw <= dst.Length - d)) throw Corrupt(CoreText.T("Lzfse.OutputExceedsExpected"));
                     int n = Lzvn.Decode(src.Slice(s, payload), dst.Slice(d, raw));
                     if (!(n == raw)) throw Corrupt(CoreText.T("Lzfse.LzvnBlockShort"));
                     s += payload; d += raw;
@@ -113,7 +114,7 @@ public static class Lzfse
             h.LState = (int)Field(v2, 32, 10);
             h.MState = (int)Field(v2, 42, 10);
             h.DState = (int)Field(v2, 52, 10);
-            if (!(headerSize >= 32 && s + headerSize <= src.Length)) throw Corrupt(CoreText.T("Lzfse.V2HeaderSizeInvalid"));
+            if (!(headerSize >= 32 && headerSize <= src.Length - s)) throw Corrupt(CoreText.T("Lzfse.V2HeaderSizeInvalid"));
             DecodeFreqTables(src.Slice(s + 32, headerSize - 32), h);
         }
         else
@@ -139,8 +140,10 @@ public static class Lzfse
         }
 
         // Başlık doğrulaması (referanstaki lzfse_check_block_header_v1 ile aynı sınırlar)
-        if (!(h.Literals <= LiteralsPerBlock && h.Matches <= MatchesPerBlock && h.Literals % 4 == 0)) throw Corrupt(CoreText.T("Lzfse.BlockCountsInvalid"));
-        if (!(h.LiteralState.All(x => x < LiteralStates) && h.LState < LStates && h.MState < MStates && h.DState < DStates))
+        if (!(h.Literals is >= 0 and <= LiteralsPerBlock && h.Matches is >= 0 and <= MatchesPerBlock && h.Literals % 4 == 0))
+            throw Corrupt(CoreText.T("Lzfse.BlockCountsInvalid"));
+        if (!(h.LiteralState.All(x => x is >= 0 and < LiteralStates) && h.LState is >= 0 and < LStates && h.MState is >= 0 and < MStates
+            && h.DState is >= 0 and < DStates))
             throw Corrupt(CoreText.T("Lzfse.InitialStatesInvalid"));
         if (!(h.LiteralBits is >= -7 and <= 0 && h.LmdBits is >= -7 and <= 0)) throw Corrupt(CoreText.T("Lzfse.BitCountsInvalid"));
         if (!(h.LiteralPayload >= 0 && h.LmdPayload >= 0 && h.RawBytes >= 0)) throw Corrupt(CoreText.T("Lzfse.SizesInvalid"));

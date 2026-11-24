@@ -23,7 +23,19 @@ internal static unsafe class RequestedAccess
     private const uint GenericRead = 0x80000000, GenericWrite = 0x40000000, GenericExecute = 0x20000000, GenericAll = 0x10000000;
     private const uint FileGenericRead = 0x120089, FileGenericWrite = 0x120116, FileGenericExecute = 0x1200A0, FileAllAccess = 0x1F01FF;
 
-    private static readonly delegate* unmanaged<IntPtr> GetOperationContext = Resolve();
+    /// <summary>
+    /// <c>FspFileSystemGetOperationContext</c>; ilk başarılı aramada saklanır. Bulunamazsa SAKLANMAZ (1.8.2): sürücü
+    /// bağlanmadan önce yapılan bir çağrı (testler yazılabilir dosya sisteminin <c>Open</c>'ını doğrudan çağırıyor) WinFsp DLL'i
+    /// henüz yüklü değilken boş sonucu kalıcı yapıyor, o süreçteki bütün MAXIMUM_ALLOWED açılışları reddediliyordu.
+    /// </summary>
+    private static delegate* unmanaged<IntPtr> s_getOperationContext;
+
+    private static delegate* unmanaged<IntPtr> GetOperationContext()
+    {
+        var fn = s_getOperationContext;
+        if (fn == null) s_getOperationContext = fn = Resolve();
+        return fn;
+    }
 
     private static delegate* unmanaged<IntPtr> Resolve()
     {
@@ -54,8 +66,9 @@ internal static unsafe class RequestedAccess
     public static bool TryGet(uint createOptions, uint grantedAccess, out uint desired)
     {
         desired = 0;
-        if (GetOperationContext == null) return false;
-        IntPtr ctx = GetOperationContext();
+        var getContext = GetOperationContext();
+        if (getContext == null) return false;
+        IntPtr ctx = getContext();
         if (ctx == IntPtr.Zero) return false;
         byte* req = *(byte**)ctx; // FSP_FILE_SYSTEM_OPERATION_CONTEXT.Request
         if (req == null) return false;

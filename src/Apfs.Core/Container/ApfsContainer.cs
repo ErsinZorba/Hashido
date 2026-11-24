@@ -55,19 +55,10 @@ public sealed class ApfsContainer : IDisposable
         if ((sb0.XpDescBlocks & ApfsConstants.XpDescBlocksNonContiguous) == 0)
         {
             ulong count = sb0.XpDescBlocks;
-            if (count > 0 && count <= 1_000_000 && sb0.XpDescBase < reader.BlockCount && sb0.XpDescBase + count <= reader.BlockCount)
+            if (count > 0 && count <= MaxDescRingBlocks && count * blockSize <= MaxCandidateScanBytes
+                && sb0.XpDescBase < reader.BlockCount && sb0.XpDescBase + count <= reader.BlockCount)
             {
-                for (ulong i = 0; i < count; i++)
-                {
-                    ulong paddr = sb0.XpDescBase + i;
-                    try
-                    {
-                        if (!reader.TryReadValidObject(paddr, ApfsConstants.TypeNxSuperblock, out var b)) continue;
-                        if (Bin.U32(b, 32) != ApfsConstants.NxMagic || Bin.U32(b, 36) != blockSize) continue;
-                        candidates.Add(NxSuperblock.Parse(b, paddr));
-                    }
-                    catch (ApfsException) { /* bu blok kullanılamaz; diğerlerine bak */ }
-                }
+                ScanCandidates(device, reader, sb0.XpDescBase, count, blockSize, candidates);
             }
             else
             {
@@ -99,6 +90,51 @@ public sealed class ApfsContainer : IDisposable
         }
         throw new ApfsException(ApfsErrorCode.NoValidCheckpoint, errors.Count > 0 ? string.Join("; ", errors.Take(3)) : null);
     }
+
+    /// <summary>
+    /// Tanımlayıcı halkasındaki süper blok adayları. Halka büyük parçalarla ardışık okunur (parça başına bir G/Ç; eskiden blok
+    /// başına bir okuma); parça okunamazsa o parçanın blokları tek tek denenir (okunamayan blok atlanır, öbürleri kullanılır).
+    /// </summary>
+    private static void ScanCandidates(IBlockDevice device, ObjectReader reader, ulong start, ulong count, uint blockSize, List<NxSuperblock> candidates)
+    {
+        int chunkBlocks = (int)Math.Max(1, CandidateChunkBytes / blockSize);
+        var chunk = new byte[(long)Math.Min((ulong)chunkBlocks, count) * blockSize];
+        for (ulong first = 0; first < count; first += (ulong)chunkBlocks)
+        {
+            int n = (int)Math.Min((ulong)chunkBlocks, count - first);
+            var span = chunk.AsSpan(0, n * (int)blockSize);
+            bool whole;
+            try { device.Read((long)((start + first) * blockSize), span); whole = true; }
+            catch (ApfsException) { whole = false; }
+            for (int k = 0; k < n; k++)
+            {
+                ulong paddr = start + first + (ulong)k;
+                try
+                {
+                    byte[] b;
+                    if (whole) b = span.Slice(k * (int)blockSize, (int)blockSize).ToArray();
+                    else b = reader.ReadBlock(paddr);
+                    if (!Fletcher64.Verify(b) || (Bin.U32(b, 24) & ApfsConstants.ObjectTypeMask) != ApfsConstants.TypeNxSuperblock) continue;
+                    if (Bin.U32(b, 32) != ApfsConstants.NxMagic || Bin.U32(b, 36) != blockSize) continue;
+                    candidates.Add(NxSuperblock.Parse(b, paddr));
+                }
+                catch (ApfsException) { /* bu blok kullanılamaz; diğerlerine bak */ }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Aday taramasının ve boş alan okumasının güvendiği en büyük tanımlayıcı halkası (blok). Gerçek halkalar küçük
+    /// (tamDuzeltmePlan P0 Mac ölçümü: 512 MB'ta 8, 64 GB–16 TB'ta 280–292 blok; gerçek Disk 3 C 280): ×28 pay. Aşılırsa açılış
+    /// yalnız blok 0'ı kullanır (uyarıyla), boş alan birim sayaçlarından. 1.8.1'e dek 1 000 000 (bozuk diskte çok uzun okuma).
+    /// </summary>
+    private const uint MaxDescRingBlocks = 8192;
+
+    /// <summary>Aday taramasının okuyabileceği en çok bayt (büyük blok boyutunda halka sınırı bundan da küçülür).</summary>
+    private const ulong MaxCandidateScanBytes = 64UL << 20;
+
+    /// <summary>Aday taramasında tek okumanın boyu.</summary>
+    private const uint CandidateChunkBytes = 1 << 20;
 
     private static void Validate(NxSuperblock sb, ObjectReader reader)
     {
@@ -183,8 +219,8 @@ public sealed class ApfsContainer : IDisposable
     /// (checkpoint_map_phys_t → cpm_oid == nx_spaceman_oid → cpm_paddr). sm_dev[SD_MAIN].sm_free_count = ofset 72.
     /// Halkanın boyu ve uzunluğu diskten gelir: halka ≤ <see cref="MaxDescRingBlocks"/> blok ve kapsayıcının içinde, uzunluk ≤
     /// <see cref="MaxDescLen"/> olmalı; değilse null (birim sayaçları). Yoksa blok 0'ı bozuk büyük bir disk bütün aygıtı 4 KiB'lık
-    /// okumalarla taratıyordu (1.8.1; gerçek Mac diski: 280 blok, uzunluk 2). <see cref="Open"/>'ın aday taraması
-    /// bilerek değişmedi.
+    /// okumalarla taratıyordu (1.8.1; gerçek Mac diski: 280 blok, uzunluk 2). Halka sınırı <see cref="Open"/>'ın aday taramasıyla
+    /// aynı (1.8.2'den beri 8192).
     /// </summary>
     private ulong? TryReadSpacemanFreeBlocks()
     {
@@ -221,11 +257,8 @@ public sealed class ApfsContainer : IDisposable
         return null;
     }
 
-    /// <summary>Boş alan okumasının güvendiği en büyük tanımlayıcı halkası (açılışın aday taramasıyla aynı sınır).</summary>
-    private const uint MaxDescRingBlocks = 1_000_000;
-
     /// <summary>Boş alan okumasının güvendiği en uzun checkpoint (tanımlayıcı blok sayısı; macOS'ta birkaç blok).</summary>
-    private const uint MaxDescLen = 4096;
+    internal const uint MaxDescLen = 4096;
 
     public void Dispose()
     {

@@ -13,7 +13,16 @@ public sealed class ApfsVolume
 
     // Önbellekler (disk salt okunur açıldığı için hiç bayatlamaz; sınırlar yalnızca bellek içindir).
     private readonly LruCache<ulong, Inode> _inodes = new(65_536);
-    private readonly LruCache<ulong, DirectoryIndex> _dirs = new(500_000, d => d.Entries.Count + 1); // toplam girdi sayısı
+    private int _dirCapacity = DirectoryIndex.CompactThreshold;
+    private LruCache<ulong, DirectoryIndex> _dirs = new(DirectoryIndex.CompactThreshold, d => d.Entries.Count + 1); // toplam girdi sayısı
+    /// <summary>
+    /// Klasör önbelleğine sığmayan (500.000 ya da daha çok girdili) son klasörün sıkı dizini: tek yuva, yenisi eskisinin
+    /// yerine geçer. Önceden böyle bir klasörde her ad araması klasörün tamamını yeniden tarayıp dizinliyordu (Gezgin'de O(n²)).
+    /// <see cref="MaxLargeDirectoryEntries"/>'ten büyüğü tutulmaz (bellek sınırı; eskisi gibi her seferinde taranır).
+    /// </summary>
+    private volatile LargeDirectory? _largeDir;
+    private sealed record LargeDirectory(ulong Id, DirectoryIndex Index);
+    internal const int MaxLargeDirectoryEntries = 2_000_000;
     private readonly LruCache<ulong, FileExtent[]> _extents = new(1_000_000, e => e.Length + 1);    // toplam extent sayısı
 
     private ApfsVolume(ApfsContainer container, ulong oid, ulong paddr, byte[] sb, Func<VolumeLockInfo, string?>? passwordProvider,
@@ -38,6 +47,7 @@ public sealed class ApfsVolume
         Name = Bin.Utf8Z(Bin.Slice(sb, 704, 256));
         Role = Bin.U16(sb, 964);
         LastModTimeNs = (long)Bin.U64(sb, 256);
+        Rolling = EncryptionRolling.Read(container.Reader, Bin.U64(sb, 976)); // apfs_er_state_oid
 
         if (IsSealed)
             throw new ApfsException(ApfsErrorCode.Unsupported, CoreText.T("Volume.SealedSystemVolume", Name));
@@ -63,6 +73,9 @@ public sealed class ApfsVolume
         var (rootPaddr, rootEncrypted) = ResolveVirtual(RootTreeOid);
         _fsTree = new BTree.BTree(container.Reader, rootPaddr, ApfsConstants.TypeFsTree, ResolveVirtual, rootEncrypted, Crypto);
     }
+
+    /// <summary>Süren şifreleme dönüşümü (macOS birimi şifrelerken yarıda kaldıysa); yoksa null.</summary>
+    public EncryptionRolling? Rolling { get; }
 
     /// <summary>Kilidi açılmış şifreli birimin şifre çözücüsü; şifresiz birimde null.</summary>
     public Apfs.Crypto.VolumeCrypto? Crypto { get; }
@@ -167,19 +180,33 @@ public sealed class ApfsVolume
         _sessionScan = scan;
         _inodes.Clear();
         _dirs.Clear();
+        _largeDir = null;
         _extents.Clear();
     }
+
+    /// <summary>Test: klasör önbelleğinin sınırı (büyük klasör yolunu küçük görüntüyle denemek için).</summary>
+    internal void LimitDirectoryCache(int entries)
+    {
+        _dirCapacity = entries;
+        _dirs = new(entries, d => d.Entries.Count + 1);
+        _largeDir = null;
+    }
+
+    /// <summary>Test: büyük klasör yuvasındaki klasör (yoksa null).</summary>
+    internal ulong? LargeDirectoryId => _largeDir?.Id;
 
     /// <summary>Yazıcı bir dizin girdisi ekledi/değiştirdi: önbellekteki klasör dizini yerinde güncellenir (yeniden kurulmaz).</summary>
     internal void SessionDirAdd(ulong dirId, DirEntry e)
     {
         if (_dirs.TryGet(dirId, out var idx)) idx.SessionAdd(e);
+        else if (_largeDir is { } big && big.Id == dirId) big.Index.SessionAdd(e);
     }
 
     /// <summary>Yazıcı bir dizin girdisini sildi.</summary>
     internal void SessionDirRemove(ulong dirId, string name)
     {
         if (_dirs.TryGet(dirId, out var idx)) idx.SessionRemove(name);
+        else if (_largeDir is { } big && big.Id == dirId) big.Index.SessionRemove(name);
     }
 
     /// <summary>Dizin girdisi anahtarındaki ad (karmalı ya da karmasız).</summary>
@@ -196,7 +223,10 @@ public sealed class ApfsVolume
         switch (type)
         {
             case JType.Inode: _inodes.Remove(id); break;
-            case JType.DirRec: _dirs.Remove(id); break;
+            case JType.DirRec:
+                _dirs.Remove(id);
+                if (_largeDir?.Id == id) _largeDir = null;
+                break;
             case JType.FileExtent: _extents.Remove(id); break;
         }
     }
@@ -221,9 +251,21 @@ public sealed class ApfsVolume
     /// <summary>Klasördeki girdiler (B-ağacı sırasıyla; önbellekten).</summary>
     public IReadOnlyList<DirEntry> ListDirectory(ulong dirId) => GetDirectory(dirId).Entries;
 
-    /// <summary>Klasörün tamamı bir kez taranır ve ada göre dizinlenir; sonraki aramalar O(1).</summary>
-    public DirectoryIndex GetDirectory(ulong dirId) =>
-        _dirs.GetOrAdd(dirId, id => new DirectoryIndex(ScanDirectory(id).ToList(), IsCaseInsensitive));
+    /// <summary>
+    /// Klasörün tamamı bir kez taranır ve ada göre dizinlenir; sonraki aramalar O(1). Önbelleğe sığmayan büyük klasör sıkı
+    /// dizinle tek yuvada tutulur (<see cref="_largeDir"/>). Üretim kilit dışında: aynı klasör iki kez kurulabilir (zararsız).
+    /// </summary>
+    public DirectoryIndex GetDirectory(ulong dirId)
+    {
+        if (_dirs.TryGet(dirId, out var idx)) return idx;
+        if (_largeDir is { } big && big.Id == dirId) return big.Index;
+        var list = ScanDirectory(dirId).ToList();
+        bool large = list.Count + 1 > _dirCapacity; // önbelleğin ağırlığıyla aynı ölçü: sığmayan büyük sayılır
+        idx = new DirectoryIndex(list, IsCaseInsensitive, compact: large);
+        if (!large) _dirs.Add(dirId, idx);
+        else if (list.Count <= MaxLargeDirectoryEntries) _largeDir = new LargeDirectory(dirId, idx);
+        return idx;
+    }
 
     /// <summary>Teşhis: klasördeki karmalı anahtarların (ad, diskteki karma) çiftleri. Karmasız anahtarlı birimde boş.</summary>
     public IEnumerable<(string Name, uint StoredHash)> ListDirectoryHashes(ulong dirId)
@@ -316,8 +358,10 @@ public sealed class ApfsVolume
                 ulong streamId = Bin.U64(data, 0);
                 ulong size = Bin.U64(data, 8);
                 if (size > (ulong)maxSize) throw new ApfsException(ApfsErrorCode.Unsupported, CoreText.T("Volume.XattrTooLarge", size));
+                var reader = new FileDataReader(this, GetExtents(streamId), size, streamId);
+                // Ayırmadan önce: öznitelik akışı ayrılan alandan büyük olamaz (diskteki boy yüzünden boşuna büyük ayırma yok)
+                if (size > reader.CoveredLength) throw ApfsException.Corrupt(CoreText.T("Volume.DataBeyondAllocation", size, reader.CoveredLength));
                 var buf = new byte[size];
-                var reader = new FileDataReader(this, GetExtents(streamId), size);
                 reader.Read(0, buf);
                 return buf;
             }
@@ -326,10 +370,13 @@ public sealed class ApfsVolume
         return null;
     }
 
+    /// <summary>Sembolik bağ hedefinin üst sınırı (macOS'ta PATH_MAX 1024; önceden 64 MiB'a dek ayrılıyordu).</summary>
+    public const int MaxSymlinkTarget = 4096;
+
     /// <summary>Sembolik bağın hedefi.</summary>
     public string? ReadSymlinkTarget(ulong id)
     {
-        var data = ReadXattr(id, "com.apple.fs.symlink");
+        var data = ReadXattr(id, "com.apple.fs.symlink", MaxSymlinkTarget);
         return data is null ? null : Bin.Utf8Z(data);
     }
 
@@ -366,14 +413,20 @@ public sealed class ApfsVolume
         if (inode.IsCompressed)
             return Compression.Decmpfs.Open(this, inode);
         var extents = inode.HasDataStream ? GetExtents(inode.PrivateId) : [];
-        return new FileDataReader(this, extents, inode.DataSize);
+        return new FileDataReader(this, extents, inode.DataSize, inode.PrivateId, (inode.InternalFlags & Inode.InternalIsSparse) != 0);
     }
 
     /// <summary>
     /// Dosyanın kullanıcıya görünen boyutu. Sıkıştırılmış dosyada açılmış boyut: inode'daki uncompressed_size
     /// (INODE_HAS_UNCOMPRESSED_SIZE varsa) veya decmpfs başlığı. Okunamazsa 0 (dosya listede yine görünür).
     /// </summary>
-    public ulong GetFileSize(Inode inode)
+    public ulong GetFileSize(Inode inode) => Math.Min(GetRawFileSize(inode), MaxFileSize);
+
+    /// <summary>Görünen boyutun üst sınırı: Windows ve .NET boyutu işaretli 64 bit tutar (2^63 üstü negatif görünüyordu).
+    /// Böyle bir dosya zaten bozuktur; okunabilen kısmı okuyucunun sınırlarıyla belirlenir.</summary>
+    public const ulong MaxFileSize = long.MaxValue;
+
+    private ulong GetRawFileSize(Inode inode)
     {
         if (!inode.IsCompressed) return inode.DataSize;
         if (inode.HasUncompressedSize) return inode.UncompressedSize;
@@ -397,7 +450,7 @@ public sealed class ApfsVolume
             if ((flags & XattrDataStream) != 0)
             {
                 if (data.Length < 16) throw ApfsException.Corrupt(CoreText.T("Volume.XattrDstreamShort"));
-                return new FileDataReader(this, GetExtents(Bin.U64(data, 0)), Bin.U64(data, 8));
+                return new FileDataReader(this, GetExtents(Bin.U64(data, 0)), Bin.U64(data, 8), Bin.U64(data, 0));
             }
             if ((flags & XattrDataEmbedded) != 0) return new EmbeddedReader(data);
             throw ApfsException.Corrupt(CoreText.T("Volume.XattrUnknownStorage", name));

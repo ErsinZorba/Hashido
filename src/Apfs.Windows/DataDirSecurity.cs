@@ -67,8 +67,7 @@ public static class DataDirSecurity
             var info = Info(h);
             if (IsLink(info) || (info.Attributes & FileAttributes.Directory) == 0)
             {
-                Delete(h); // bağ ya da klasörün yerindeki dosya
-                state.LinksRemoved++;
+                if (DeleteIf(dir, i => IsLink(i) || (i.Attributes & FileAttributes.Directory) == 0)) state.LinksRemoved++; // bağ ya da klasörün yerindeki dosya
                 continue;
             }
             SetSecurity(h, isContainer: true, state);
@@ -94,8 +93,7 @@ public static class DataDirSecurity
                     isDir = (info.Attributes & FileAttributes.Directory) != 0;
                     if (IsLink(info) || (!isDir && info.Links > 1))
                     {
-                        Delete(h);
-                        state.LinksRemoved++;
+                        if (DeleteIf(path, i => IsLink(i) || ((i.Attributes & FileAttributes.Directory) == 0 && i.Links > 1))) state.LinksRemoved++;
                         continue;
                     }
                     SetSecurity(h, isDir, state);
@@ -138,9 +136,14 @@ public static class DataDirSecurity
             throw new Win32Exception(Marshal.GetLastWin32Error());
     }
 
-    private static SafeFileHandle Open(string path)
+    /// <summary>
+    /// Öğeyi bağı İZLEMEDEN açar. DELETE yalnız silinecek öğe için istenir (<see cref="DeleteIf"/>): klasörde silme
+    /// paylaşımsız bir tanıtıcı varsa (ör. orada açık bir konsol penceresinin çalışma klasörü) DELETE'li açılış paylaşım ihlaliyle
+    /// düşüyor, öğe — kökse bütün klasör — güvenceye alınmadan kalıyordu.
+    /// </summary>
+    private static SafeFileHandle Open(string path, bool delete = false)
     {
-        var h = CreateFileW(path, FileReadAttributes | WriteDac | WriteOwner | DeleteAccess,
+        var h = CreateFileW(path, FileReadAttributes | WriteDac | WriteOwner | (delete ? DeleteAccess : 0),
             FileShare.ReadWrite | FileShare.Delete, IntPtr.Zero, FileMode.Open, FileFlagBackupSemantics | FileFlagOpenReparsePoint, IntPtr.Zero);
         if (h.IsInvalid)
         {
@@ -155,6 +158,18 @@ public static class DataDirSecurity
     {
         if (!GetFileInformationByHandle(h, out var info)) throw new Win32Exception(Marshal.GetLastWin32Error());
         return new FileInfoByHandle((FileAttributes)info.FileAttributes, info.NumberOfLinks);
+    }
+
+    /// <summary>
+    /// Öğeyi DELETE ile yeniden açar; yeni tanıtıcıda koşul hâlâ doğruysa siler (iki açılış arasında yer değişmiş olabilir). true:
+    /// silindi.
+    /// </summary>
+    private static bool DeleteIf(string path, Func<FileInfoByHandle, bool> condition)
+    {
+        using var h = Open(path, delete: true);
+        if (!condition(Info(h))) return false;
+        Delete(h);
+        return true;
     }
 
     /// <summary>Tanıtıcının açtığı adı siler: bağın kendisini (hedefe dokunmaz) ya da sabit bağlı dosyanın bu adını.</summary>

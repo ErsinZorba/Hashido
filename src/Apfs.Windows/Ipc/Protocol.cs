@@ -35,7 +35,10 @@ public sealed record DiskStatus(string Id, string Device, string Description, Li
 /// bildirimler"de de gösterir. Eski hizmette yok → false.</param>
 public sealed record Notice(long Id, string Level, string Text, DateTime Time, bool Requested = false);
 
-public sealed record StatusResponse(List<DiskStatus> Disks, List<Notice> Notices, long LastNoticeId);
+/// <param name="Instance">Hizmet sürecinin bu çalışmaya özgü kimliği (1.8.2): hizmet yeniden başlayınca bildirim kimlikleri
+/// 1'den başlar; değiştiğini gören tepsi bildirim imlecini sıfırlar (yoksa yeni hizmetin ilk "bağlandı" balonları kayboluyordu).
+/// Eski hizmette null.</param>
+public sealed record StatusResponse(List<DiskStatus> Disks, List<Notice> Notices, long LastNoticeId, string? Instance = null);
 
 /// <param name="Busy">Yalnızca "eject": diskte açık dosya/kopyalama var, hiçbir şey yapılmadı; kullanıcı onaylarsa Force ile tekrar.</param>
 /// <param name="Code">Yalnızca "unlock" hatası: <c>ApfsErrorCode</c> adı (ör. "WrongPassword"; tepsi kayıtlı parolayı buna göre siler).
@@ -53,12 +56,15 @@ public sealed record ReportsResponse(List<QueuedReport>? Reports, bool More = fa
 /// Tepsiden hizmete istek. "status" (since: son görülen bildirim), "unlock" (disk, birim, parola), "rescan",
 /// "eject" (disk; force: açık dosya olsa da çıkar), "set-writable" (disk, container; enable: yazmayı aç/kapat; force: açık dosya
 /// olsa da). Container: APFS bölüm sırası ("unlock" ve "set-writable"; eski istemcide 0 = ilk bölüm).
-/// Lang: tepsinin arayüz dili (ör. "de"); hizmet bildirimleri ve nedenleri bu dilde üretir. Yoksa hizmetin dili değişmez.
+/// Lang: tepsinin arayüz dili (ör. "de"); hizmet bu isteğin yanıtını (ve o sırada ürettiği metinleri) bu dilde üretir; istek etkin
+/// konsol oturumundan geliyorsa hizmetin varsayılan dili de olur (1.8.2). Yoksa varsayılan dil.
 /// Raporlama (1.4.0): "reports-pull" (ReportAfter: bu kimlikten sonrakiler), "reports-ack" (ReportAfter: bu kimlik dahil
 /// öncekiler silinir), "reports-config" (Enable: kullanıcının onayı; kapatınca kuyruk silinir).
+/// Culture (1.8.2): tepsinin bölge ayarı (sayı biçimi, ör. "de-DE"); disk başlığındaki boyut ("1,81 TB" / "1.81 TB") Lang gibi
+/// isteğe ve konsol oturumundan geliyorsa varsayılana uygulanır. Eski tepside yok → hizmetin kendi kültürü (sistem yereli).
 /// </summary>
 public sealed record Request(string Op, long Since = 0, string? Disk = null, int Volume = 0, string? Password = null, bool Force = false, bool Enable = false,
-    int Container = 0, string? Lang = null, long ReportAfter = 0);
+    int Container = 0, string? Lang = null, long ReportAfter = 0, string? Culture = null);
 
 /// <summary>
 /// Adlandırılmış kanal: her bağlantıda tek satır JSON istek, tek satır JSON yanıt. Erişim listesi yalnızca SYSTEM, Yöneticiler ve
@@ -79,6 +85,21 @@ public static class PipeProtocol
 
     /// <summary>"status" yanıtındaki bildirimlerin toplam JSON boyu (1.8.1): yanıt eski istemcinin 64 KiB'ına da sığsın.</summary>
     public const int MaxNoticeBytes = 32 * 1024;
+
+    /// <summary>
+    /// Tek bildirim metninin en çok uzunluğu (karakter; 1.8.2). JSON kaçışıyla en kötü 6 bayt/karakter: tek bildirim
+    /// <see cref="MaxNoticeBytes"/> bütçesine her zaman sığar (önceden daha uzunu yanıttan sessizce düşerdi; bugünkü metinlerle olanaksız).
+    /// </summary>
+    public const int MaxNoticeChars = 2048;
+
+    /// <summary>Bildirim metnini <see cref="MaxNoticeChars"/>'a kısaltır (sonuna "…"; vekil çifti bölünmez).</summary>
+    public static string ClampNoticeText(string text)
+    {
+        if (text.Length <= MaxNoticeChars) return text;
+        int n = MaxNoticeChars - 1;
+        if (char.IsHighSurrogate(text[n - 1])) n--;
+        return text[..n] + "…";
+    }
 
     /// <summary>"status" yanıtındaki parola ipucunun en çok uzunluğu (karakter; 1.8.1).</summary>
     public const int MaxHintChars = 256;
@@ -132,6 +153,9 @@ public static class PipeProtocol
     /// <summary>İstemcinin arayüz dili; <see cref="SendAsync{T}"/> dili belirtilmemiş her isteğe ekler (tepsi açılışta ayarlar).</summary>
     public static string? ClientLanguage { get; set; }
 
+    /// <summary>İstemcinin bölge ayarı (sayı biçimi kültürü); <see cref="SendAsync{T}"/> belirtilmemiş her isteğe ekler (1.8.2).</summary>
+    public static string? ClientCulture { get; set; }
+
     public static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
     /// <param name="firstInstance">Kanalın ilk örneği (<see cref="PipeOptions.FirstPipeInstance"/>): ad başka bir sürecin
@@ -154,16 +178,27 @@ public static class PipeProtocol
 
     /// <param name="maxBytes">Satır sınırı: sunucu istekleri <see cref="MaxMessageBytes"/>'la, istemci yanıtları
     /// <see cref="MaxResponseBytes"/>'la okur. Aşılırsa <see cref="InvalidDataException"/>.</param>
+    /// <remarks>
+    /// Arabellekli okur (1.8.2; önceden bayt bayt <c>await ReadAsync</c>: 72 KB'lık yanıt 72 000 iş parçacığı geçişiydi, ağır
+    /// işlemci yükünde saniyeler sürüyordu). Satır sonundan sonra okunan baytlar atılır: bağlantı başına tek istek, tek yanıt.
+    /// Satırın içeriği <paramref name="maxBytes"/>'tan kısa olmalı (eskisi gibi).
+    /// </remarks>
     public static async Task<string?> ReadLineAsync(Stream s, CancellationToken ct, int maxBytes = MaxMessageBytes)
     {
-        var buf = new List<byte>(256);
-        var one = new byte[1];
-        while (buf.Count < maxBytes)
+        var buf = new MemoryStream();
+        var chunk = new byte[Math.Min(16 * 1024, maxBytes)];
+        while (buf.Length < maxBytes)
         {
-            int n = await s.ReadAsync(one, ct);
-            if (n == 0) return buf.Count == 0 ? null : Encoding.UTF8.GetString([.. buf]);
-            if (one[0] == (byte)'\n') return Encoding.UTF8.GetString([.. buf]);
-            buf.Add(one[0]);
+            int want = (int)Math.Min(chunk.Length, maxBytes - buf.Length);
+            int n = await s.ReadAsync(chunk.AsMemory(0, want), ct);
+            if (n == 0) return buf.Length == 0 ? null : Encoding.UTF8.GetString(buf.GetBuffer(), 0, (int)buf.Length);
+            int newline = Array.IndexOf(chunk, (byte)'\n', 0, n);
+            if (newline >= 0)
+            {
+                buf.Write(chunk, 0, newline);
+                return Encoding.UTF8.GetString(buf.GetBuffer(), 0, (int)buf.Length);
+            }
+            buf.Write(chunk, 0, n);
         }
         throw new InvalidDataException(WinText.T("Ipc.MessageTooLong"));
     }
@@ -174,6 +209,15 @@ public static class PipeProtocol
         await s.WriteAsync(bytes, ct);
         await s.FlushAsync(ct);
     }
+
+    /// <summary>
+    /// <see cref="SendAsync{T}"/>'in "hizmete ulaşılamadı" sayılan bütün hataları (1.8.2): bağlanamama/süre (Timeout,
+    /// OperationCanceled), kanal kopması ve güvenilmeyen sunucu (IOException), erişim reddi (UnauthorizedAccess), aşırı uzun yanıt
+    /// (InvalidData), bozuk yanıt (Json). Tepsinin ve rapor istemcisinin her isteği bununla yakalar: önceden bazı istekler yalnız
+    /// ilk üçünü yakalıyordu, öbürleri tepsiyi düşürebiliyordu.
+    /// </summary>
+    public static bool IsChannelFailure(Exception e) =>
+        e is TimeoutException or IOException or OperationCanceledException or UnauthorizedAccessException or InvalidDataException or JsonException;
 
     /// <summary>İstemci tarafı: tek istek gönderir, yanıtı döndürür. Hizmet çalışmıyorsa TimeoutException/IOException.</summary>
     public static async Task<T?> SendAsync<T>(Request request, TimeSpan timeout, CancellationToken ct = default)
@@ -186,7 +230,9 @@ public static class PipeProtocol
         // çalışamaz. Denetlenemezse de güvenilmez sayılır; isteğin tek baytı gitmez.
         if (RequiresServiceSession(PipeName) && !(GetNamedPipeServerSessionId(client.SafePipeHandle, out uint session) && session == 0))
             throw new UntrustedServerException(WinText.T("Ipc.UntrustedServer", PipeName));
-        await WriteLineAsync(client, request.Lang is null && ClientLanguage is not null ? request with { Lang = ClientLanguage } : request, cts.Token);
+        if (request.Lang is null && ClientLanguage is not null) request = request with { Lang = ClientLanguage };
+        if (request.Culture is null && ClientCulture is not null) request = request with { Culture = ClientCulture };
+        await WriteLineAsync(client, request, cts.Token);
         var line = await ReadLineAsync(client, cts.Token, MaxResponseBytes);
         return line is null ? default : JsonSerializer.Deserialize<T>(line, Json);
     }

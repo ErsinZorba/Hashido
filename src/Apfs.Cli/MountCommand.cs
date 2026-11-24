@@ -29,7 +29,8 @@ internal static partial class MountCommand
         {
             foreach (var volume in volumes)
             {
-                var mount = ApfsMount.Mount(volume, mountPoint, msg => Console.Error.WriteLine(WinText.T("Cli.MountWarning", msg)));
+                Action<string> warn = msg => Console.Error.WriteLine(WinText.T("Cli.MountWarning", msg));
+                var mount = ApfsMount.Mount(volume, mountPoint, warn, onLog: warn);
                 mount.FileSystem.Stats.Enabled = o.Has("--stats");
                 mounts.Add(mount);
                 Console.WriteLine(WinText.T("Cli.Mounted", mount.MountPoint, volume.Name, (volume.RoleName.Length > 0 ? $" [{volume.RoleName}]" : ""), (mount.FileSystem.KernelReadOnlyFlagSet ? "" : WinText.T("Cli.KernelFlagNotSet"))));
@@ -124,7 +125,8 @@ internal static partial class MountCommand
                 if (volumes.Count == 0) throw new ApfsException(ApfsErrorCode.NotFound, WinText.T("Cli.NoMountableVolume"));
                 foreach (var volume in volumes)
                 {
-                    var m = ApfsMount.Mount(volume, volumes.Count == 1 ? mountPoint : null, msg => ServiceLog.Write($"{disk}: {msg}"));
+                    Action<string> log = msg => ServiceLog.Write($"{disk}: {msg}");
+                    var m = ApfsMount.Mount(volume, volumes.Count == 1 ? mountPoint : null, log, onLog: log);
                     _mounts.Add(m);
                     ServiceLog.Write(WinText.T("Cli.LauncherMounted", disk, volume.Name, m.MountPoint));
                 }

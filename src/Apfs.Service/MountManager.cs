@@ -27,11 +27,15 @@ internal sealed class MountManager : IDisposable
     private readonly Lock _gate = new();
     private readonly Dictionary<string, TrackedDisk> _disks = new(StringComparer.OrdinalIgnoreCase);
     private readonly List<Notice> _notices = [];
-    private readonly Dictionary<string, DateTime> _recentNotices = [];
-    private readonly Dictionary<string, DateTime> _recentQueued = []; // AddNotice queueKey → son kuyruğa giriş
+    // Seyreltmeler tekdüze saatle ve sınırlı (1.8.2): saat geri alınınca iletiler susmaz, düşmanca klasörün sayısız farklı
+    // iletisi belleği büyütmez
+    private readonly RecentKeys _recentNotices = new(); // AddNotice throttleKey (ve "unreadable#disk") → günlük/bildirim seyreltmesi
+    private readonly RecentKeys _recentQueued = new();  // AddNotice queueKey → kuyruk seyreltmesi
     private readonly IReadOnlyList<string>? _imageSources;
     private readonly HashSet<string> _released = new(StringComparer.OrdinalIgnoreCase); // güvenli kaldırma sonrası yeniden bağlanmasın
     private long _noticeId;
+    /// <summary>Bu hizmet çalışmasının kimliği ("status" yanıtında): tepsi hizmetin yeniden başladığını buradan anlar.</summary>
+    private readonly string _instance = Guid.NewGuid().ToString("N");
     private readonly ReportRecorder? _reports;
     private readonly Dictionary<string, int> _devOpenAttempts = new(StringComparer.OrdinalIgnoreCase); // APFS_DEV_OPEN_FAILURES
 
@@ -47,17 +51,25 @@ internal sealed class MountManager : IDisposable
     /// Takılı bir disk. <see cref="Device"/> diskin tamamını salt okunur açar (bütün salt okunur kapsayıcılar ve kimlik denetimi
     /// bunu kullanır). Yazmaya açılan her APFS bölümünün kendi oturumu ve yazma tanıtıcısı vardır (<see cref="Writes"/>).
     /// </summary>
-    private sealed class TrackedDisk(string key, IBlockDevice device, string description)
+    private sealed class TrackedDisk(string key, IBlockDevice device)
     {
         public string Key { get; } = key;
         public IBlockDevice Device { get; } = device;
         /// <summary>Takıldığındaki APFS kimliği (<see cref="PartitionLocator.Fingerprint"/>); değişirse disk başka bir programca değiştirilmiştir.</summary>
         public string Fingerprint { get; set; } = "";
-        public string Description { get; } = description;
+        /// <summary>Takıldığındaki boyut (aygıt bırakıldıktan sonra da başlık yazılabilsin).</summary>
+        private readonly long _length = device.Length;
+        /// <summary>
+        /// Disk başlığı ("Disk 2 (1,81 TB)"; tepsi, menü, bildirimler, yanıtlar). Kullanıldığı ANDA üretilir (1.8.2): o anki
+        /// arayüz dili ve sayı biçimiyle — istek sürerken isteyeninki, kendiliğinden işte varsayılan (<see cref="ServiceLanguage"/>).
+        /// </summary>
+        public string Description => DescribeDisk(Key, _length);
         /// <summary>APFS bölüm sırası → salt okunur açılmış kapsayıcı (yazmaya açık bölümde yok; onu oturum tutar).</summary>
         public Dictionary<int, ApfsContainer> Containers { get; } = [];
         public List<TrackedVolume> Volumes { get; } = [];
         public DeviceNotifications.Registration? RemovalWatch { get; set; }
+        /// <summary>Disk bırakılınca (çıkarma, içerik değişimi, hizmet durması) iptal edilir: süren kilit açma kayıtlar arasında durur.</summary>
+        public CancellationTokenSource Released { get; } = new();
         /// <summary>APFS bölüm sırası → yazma oturumu (o bölüm yazmaya açıksa).</summary>
         public Dictionary<int, ContainerWrite> Writes { get; } = [];
         /// <summary>APFS bölüm sırası → son "yazmaya izin ver" denemesinin ret nedeni.</summary>
@@ -176,19 +188,20 @@ internal sealed class MountManager : IDisposable
     /// </summary>
     private static readonly TimeSpan UnreadableGrace = TimeSpan.FromSeconds(20);
 
-    /// <summary>Disk anahtarı → okunamadığı ilk an (<see cref="_gate"/> altında); okunabilince ya da kaybolunca silinir.</summary>
-    private readonly Dictionary<string, DateTime> _unreadableSince = new(StringComparer.OrdinalIgnoreCase);
+    /// <summary>Disk anahtarı → okunamadığı ilk an (<see cref="Environment.TickCount64"/>, <see cref="_gate"/> altında); okunabilince ya
+    /// da kaybolunca silinir.</summary>
+    private readonly Dictionary<string, long> _unreadableSince = new(StringComparer.OrdinalIgnoreCase);
 
     private void OnDiskUnreadable(string key, Exception e)
     {
-        var now = DateTime.UtcNow;
+        long now = Environment.TickCount64; // tekdüze saat
         bool first, warn = false;
         TimeSpan elapsed;
         lock (_gate)
         {
-            first = !_unreadableSince.TryGetValue(key, out var since);
+            first = !_unreadableSince.TryGetValue(key, out long since);
             if (first) _unreadableSince[key] = since = now;
-            elapsed = now - since;
+            elapsed = TimeSpan.FromMilliseconds(now - since);
             if (elapsed >= UnreadableGrace) warn = _unreadableWarned.Add(key);
         }
         if (elapsed < UnreadableGrace)
@@ -204,11 +217,7 @@ internal sealed class MountManager : IDisposable
         {
             // Sonraki hatalar yalnız günlüğe, önceki gibi dakikada bir (hata iletisi değişse de iz kalsın)
             bool log;
-            lock (_gate)
-            {
-                log = !_recentNotices.TryGetValue("unreadable#" + key, out var last) || now - last >= TimeSpan.FromMinutes(1);
-                if (log) _recentNotices["unreadable#" + key] = now;
-            }
+            lock (_gate) log = _recentNotices.TryMark("unreadable#" + key, TimeSpan.FromMinutes(1));
             if (log) ServiceLog.Write($"[{level}] {text}"); // AddNotice'in günlük satırıyla aynı biçim
         }
     }
@@ -258,7 +267,7 @@ internal sealed class MountManager : IDisposable
 
     private void AttachDisk(string key, IBlockDevice device)
     {
-        var disk = new TrackedDisk(key, device, DescribeDisk(key, device)) { Fingerprint = PartitionLocator.Fingerprint(device) };
+        var disk = new TrackedDisk(key, device) { Fingerprint = PartitionLocator.Fingerprint(device) };
         int count = PartitionLocator.FindApfsPartitions(device).Count;
         disk.Facts = new DiskFacts(device is RawDiskDevice r ? ReportEvents.BusToken(r.QueryBusType() ?? -1) : "image", device.SectorSize,
             PartitionLocator.LooksLikeContainer(device, 0) ? "none" : "gpt", count);
@@ -421,8 +430,9 @@ internal sealed class MountManager : IDisposable
         }
         try
         {
-            string description = disk.Description, volumeKey = $"{disk.Key}#{tv.ContainerIndex}#{tv.Index}";
-            var m = ApfsMount.Mount(v, null, msg => OnFileError(description, v.Name, volumeKey, msg));
+            string volumeKey = $"{disk.Key}#{tv.ContainerIndex}#{tv.Index}";
+            var m = ApfsMount.Mount(v, null, msg => OnFileError(disk, v.Name, volumeKey, msg),
+                onLog: msg => ServiceLog.Write($"{disk.Description} \"{v.Name}\": {msg}"));
             tv.Mount = m;
             tv.State = VolumeStatus.Mounted;
             tv.Message = null;
@@ -439,6 +449,85 @@ internal sealed class MountManager : IDisposable
     }
 
     // ---------------- Parola ----------------
+
+    /// <summary>
+    /// Parola denemesi sınırı (1.8.2; kullanıcı kararı 2026-11-24 "disk kimliğine bağla"): sayaç bölümün APFS kimliği
+    /// (kapsayıcı UUID'si) + deneyen hesabın SID'i başına, hizmetin belleğinde. İlk <see cref="FreeAttempts"/> yanlış beklemesiz;
+    /// sonra her deneme 1, 2, 4… en çok <see cref="MaxDelayUnits"/> birim (1 sn) bekler — eşzamansız, <see cref="_gate"/> ve
+    /// <c>Switching</c> dışında. Doğru parolada sıfırlanır; disk çıkarılıp takılınca SÜRER (çıkar + yeniden tara döngüsüyle aşılmasın),
+    /// başka disk kendi sayacını alır. Başka hesabın denemeleri sahibini bekletmez. Aynı sayaca bekleyen/süren deneme varken yenisi
+    /// "önceki istek bitmedi". Toplam: kilit açma bütçesi (≤ ~20 sn) + 20 sn, tepsinin 60 sn'sinin altında. Arayüz metni değişmez.
+    /// </summary>
+    private sealed class UnlockAttempts
+    {
+        public int Failures;
+        public bool Busy;
+        public long LastUse;
+    }
+
+    private const int FreeAttempts = 5, MaxDelayUnits = 20, MaxAttemptCounters = 1024;
+    private readonly Dictionary<string, UnlockAttempts> _attempts = new(StringComparer.Ordinal); // _gate altında
+
+    /// <summary>Bekleme birimi: 1 sn; yalnız geliştirme modunda (testler) <c>APFS_DEV_UNLOCK_DELAY_UNIT_MS</c> ile kısaltılır.</summary>
+    private int DelayUnitMs =>
+        _imageSources is not null && int.TryParse(Environment.GetEnvironmentVariable("APFS_DEV_UNLOCK_DELAY_UNIT_MS"), out int ms) && ms > 0 ? ms : 1000;
+
+    /// <summary>Kanaldan gelen kilit açma: deneme sınırından geçer, sonra <see cref="Unlock"/>.</summary>
+    /// <param name="caller">İsteyen hesabın SID'i (öğrenilemezse "?").</param>
+    public async Task<UnlockResponse> UnlockAsync(string diskKey, int container, int volumeIndex, string password, string caller)
+    {
+        UnlockAttempts? attempts = null;
+        int delayMs = 0;
+        lock (_gate)
+        {
+            // Sayaç yalnız gerçekten parola bekleyen salt okunur bölümde (öbür durumlarda Unlock parolaya bakmadan reddeder)
+            if (_disks.GetValueOrDefault(diskKey) is { } disk && disk.Containers.GetValueOrDefault(container) is { } c
+                && disk.Volumes.Any(v => v.ContainerIndex == container && v.Index == volumeIndex && v.State == VolumeStatus.NeedsPassword))
+            {
+                string id = $"{c.Superblock.Uuid:D}|{caller}";
+                if (!_attempts.TryGetValue(id, out attempts))
+                {
+                    if (_attempts.Count >= MaxAttemptCounters) ForgetOldestAttempts();
+                    _attempts[id] = attempts = new UnlockAttempts();
+                }
+                if (attempts.Busy) return new UnlockResponse(false, WinText.U("Write.PreviousRequestPending"));
+                attempts.Busy = true;
+                attempts.LastUse = Environment.TickCount64;
+                if (attempts.Failures >= FreeAttempts)
+                    delayMs = DelayUnitMs * Math.Min(MaxDelayUnits, 1 << Math.Min(attempts.Failures - FreeAttempts, 5));
+            }
+        }
+        try
+        {
+            if (delayMs > 0)
+            {
+                ServiceLog.Write(WinText.T("Svc.UnlockDelayed", diskKey, delayMs));
+                await Task.Delay(delayMs);
+            }
+            var r = await Task.Run(() => Unlock(diskKey, container, volumeIndex, password));
+            if (attempts is not null)
+                lock (_gate)
+                {
+                    if (r.Ok) attempts.Failures = 0;
+                    else if (r.Code == nameof(ApfsErrorCode.WrongPassword)) attempts.Failures++;
+                }
+            return r;
+        }
+        finally
+        {
+            if (attempts is not null) lock (_gate) attempts.Busy = false;
+        }
+    }
+
+    /// <summary>Sayaç sınırı dolunca en uzun süredir kullanılmayan boştaki sayaç bırakılır (<see cref="_gate"/> altında).</summary>
+    private void ForgetOldestAttempts()
+    {
+        string? oldest = null;
+        long when = long.MaxValue;
+        foreach (var (id, a) in _attempts)
+            if (!a.Busy && a.LastUse < when) (oldest, when) = (id, a.LastUse);
+        if (oldest is not null) _attempts.Remove(oldest);
+    }
 
     /// <param name="container">APFS bölüm sırası (birim sırası bölüm içindedir; çok bölümlü diskte ikisi de gerekir).</param>
     public UnlockResponse Unlock(string diskKey, int container, int volumeIndex, string password)
@@ -467,22 +556,38 @@ internal sealed class MountManager : IDisposable
         }
     }
 
+    /// <remarks>
+    /// 1.8.2: kilit açma sürerken disk bırakılabilir (Güvenle çıkar, kablo, içerik değişti). <see cref="ReleaseDisk"/> o anda
+    /// diskin anahtarlarını siler ve bağlı sürücülerini ayırır; ama bu çağrının henüz eklemediği anahtarı ve henüz bağlamadığı
+    /// sürücüyü göremez. Bu yüzden anahtar ancak disk hâlâ listedeyken eklenir (<see cref="_gate"/> altında: ekleme ya bırakmadan
+    /// önce olur — bırakma onu siler — ya da hiç olmaz), bağlamadan sonra yeniden bakılır: disk gittiyse sürücü burada ayrılır ve
+    /// "bağlandı" denmez (önceden sahipsiz bir sürücü harfi, yanlış "bağlandı" yanıtı ve bellekte kalan anahtar olabiliyordu).
+    /// </remarks>
     private UnlockResponse UnlockCore(TrackedDisk disk, TrackedVolume tv, int container, string password)
     {
         VolumeKey? key = null;
+        Guid? uuid = null;
+        UnlockResponse? gone = null;
         var watch = Stopwatch.StartNew();
         try
         {
-            var uuid = tv.Container.VolumeUuid(tv.Oid);
-            key = VolumeKey.Unlock(tv.Container, uuid, password);
+            uuid = tv.Container.VolumeUuid(tv.Oid);
+            key = VolumeKey.Unlock(tv.Container, uuid.Value, password, disk.Released.Token);
             var v = ApfsVolume.Open(tv.Container, tv.Oid, key);
+            // Yalnız geliştirme modu (testler): kilit açma ↔ çıkarma yarışını sınamak için pencereyi genişletir — anahtar türetildi, henüz eklenmedi
+            DevPause("APFS_DEV_UNLOCK_DELAY_MS");
             lock (_gate)
             {
-                if (disk.Keys.Remove(uuid, out var old)) old.Dispose();
-                disk.Keys[uuid] = key;
+                if (!IsAttached(disk)) return gone = DiskGoneDuringUnlock(disk, tv, uuid); // anahtar eklenmez, finally siler
+                if (disk.Keys.Remove(uuid.Value, out var old)) old.Dispose();
+                disk.Keys[uuid.Value] = key;
             }
-            key = null; // sahipliği diske geçti
+            key = null; // sahipliği diske geçti (disk bundan sonra bırakılırsa ReleaseDisk siler)
             TryMount(disk, tv, v, notifyFailure: false); // sonuç yalnız yanıtta: tepsi balonu ya da parola penceresi
+            DevPause("APFS_DEV_UNLOCK_MOUNTED_DELAY_MS"); // yalnız geliştirme modu: birim bağlandı, yanıt henüz yok
+            bool attached;
+            lock (_gate) attached = IsAttached(disk);
+            if (!attached) return gone = DiskGoneDuringUnlock(disk, tv, uuid);
             _reports?.Record(() => Event("unlock", tv.State == VolumeStatus.Mounted ? "ok" : "fail", disk, container)
                 .WithCode(tv.FailureCode).WithDuration(watch.Elapsed));
             return tv.State == VolumeStatus.Mounted
@@ -491,15 +596,60 @@ internal sealed class MountManager : IDisposable
         }
         catch (ApfsException e)
         {
+            // Bu arada bırakılan diskte (PBKDF2 iptal edildi, aygıt kapandı) sonuç parola hakkında bir şey söylemez
+            bool attached;
+            lock (_gate) attached = IsAttached(disk);
+            if (!attached) return gone = DiskGoneDuringUnlock(disk, tv, uuid);
             // Parola yanlışsa günlüğe yalnızca olay yazılır, parola asla.
             ServiceLog.Write(WinText.T("Svc.UnlockFailed", disk.Key, tv.Name, e.Code));
             _reports?.Record(() => Event("unlock", "fail", disk, container).WithCode(e.Code.ToString()).WithDuration(watch.Elapsed));
             return new UnlockResponse(false, e.Message, Code: e.Code.ToString());
         }
+        catch (ObjectDisposedException)
+        {
+            // Bırakılan diskin kapsayıcısı/aygıtı kapatıldı (önceden yakalanmıyordu: istek yanıtsız kalıyordu)
+            return gone = DiskGoneDuringUnlock(disk, tv, uuid);
+        }
         finally
         {
             key?.Dispose();
+            // Yalnız geliştirme modu (testler): yarıştan sonra bellekte kalan anahtar sayısı (0 olmalı)
+            if (gone is not null && _imageSources is not null) ServiceLog.Write($"APFS_DEV_LIVE_KEYS {VolumeKey.LiveCount}");
         }
+    }
+
+    /// <summary>
+    /// Yalnız geliştirme modu (testler, <c>--image</c>): ortam değişkeninde ms verilmişse günlüğe değişkenin adını yazıp o kadar bekler
+    /// (test o satırı görünce yarışan isteği gönderir).
+    /// </summary>
+    private void DevPause(string variable)
+    {
+        if (_imageSources is null || !int.TryParse(Environment.GetEnvironmentVariable(variable), out int ms)) return;
+        ServiceLog.Write(variable);
+        Thread.Sleep(ms);
+    }
+
+    /// <summary>Disk hâlâ bu nesneyle listede mi (<see cref="_gate"/> altında çağrılır).</summary>
+    private bool IsAttached(TrackedDisk disk) => _disks.TryGetValue(disk.Key, out var current) && ReferenceEquals(current, disk);
+
+    /// <summary>
+    /// Kilit açılırken disk bırakıldı: bu çağrının bağladığı sürücü (bırakma onu görmediyse) ayrılır; yanıt "disk artık takılı
+    /// değil", kod yok (tepsi kayıtlı parolaya dokunmaz). Anahtarı finally (eklenmediyse) ya da bırakma siler; bırakmadan SONRA
+    /// eklenmiş olsa da (ekleme öncesi denetim bunu zaten önler) burada silinir: hiçbir yolda bellekte kalmaz.
+    /// </summary>
+    private UnlockResponse DiskGoneDuringUnlock(TrackedDisk disk, TrackedVolume tv, Guid? uuid)
+    {
+        ApfsMount? mount;
+        VolumeKey? orphan = null;
+        lock (_gate)
+        {
+            (mount, tv.Mount) = (tv.Mount, null);
+            if (uuid is Guid u && disk.Keys.Remove(u, out var k)) orphan = k;
+        }
+        orphan?.Dispose();
+        try { mount?.Dispose(); } catch (Exception e) { ServiceLog.Write(WinText.T("Svc.UnmountError", disk.Key, e.Message)); }
+        ServiceLog.Write(WinText.T("Svc.UnlockDiskGone", disk.Key, tv.Name));
+        return new UnlockResponse(false, WinText.U("Disk.Gone"));
     }
 
     // ---------------- Çıkarma ----------------
@@ -512,27 +662,44 @@ internal sealed class MountManager : IDisposable
     public UnlockResponse Eject(string diskKey, bool force = false)
     {
         TrackedDisk? disk;
-        List<string> busy;
-        lock (_gate)
-        {
-            disk = _disks.GetValueOrDefault(diskKey);
-            busy = disk is null ? [] : BusyVolumes(disk);
-        }
+        lock (_gate) disk = _disks.GetValueOrDefault(diskKey);
         if (disk is null) return new UnlockResponse(false, WinText.U("Disk.Gone"));
-        if (!force && busy.Count > 0)
+        List<string> busy = force ? [] : BusyAfterSecondLook(disk);
+        List<Action<bool>> refuseOpens = [];
+        if (busy.Count == 0)
         {
+            // Ayırma kararı verildi: yeni açılışlar reddedilir — karar ile ayırma arasında başlayan kopyalama yarıda
+            // kesilmesin, hiç başlamasın. Denetimi reddin açılmasından önce geçmiş, henüz sayılmamış açılışlar biter (en çok
+            // OpeningWaitMs); sonra açık dosya varsa yine "kullanımda" ve açılışlar geri açılır. Uyarı verilecekse ret hiç açılmaz:
+            // kullanıcıya "kopyalama sürüyor" sorulurken kopyanın sonraki dosyası reddedilmesin.
+            lock (_gate) refuseOpens = OpenGates(disk);
+            foreach (var refuse in refuseOpens) refuse(true);
+            bool settled = WaitForOpens(disk);
+            if (!force)
+                lock (_gate)
+                    busy = settled
+                        ? [.. disk.Volumes.Where(v => OpenFiles(v) > 0).Select(VolumeLabel)]
+                        : [.. disk.Volumes.Where(v => OpenFiles(v) + Opening(v) > 0).Select(VolumeLabel)];
+        }
+        if (busy.Count > 0)
+        {
+            foreach (var refuse in refuseOpens) refuse(false);
             ServiceLog.Write(WinText.T("Svc.EjectDeferred", diskKey, string.Join(", ", busy)));
             _reports?.Record(() => Event("eject", "busy", disk, null));
             return new UnlockResponse(false,
                 WinText.U("Eject.Busy", disk.Description, string.Join(", ", busy)), Busy: true);
         }
+        // Yalnız geliştirme modu (testler): karar ile ayırma arasındaki pencereyi genişletir (bu arada açılış reddedilmeli)
+        DevPause("APFS_DEV_EJECT_DELAY_MS");
 
         DiskEjector.Target? target = null;
         if (_imageSources is null && diskKey.StartsWith("PhysicalDrive", StringComparison.OrdinalIgnoreCase)
             && int.TryParse(diskKey.AsSpan(13), out int number))
             target = DiskEjector.Find(number);
 
-        ReleaseDisk(diskKey, "", rememberReleased: true, notify: false, closeKind: "eject");
+        // Yalnız denetlenen disk nesnesi (ikinci bakış sırasında çekilip yeniden takılan diskin yerine geçen yeni nesne değil)
+        if (!ReleaseDisk(diskKey, "", rememberReleased: true, notify: false, closeKind: "eject", expected: disk))
+            return new UnlockResponse(false, WinText.U("Disk.Gone"));
         if (target is not { Removable: true })
         {
             _reports?.Record(() => Event("eject", "detached", disk, null));
@@ -548,7 +715,7 @@ internal sealed class MountManager : IDisposable
         }
         ServiceLog.Write(WinText.T("Svc.EjectRefused", diskKey, error));
         lock (_gate) _released.Remove(diskKey);
-        ThreadPool.QueueUserWorkItem(_ => Rescan());
+        QueueRescan();
         return new UnlockResponse(false, WinText.U("Eject.Remounting", error));
     }
 
@@ -557,7 +724,72 @@ internal sealed class MountManager : IDisposable
     private static List<string> BusyVolumes(TrackedDisk disk, int? container = null) =>
         [.. disk.Volumes.Where(v => container is null || v.ContainerIndex == container)
             .Where(v => v.Mount?.FileSystem.IsBusy == true || v.WritableMount?.FileSystem.IsBusy == true)
-            .Select(v => $"{v.Mount?.MountPoint ?? v.WritableMount?.MountPoint} \"{v.Name}\"")];
+            .Select(VolumeLabel)];
+
+    private static string VolumeLabel(TrackedVolume v) => $"{v.Mount?.MountPoint ?? v.WritableMount?.MountPoint} \"{v.Name}\"";
+
+    /// <summary>
+    /// Güvenle çıkar'ın ikinci bakışının en uzun süresi ve "sessiz" sayılan süre. Sessizlik ilk bakışınkiyle (IsBusy) aynı
+    /// 3 sn: dosyalar arasında 1–3 sn duraklayan kopya (yavaş hedef, her dosyayı tarayan virüs koruması) eskisi gibi yakalanır.
+    /// </summary>
+    private const int SecondLookMs = 4500, QuietMs = 3000;
+
+    /// <summary>Reddi açtıktan sonra süren açılışların bitmesi için en uzun bekleme.</summary>
+    private const int OpeningWaitMs = 5000;
+
+    private static int OpenFiles(TrackedVolume v) => (v.Mount?.FileSystem.OpenFileCount ?? 0) + (v.WritableMount?.FileSystem.OpenFileCount ?? 0);
+    private static int Opening(TrackedVolume v) => (v.Mount?.FileSystem.OpeningCount ?? 0) + (v.WritableMount?.FileSystem.OpeningCount ?? 0);
+
+    /// <summary>Diskin bütün sürücülerinde süren açılışlar bitene dek bekler (en çok <see cref="OpeningWaitMs"/>); bittiyse true.</summary>
+    private bool WaitForOpens(TrackedDisk disk)
+    {
+        long until = Environment.TickCount64 + OpeningWaitMs;
+        while (true)
+        {
+            int opening;
+            lock (_gate) opening = disk.Volumes.Sum(Opening);
+            if (opening == 0) return true;
+            if (Environment.TickCount64 >= until) return false;
+            Thread.Sleep(10);
+        }
+    }
+
+    /// <summary>
+    /// Güvenle çıkar'ın meşguliyet denetimi (1.8.2). İlk bakış eskisi gibi (açık dosya ya da son 3 sn'de okuma); meşgul
+    /// görünürse uyarmadan önce kısa bir ikinci bakış: Gezgin'in önizleme/küçük resmi ya da virüs taraması dosyayı birkaç yüz ms
+    /// açık tutup okur ve bırakır, önceden "kopyalama sürüyor gibi" yanlış alarmı veriyordu. En çok <see cref="SecondLookMs"/>
+    /// beklenir; açık dosya kalmadıysa ve son <see cref="QuietMs"/>'de okuma/yazma olmadıysa meşgul değil. Kopya sürerse (yeni
+    /// okuma, açık dosya) ve uzun yaşayan tanıtıcıda (oynatıcı) uyarı verilir.
+    /// </summary>
+    private List<string> BusyAfterSecondLook(TrackedDisk disk)
+    {
+        List<string> busy;
+        lock (_gate) busy = BusyVolumes(disk);
+        if (busy.Count == 0) return busy;
+        long until = Environment.TickCount64 + SecondLookMs;
+        while (true)
+        {
+            Thread.Sleep(100);
+            long now = Environment.TickCount64;
+            lock (_gate)
+                busy = [.. disk.Volumes.Where(v => OpenFiles(v) > 0
+                        || now - Math.Max(v.Mount?.FileSystem.LastIoTicks ?? long.MinValue / 2, v.WritableMount?.FileSystem.LastIoTicks ?? long.MinValue / 2) < QuietMs)
+                    .Select(VolumeLabel)];
+            if (busy.Count == 0 || now >= until) return busy;
+        }
+    }
+
+    /// <summary>Diskin bağlı bütün sürücülerinin (iki tür) yeni açılışları reddetme anahtarları (<see cref="_gate"/> altında).</summary>
+    private static List<Action<bool>> OpenGates(TrackedDisk disk)
+    {
+        var list = new List<Action<bool>>();
+        foreach (var v in disk.Volumes)
+        {
+            if (v.Mount?.FileSystem is { } ro) list.Add(x => ro.RefuseOpens = x);
+            if (v.WritableMount?.FileSystem is { } rw) list.Add(x => rw.RefuseOpens = x);
+        }
+        return list;
+    }
 
     /// <summary>
     /// Tepsideki "Yazmaya izin ver" / "Salt okunura dön", APFS bölümü başına (<paramref name="container"/> = bölüm sırası; diskteki
@@ -605,7 +837,7 @@ internal sealed class MountManager : IDisposable
 
     private UnlockResponse EnableWrite(TrackedDisk disk, int container)
     {
-        string key = disk.Key, description = disk.Description;
+        string key = disk.Key;
         var watch = Stopwatch.StartNew();
         UnmountContainer(disk, container); // bölümün salt okunur sürücüleri; disk ve öbür bölümler bağlı kalır
 
@@ -663,11 +895,16 @@ internal sealed class MountManager : IDisposable
             // Yalnız geliştirme modu (testler): her yazma bariyeri hata verir → ilk commit düşer (WriteSession.Open bariyer kullanmaz)
             if (_imageSources is not null && Environment.GetEnvironmentVariable("APFS_DEV_COMMIT_FAIL") == "1")
                 raw = new DevFailingFlushDevice(raw, grant);
+            // Yalnız geliştirme modu (testler): kapatırken blok 0 yazımı hata verir (bölümsüz görüntü)
+            else if (_imageSources is not null && Environment.GetEnvironmentVariable("APFS_DEV_BLOCK0_FAIL") == "1")
+                raw = new DevFailingFlushDevice(raw, grant, block0Only: true);
             resources.Add(raw);
             var p = PartitionLocator.FindApfsPartitions(raw)[container];
             IWritableBlockDevice window = p.Offset == 0 && p.Length == raw.Length ? raw : new WritableOffsetDevice(raw, p.Offset, p.Length, grant);
             if (!ReferenceEquals(window, raw)) resources.Insert(0, window);
             var session = WriteSession.Open(window, grant);
+            // Commit kaydedildi ama ardından bir aygıt işlemi yapılamadı: yalnız günlük, oturum sağlam
+            session.Warning += msg => ServiceLog.Write($"{key}#{container}: {msg}");
             var thisWrite = write = new ContainerWrite(session, resources);
             var sc = session.Container;
             for (int i = 0; i < sc.Superblock.FsOids.Count; i++)
@@ -692,17 +929,18 @@ internal sealed class MountManager : IDisposable
             {
                 string name = tv.Name, volumeKey = $"{key}#{container}#{tv.Index}";
                 tv.WritableMount = ApfsWritableMount.Mount(session, tv.Index, null,
-                    msg => OnFileError(description, name, volumeKey, msg), closeSession: false,
+                    msg => OnFileError(disk, name, volumeKey, msg), closeSession: false,
                     // Değişiklik kaybı (kaydedilemedi/silinemedi) birim seyreltmesine girmez: kullanıcı onu başka yerden göremez.
                     // Çok birimde commit bütün oturumundur (hangi sürücünün zamanlayıcısı yazdıysa): ileti diskle, birim adı olmadan
-                    onChangeLost: msg => AddNotice("uyarı", many ? $"{description}: {msg}" : $"{description} \"{name}\": {msg}", throttleKey: msg),
+                    onChangeLost: msg => AddNotice("uyarı", many ? $"{disk.Description}: {msg}" : $"{disk.Description} \"{name}\": {msg}", throttleKey: msg),
                     // Commit düştü (oturum başına bir kez): oturum kaydedilmeden bırakılır, bölüm salt okunur bağlanır. Bu bir WinFsp
                     // geri çağrısı (Flush/zamanlayıcı, oturum kilidi altında): sürücü burada ayrılamaz → iş parçacığı havuzuna
                     onFaulted: msg =>
                     {
                         thisWrite.FaultMessage = msg;
                         QueueFault(key, container, thisWrite);
-                    });
+                    },
+                    onLog: msg => ServiceLog.Write($"{disk.Description} \"{name}\": {msg}"));
                 tv.State = VolumeStatus.Mounted;
             }
             if (raw is RawDiskWriter rw) write.RemovalWatch = DeviceNotifications.WatchHandle(rw.Handle, a => OnHandleEvent(key, a));
@@ -730,7 +968,7 @@ internal sealed class MountManager : IDisposable
             }
             else
             {
-                text = WinText.U("Notice.MountedWritableMany", description, string.Join(", ", writers.Select(t => t.WritableMount!.MountPoint)));
+                text = WinText.U("Notice.MountedWritableMany", disk.Description, string.Join(", ", writers.Select(t => t.WritableMount!.MountPoint)));
                 AddNotice("bilgi", text, requested: true);
             }
             _reports?.Record(() => Event("write-enable", "ok", disk, container).WithDuration(watch.Elapsed));
@@ -871,11 +1109,11 @@ internal sealed class MountManager : IDisposable
 
     /// <summary>Arızalı oturumun işini iş parçacığı havuzuna bırakır (WinFsp geri çağrısında sürücü ayırmak kilitlenir).</summary>
     private void QueueFault(string diskKey, int container, ContainerWrite write) =>
-        ThreadPool.QueueUserWorkItem(_ =>
+        ThreadPool.UnsafeQueueUserWorkItem(_ => // arka plan işi: çağıranın dili/biçimi taşınmaz
         {
             try { HandleFault(diskKey, container, write); }
             catch (Exception e) { ServiceLog.Write($"{diskKey}: {e.Message}"); }
-        });
+        }, null);
 
     /// <summary>
     /// Açık depo bildirimi #1: oturumun bir commit'i yarıda kaldı. Oturum bir daha yazamaz (<see cref="WriteSession.IsFaulted"/>);
@@ -911,10 +1149,22 @@ internal sealed class MountManager : IDisposable
         }
     }
 
+    /// <summary>
+    /// Arka planda tek tarama (Windows çıkarmayı reddetti). Arka plan işi: isteğin dili/biçimi taşınmaz. İstisna günlüğe yazılır
+    /// (1.8.2): iş parçacığı havuzunda yakalanmayan istisna hizmet sürecini düşürürdü.
+    /// </summary>
+    private void QueueRescan() =>
+        ThreadPool.UnsafeQueueUserWorkItem(_ =>
+        {
+            try { Rescan(); }
+            catch (Exception e) { ServiceLog.Write(WinText.T("Svc.ScanError", e.Message)); }
+        }, null);
+
     /// <summary>"Yeniden tara": daha önce ayrılmış (ama çıkarılmamış) diskler de yeniden bağlansın.</summary>
     public void ForgetReleased()
     {
         lock (_gate) _released.Clear();
+        RawDiskDevice.ForgetStalled(); // okuması yanıt vermediği için bir süre açılmayan diskler de
     }
 
     private void OnHandleEvent(string key, DeviceNotifications.NotifyAction action)
@@ -927,7 +1177,7 @@ internal sealed class MountManager : IDisposable
                 break;
             case DeviceNotifications.NotifyAction.QueryRemoveFailed:
                 lock (_gate) _released.Remove(key);
-                ThreadPool.QueueUserWorkItem(_ => Rescan());
+                QueueRescan();
                 break;
             case DeviceNotifications.NotifyAction.RemovePending:
             case DeviceNotifications.NotifyAction.RemoveComplete:
@@ -988,13 +1238,9 @@ internal sealed class MountManager : IDisposable
         {
             List<string> released;
             lock (_gate) released = [.. _released];
+            // Aygıt yolu \\.\ önekiyle (1.8.2): öneksiz ad göreli dosya yoluydu, çıkarılamayan disk hemen yeniden bağlanıyordu
             foreach (var key in released)
-            {
-                bool present;
-                try { using var dev = new RawDiskDevice(key); present = true; }
-                catch (ApfsException) { present = false; }
-                if (!present) lock (_gate) _released.Remove(key);
-            }
+                if (!RawDiskDevice.IsPresent(key)) lock (_gate) _released.Remove(key);
         }
     }
 
@@ -1007,16 +1253,18 @@ internal sealed class MountManager : IDisposable
     /// ilk çağrı BÜTÜN tanıtıcıları eşzamanlı kapatır (QueryRemove geri çağrısının içinde), sonrakiler bir şey bulmaz.
     /// </remarks>
     /// <param name="closeKind">Yazma oturumu varsa raporda kapanış biçimi (bkz. <see cref="CloseWrite"/>).</param>
-    private void ReleaseDisk(string key, string reason, bool rememberReleased, bool notify = true, bool abandonWrites = false,
+    /// <returns>true: disk bu çağrıyla bırakıldı; false: listede yoktu ya da <paramref name="expected"/> değildi.</returns>
+    private bool ReleaseDisk(string key, string reason, bool rememberReleased, bool notify = true, bool abandonWrites = false,
         TrackedDisk? expected = null, bool contentChanged = false, string closeKind = "removed")
     {
         TrackedDisk? disk;
         lock (_gate)
         {
-            if (!_disks.TryGetValue(key, out disk) || (expected is not null && !ReferenceEquals(disk, expected))) return;
+            if (!_disks.TryGetValue(key, out disk) || (expected is not null && !ReferenceEquals(disk, expected))) return false;
             _disks.Remove(key);
             if (rememberReleased) _released.Add(key);
         }
+        disk.Released.Cancel(); // süren kilit açma (PBKDF2) sıradaki kayda geçmeden dursun
         bool abandoned;
         List<TrackedVolume> mounted;
         List<int> writes;
@@ -1031,7 +1279,10 @@ internal sealed class MountManager : IDisposable
             foreach (int p in writes) CloseWrite(disk, p, abandonWrites, contentChanged ? "changed" : closeKind);
             foreach (var tv in mounted)
             {
-                try { tv.Mount?.Dispose(); } catch (Exception e) { ServiceLog.Write(WinText.T("Svc.UnmountError", key, e.Message)); }
+                // Sürücü alınıp boşaltılır (_gate altında): o anda kilit açan istek aynı sürücüyü ikinci kez ayırmasın
+                ApfsMount? mount;
+                lock (_gate) (mount, tv.Mount) = (tv.Mount, null);
+                try { mount?.Dispose(); } catch (Exception e) { ServiceLog.Write(WinText.T("Svc.UnmountError", key, e.Message)); }
             }
             List<ApfsContainer> containers;
             lock (_gate) containers = [.. disk.Containers.Values];
@@ -1044,10 +1295,10 @@ internal sealed class MountManager : IDisposable
         }
         if (contentChanged) _reports?.Record(() => Event("disk-changed", abandoned ? "abandoned" : "ok", disk, null));
         if (reason.Length > 0) ServiceLog.Write($"{key}: {reason}.");
-        if (!notify) return;
+        if (!notify) return true;
         // Salt okunur diskin kablosu çekildi: veri riski yok, kullanıcı biliyor (Windows da USB çekilince susar) → yalnız günlük.
         // Yazma oturumu vardıysa ya da içerik değiştiyse uyarı kalır. Karar türle verilir, çevrilmiş metinle değil.
-        if (closeKind == "removed" && !contentChanged && writes.Count == 0) return;
+        if (closeKind == "removed" && !contentChanged && writes.Count == 0) return true;
         var names = mounted.Where(v => v.State == VolumeStatus.Mounted).Select(v => $"\"{v.Name}\"").ToList();
         string text = $"{disk.Description}{(names.Count > 0 ? " (" + string.Join(", ", names) + ")" : "")} {reason}.";
         if (abandoned)
@@ -1055,6 +1306,7 @@ internal sealed class MountManager : IDisposable
                 ? WinText.U("Release.UnsavedNotWrittenChanged")
                 : WinText.U("Release.UnsavedLost"));
         AddNotice(abandoned ? "uyarı" : "bilgi", text);
+        return true;
     }
 
     // ---------------- Raporlama ----------------
@@ -1084,7 +1336,7 @@ internal sealed class MountManager : IDisposable
                 Writable: d.Writes.Count > 0,
                 WriteBlockReason: d.WriteBlockReasons.OrderBy(r => r.Key).Select(r => r.Value).FirstOrDefault())).ToList();
             // Bildirimler bayt bütçesiyle (en yeniler kalır; LastNoticeId değişmez): yanıt 64 KiB'ı aşınca tepsi çöküyordu
-            return new StatusResponse(disks, PipeProtocol.NewestWithinBudget(_notices.Where(n => n.Id > since).ToList()), _noticeId);
+            return new StatusResponse(disks, PipeProtocol.NewestWithinBudget(_notices.Where(n => n.Id > since).ToList()), _noticeId, _instance);
         }
     }
 
@@ -1100,21 +1352,12 @@ internal sealed class MountManager : IDisposable
     {
         lock (_gate)
         {
-            var now = DateTime.UtcNow;
-            if (throttleKey is not null)
-            {
-                if (_recentNotices.TryGetValue(throttleKey, out var last) && now - last < TimeSpan.FromMinutes(1)) return;
-                _recentNotices[throttleKey] = now;
-            }
-            bool queue = true;
-            if (queueKey is not null)
-            {
-                queue = !_recentQueued.TryGetValue(queueKey, out var last) || now - last >= queueWindow;
-                if (queue) _recentQueued[queueKey] = now;
-            }
+            if (throttleKey is not null && !_recentNotices.TryMark(throttleKey, TimeSpan.FromMinutes(1))) return;
+            bool queue = queueKey is null || _recentQueued.TryMark(queueKey, queueWindow);
             if (queue)
             {
-                _notices.Add(new Notice(++_noticeId, level, text, DateTime.Now, requested));
+                // Kuyruktaki metin kısaltılır (tek bildirim yanıt bütçesine sığsın); günlüğe tamamı
+                _notices.Add(new Notice(++_noticeId, level, PipeProtocol.ClampNoticeText(text), DateTime.Now, requested));
                 if (_notices.Count > 200) _notices.RemoveAt(0);
             }
         }
@@ -1127,16 +1370,17 @@ internal sealed class MountManager : IDisposable
     /// </summary>
     private static readonly TimeSpan FileErrorNoticeWindow = TimeSpan.FromMinutes(10);
 
-    private void OnFileError(string description, string volumeName, string volumeKey, string msg) =>
-        AddNotice("uyarı", $"{description} \"{volumeName}\": {msg}", throttleKey: msg, queueKey: volumeKey, queueWindow: FileErrorNoticeWindow);
+    private void OnFileError(TrackedDisk disk, string volumeName, string volumeKey, string msg) =>
+        AddNotice("uyarı", $"{disk.Description} \"{volumeName}\": {msg}", throttleKey: msg, queueKey: volumeKey, queueWindow: FileErrorNoticeWindow);
 
     /// <summary>
     /// Disk başlığı (tepsi, menü, bildirimler). Boyut birim satırı ve Gezgin gibi ikili birimle, tek biçimleyiciden
-    /// (<see cref="SizeText"/>; 1.7.1'e dek ondalıktı: 1 TB disk "1000,2 GB", birim satırı "931 GB").
+    /// (<see cref="SizeText"/>; 1.7.1'e dek ondalıktı: 1 TB disk "1000,2 GB", birim satırı "931 GB"). Sayı biçimi isteyenin bölge
+    /// ayarı (önceden hizmetin sistem yereli: birim satırı "1,81 TB" iken başlık "1.81 TB" olabiliyordu).
     /// </summary>
-    private static string DescribeDisk(string key, IBlockDevice device)
+    private static string DescribeDisk(string key, long length)
     {
-        string size = SizeText.Format(device.Length);
+        string size = SizeText.Format(length, ServiceLanguage.Format);
         return key.StartsWith("PhysicalDrive", StringComparison.OrdinalIgnoreCase) ? WinText.U("Disk.PhysicalName", key[13..], size) : $"{Path.GetFileName(key)} ({size})";
     }
 

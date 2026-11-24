@@ -87,6 +87,7 @@ public sealed partial class VolumeWriter
         var target = GetInode(de.FileId) ?? throw ApfsException.Corrupt(CoreText.T("VolWriter.EntryInodeMissing", de.Name));
         if (target.IsDirectory && target.ChildrenOrLinks != 0) throw new ApfsException(ApfsErrorCode.DirectoryNotEmpty, de.Name);
         var (key, val) = DrecRecord(parentId, de);
+        EnsureSpace(Room.Release, DeleteCost(parentId, key, de.FileId, target)); // yer açar: pay kullanılabilir (dolu diskte silinebilsin)
         Mutate(() => DeleteCore(parentId, parent, de, target, key, val));
     }
 
@@ -200,6 +201,7 @@ public sealed partial class VolumeWriter
         var existing = FindCollision(dstParentId, dstName);
         bool sameItem = existing is not null && existing.FileId == de.FileId && dstParentId == srcParentId;
         bool replaceExisting = existing is not null && !sameItem;
+        var cost = RenameCost;
         if (replaceExisting)
         {
             if (!replace) throw new ApfsException(ApfsErrorCode.AlreadyExists, dstName);
@@ -207,10 +209,12 @@ public sealed partial class VolumeWriter
             if (other.IsDirectory != ino.IsDirectory) throw new ApfsException(ApfsErrorCode.AlreadyExists, dstName);
             // Delete'in denetimleri burada: değişiklik evresindeki Delete sıradan bir hatayla düşerse oturum arızalanırdı
             if (other.IsDirectory && other.ChildrenOrLinks != 0) throw new ApfsException(ApfsErrorCode.DirectoryNotEmpty, existing.Name);
-            DrecRecord(dstParentId, existing);
+            var (existingKey, _) = DrecRecord(dstParentId, existing);
+            cost += DeleteCost(dstParentId, existingKey, existing.FileId, other); // içteki Delete burada denetlenir (değişiklik evresinde denetlenmez)
         }
         if (sameItem && existing!.Name == dstName) return; // değişiklik yok
         var (oldKey, val) = DrecRecord(srcParentId, de);
+        EnsureSpace(Room.Metadata, cost);
 
         Mutate(() =>
         {
@@ -269,6 +273,7 @@ public sealed partial class VolumeWriter
     public void SetTimes(ulong id, long? createNs, long? modNs, long? changeNs, long? accessNs)
     {
         var ino = GetInode(id) ?? throw new ApfsException(ApfsErrorCode.NotFound, $"inode {id}");
+        EnsureSpace(Room.Metadata, InodeOnlyCost);
         Mutate(() =>
         {
             if (createNs is long c) ino.CreateNs = c;
@@ -286,6 +291,7 @@ public sealed partial class VolumeWriter
         var ino = GetInode(id) ?? throw new ApfsException(ApfsErrorCode.NotFound, $"inode {id}");
         uint flags = hidden ? ino.BsdFlags | UfHidden : ino.BsdFlags & ~UfHidden;
         if (flags == ino.BsdFlags) return;
+        EnsureSpace(Room.Metadata, InodeOnlyCost);
         Mutate(() =>
         {
             ino.BsdFlags = flags;

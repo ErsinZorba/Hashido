@@ -118,6 +118,14 @@ public sealed class AppController : IDisposable
         {
             var s = await _services.Channel.SendAsync<StatusResponse>(new Request("status", Since: Math.Max(0, _lastNotice)), TimeSpan.FromSeconds(3));
             if (s is null) return;
+            if (ServiceRestarted(s))
+            {
+                // Hizmet yeniden başladı (1.8.2): bildirim kimlikleri 1'den başladı, eski imleçle sorulan yanıt yeni
+                // hizmetin ilk bildirimlerini ("E: bağlandı") içermiyordu. Yeni hizmetin bütün bildirimleri bu tepsi için yeni.
+                s = await _services.Channel.SendAsync<StatusResponse>(new Request("status", Since: 0), TimeSpan.FromSeconds(3));
+                if (s is null) return;
+            }
+            _serviceInstance = s.Instance;
             ServiceDown = false;
             Status = s;
             if (_lastNotice >= 0) ShowNotices(s.Notices); // ilk açılışta eski bildirimleri gösterme
@@ -127,8 +135,7 @@ public sealed class AppController : IDisposable
         }
         // Aşırı uzun ya da bozuk yanıt (InvalidData/Json) da "hizmete ulaşılamadı": zamanlayıcı async void, dışarı çıkan istisna
         // tepsiyi düşürüyordu
-        catch (Exception e) when (e is TimeoutException or IOException or OperationCanceledException or UnauthorizedAccessException
-            or InvalidDataException or JsonException)
+        catch (Exception e) when (PipeProtocol.IsChannelFailure(e))
         {
             ServiceDown = true;
             RaiseIfChanged();
@@ -138,6 +145,16 @@ public sealed class AppController : IDisposable
             _busy = false;
         }
     }
+
+    /// <summary>Son başarılı yoklamadaki hizmet çalışmasının kimliği (eski hizmette null).</summary>
+    private string? _serviceInstance;
+
+    /// <summary>
+    /// Yanıt, son yoklamadakinden başka bir hizmet çalışmasından mı (ilk yoklamada hayır): kimlik değişti (eski hizmetten yeniye
+    /// geçiş dahil) ya da hizmetin son bildirim kimliği imlecin gerisinde (eski hizmet de; kimlik yokken tek ipucu).
+    /// </summary>
+    private bool ServiceRestarted(StatusResponse s) =>
+        _lastNotice >= 0 && ((s.Instance is not null && s.Instance != _serviceInstance) || s.LastNoticeId < _lastNotice);
 
     private void RaiseIfChanged()
     {
@@ -385,22 +402,25 @@ public sealed class AppController : IDisposable
     /// <summary>Kilit açma akışının arasında taze durum (bildirim imleci ilerletilmez; alınamazsa null).</summary>
     private async Task<StatusResponse?> FreshStatusAsync()
     {
-        try { return await _services.Channel.SendAsync<StatusResponse>(new Request("status", Since: Math.Max(0, _lastNotice)), TimeSpan.FromSeconds(3)); }
-        catch (Exception e) when (e is TimeoutException or IOException or OperationCanceledException or UnauthorizedAccessException) { return null; }
+        var (_, s) = await RequestAsync<StatusResponse>(new Request("status", Since: Math.Max(0, _lastNotice)), TimeSpan.FromSeconds(3));
+        return s;
+    }
+
+    /// <summary>
+    /// Hizmete tek istek; kanalın her hatası (<see cref="PipeProtocol.IsChannelFailure"/>: bozuk/aşırı uzun yanıt, erişim reddi
+    /// dahil) "ulaşılamadı" (Reached false) olur, istisna dışarı çıkmaz (1.8.2).
+    /// </summary>
+    private async Task<(bool Reached, T? Value)> RequestAsync<T>(Request request, TimeSpan timeout)
+    {
+        try { return (true, await _services.Channel.SendAsync<T>(request, timeout)); }
+        catch (Exception e) when (PipeProtocol.IsChannelFailure(e)) { return (false, default); }
     }
 
     /// <summary>Hizmete "unlock"; ulaşılamazsa null.</summary>
     private async Task<UnlockResponse?> SendUnlockAsync(DiskStatus d, VolumeStatus v, string password)
     {
-        try
-        {
-            var r = await _services.Channel.SendAsync<UnlockResponse>(new Request("unlock", Disk: d.Id, Volume: v.Index, Password: password, Container: v.Container), TimeSpan.FromSeconds(60));
-            return r ?? new UnlockResponse(false, WinText.U("Unlock.Failed"));
-        }
-        catch (Exception e) when (e is TimeoutException or IOException or OperationCanceledException)
-        {
-            return null;
-        }
+        var (reached, r) = await RequestAsync<UnlockResponse>(new Request("unlock", Disk: d.Id, Volume: v.Index, Password: password, Container: v.Container), TimeSpan.FromSeconds(60));
+        return reached ? r ?? new UnlockResponse(false, WinText.U("Unlock.Failed")) : null;
     }
 
     // Kasa erişimi kilit açmayı hiçbir zaman bozmaz: geçersiz UUID (ArgumentException) ve kasa hatası yutulur; kaydetme hatası
@@ -480,14 +500,8 @@ public sealed class AppController : IDisposable
 
     private async Task<UnlockResponse?> SendEjectAsync(string disk, bool force)
     {
-        try
-        {
-            return await _services.Channel.SendAsync<UnlockResponse>(new Request("eject", Disk: disk, Force: force), TimeSpan.FromSeconds(60));
-        }
-        catch (Exception e) when (e is TimeoutException or IOException or OperationCanceledException)
-        {
-            return new UnlockResponse(false, WinText.U("Error.ServiceUnreachable"));
-        }
+        var (reached, r) = await RequestAsync<UnlockResponse>(new Request("eject", Disk: disk, Force: force), TimeSpan.FromSeconds(60));
+        return reached ? r : new UnlockResponse(false, WinText.U("Error.ServiceUnreachable"));
     }
 
     // ---------------- Yazma (deneysel) ----------------
@@ -527,15 +541,9 @@ public sealed class AppController : IDisposable
 
     private async Task<UnlockResponse?> SendSetWritableAsync(string disk, int container, bool enable, bool force)
     {
-        try
-        {
-            // Kapı tam denetim yapar; büyük diskte birkaç saniye sürebilir
-            return await _services.Channel.SendAsync<UnlockResponse>(new Request("set-writable", Disk: disk, Enable: enable, Force: force, Container: container), TimeSpan.FromMinutes(5));
-        }
-        catch (Exception e) when (e is TimeoutException or IOException or OperationCanceledException)
-        {
-            return new UnlockResponse(false, WinText.U("Error.ServiceUnreachable"));
-        }
+        // Kapı tam denetim yapar; büyük diskte birkaç saniye sürebilir
+        var (reached, r) = await RequestAsync<UnlockResponse>(new Request("set-writable", Disk: disk, Enable: enable, Force: force, Container: container), TimeSpan.FromMinutes(5));
+        return reached ? r : new UnlockResponse(false, WinText.U("Error.ServiceUnreachable"));
     }
 
     // ---------------- Kutular (açık-pencere sayacıyla) ----------------
@@ -553,8 +561,7 @@ public sealed class AppController : IDisposable
         if (Rescanning) return;
         Rescanning = true;
         RaiseIfChanged();
-        try { await _services.Channel.SendAsync<UnlockResponse>(new Request("rescan"), TimeSpan.FromSeconds(30)); }
-        catch (Exception e) when (e is TimeoutException or IOException or OperationCanceledException or UnauthorizedAccessException) { }
+        try { await RequestAsync<UnlockResponse>(new Request("rescan"), TimeSpan.FromSeconds(30)); }
         finally
         {
             Rescanning = false;

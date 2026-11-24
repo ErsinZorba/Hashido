@@ -36,6 +36,12 @@ for (int i = 0; i < args.Length - 1; i++)
     if (args[i] == "--lang" && args.Contains("--console")) Apfs.Service.ServiceLanguage.Apply(args[i + 1]);
     if (args[i] == "--reports-dir" && args.Contains("--console")) reportsDir = Path.GetFullPath(args[i + 1]);
 }
+// Geliştirme kipinde "etkin konsol oturumu" hizmetin kendi oturumudur (tepsi de orada); testler başka bir oturumu taklit edebilir
+// (yalnız konsol oturumunun istekleri varsayılan dili değiştirir)
+if (ServiceLog.EchoToConsole)
+    Apfs.Service.ServiceLanguage.ConsoleSessionOverride =
+        uint.TryParse(Environment.GetEnvironmentVariable("APFS_DEV_CONSOLE_SESSION"), out uint devConsole) ? devConsole
+            : (uint)System.Diagnostics.Process.GetCurrentProcess().SessionId;
 // Konsol kipinde varsayılan kuyruk kanala özgü geçici klasör: kurulu hizmetin ProgramData'daki kuyruğuna dokunulmaz
 reportsDir ??= ServiceLog.EchoToConsole
     ? Path.Combine(Path.GetTempPath(), "apfs-dev-reports", Apfs.Windows.Ipc.PipeProtocol.PipeName)
@@ -61,11 +67,22 @@ internal sealed class ApfsService(IReadOnlyList<string>? images, ReportRecorder 
         _pipe = new PipeServer(_manager, reports);
         _pipe.Start();
         // Disk takıldığında/çıkarıldığında hemen; ayrıca bildirim kaçarsa diye 15 saniyede bir tara.
-        _diskWatch = DeviceNotifications.WatchDiskInterfaces(_ => ScheduleScan(TimeSpan.FromSeconds(1)));
+        _diskWatch = DeviceNotifications.WatchDiskInterfaces(_ =>
+        {
+            RawDiskDevice.ForgetStalled(); // takılan/çıkarılan aygıt: okuması bırakılmış diskler yeniden denensin
+            ScheduleScan(TimeSpan.FromSeconds(1));
+        });
         _timer = new Timer(_ => ScheduleScan(TimeSpan.Zero), null, TimeSpan.Zero, TimeSpan.FromSeconds(15));
     }
 
     private void ScheduleScan(TimeSpan delay)
+    {
+        // Zamanlanmış tarama arka plan işidir: onu isteyen bir kanal isteğinin dili ve sayı biçimi taşınmaz
+        if (ExecutionContext.IsFlowSuppressed()) { StartScanAfter(delay); return; }
+        using (ExecutionContext.SuppressFlow()) StartScanAfter(delay);
+    }
+
+    private void StartScanAfter(TimeSpan delay)
     {
         Task.Delay(delay).ContinueWith(_ =>
         {

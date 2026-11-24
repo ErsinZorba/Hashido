@@ -44,7 +44,7 @@ public sealed class ReportClient : IDisposable
         bool? consent = _consent();
         if (consent is null) return UploadOutcome.Nothing;
         try { await PipeProtocol.SendAsync<UnlockResponse>(new Request("reports-config", Enable: consent.Value), TimeSpan.FromSeconds(10), ct); }
-        catch (Exception e) when (e is IOException or TimeoutException or OperationCanceledException or UnauthorizedAccessException) { }
+        catch (Exception e) when (PipeProtocol.IsChannelFailure(e)) { }
         if (_local.Enabled != consent.Value) _local.SetEnabled(consent.Value);
         if (consent != true) return UploadOutcome.Nothing;
 

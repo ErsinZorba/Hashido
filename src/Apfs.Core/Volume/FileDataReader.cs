@@ -2,18 +2,27 @@ namespace Apfs.Volume;
 
 /// <summary>
 /// Bir veri akışını extent listesi üzerinden okur. İş parçacığı güvenlidir (durum tutmaz).
-/// Extent'ler arasındaki boşluklar ve PhysBlock = 0 olan extent'ler seyrek alandır ve sıfır döner.
+/// Extent'ler arasındaki boşluklar ve PhysBlock = 0 olan extent'ler seyrek alandır ve sıfır döner. Seyrek OLMAYAN akışta son
+/// extent'in ötesi okunamaz (Corrupt): macOS ve yazıcımız seyrek dosyanın deliklerini de extent olarak yazar ve INODE_IS_SPARSE
+/// koyar; boyu ayrılandan büyük seyrek olmayan dosya bozuktur (önceden sonsuz sıfır okunuyordu).
 /// </summary>
 public sealed class FileDataReader : IDataReader
 {
     private readonly ApfsVolume _volume;
     private readonly FileExtent[] _extents;
+    private readonly ulong _streamId;
+    private readonly bool _sparse;
 
     /// <param name="extents">Mantıksal ofsete göre sıralı extent'ler. Dizi paylaşılabilir (önbellek); değiştirilmez.</param>
-    public FileDataReader(ApfsVolume volume, FileExtent[] extents, ulong size)
+    /// <param name="streamId">Veri akışının kimliği (extent anahtarlarındaki nesne kimliği); şifreleme dönüşümü sürerken yarıda
+    /// kalan akışı tanımak için (<see cref="ApfsVolume.Rolling"/>).</param>
+    /// <param name="sparse">Akış seyrek mi (dosyanın INODE_IS_SPARSE bayrağı); değilse son extent'in ötesi okunamaz.</param>
+    public FileDataReader(ApfsVolume volume, FileExtent[] extents, ulong size, ulong streamId = 0, bool sparse = false)
     {
         _volume = volume;
         _extents = extents;
+        _streamId = streamId;
+        _sparse = sparse;
         Length = size;
         ulong prevEnd = 0;
         foreach (var e in _extents)
@@ -24,15 +33,21 @@ public sealed class FileDataReader : IDataReader
             if (prevEnd < e.LogicalOffset)
                 throw ApfsException.Corrupt(CoreText.T("Volume.ExtentSizeOverflow"));
         }
+        CoveredLength = prevEnd;
     }
 
     public ulong Length { get; }
+
+    /// <summary>Extent'lerin kapladığı uzunluk (son extent'in sonu); seyrek olmayan akışta okunabilen en çok bayt.</summary>
+    public ulong CoveredLength { get; }
 
     /// <summary><paramref name="offset"/>'ten başlayarak okur; dosya sonunda kısalır. Okunan bayt sayısını döndürür.</summary>
     public int Read(ulong offset, Span<byte> buffer)
     {
         if (offset >= Length) return 0;
         int toRead = (int)Math.Min((ulong)buffer.Length, Length - offset);
+        if (!_sparse && offset + (ulong)toRead > CoveredLength)
+            throw ApfsException.Corrupt(CoreText.T("Volume.DataBeyondAllocation", Length, CoveredLength));
         buffer = buffer[..toRead];
         uint bs = _volume.Reader.BlockSize;
 
@@ -67,13 +82,51 @@ public sealed class FileDataReader : IDataReader
                 if (lastBlock >= _volume.Reader.BlockCount || lastBlock < ext.PhysBlock)
                     throw ApfsException.Corrupt(CoreText.T("Volume.ExtentOutsideDisk"));
                 if (_volume.Crypto is { } crypto && ext.CryptoId != 0)
-                    ReadEncrypted(crypto, ext, within, buffer.Slice(done, count));
+                    ReadCrypted(crypto, ext, within, buffer.Slice(done, count));
                 else
                     _volume.Reader.ReadBlocks(ext.PhysBlock + within / bs, (long)(within % bs), buffer.Slice(done, count));
             }
             done += count;
         }
         return toRead;
+    }
+
+    /// <summary>
+    /// crypto_id taşıyan extent. Birimde şifreleme dönüşümü sürüyorsa (<see cref="ApfsVolume.Rolling"/>): dönüştürülen akışta
+    /// ilerleme ofsetini içeren extent'in ofset ötesi diskte hâlâ düzdür (çözülmeden okunur); o akışta ofsetten sonra başlayan
+    /// crypto_id'li extent'in durumu bilinemez, durum anlaşılamadıysa hiçbir şifreli extent okunmaz (yanlış içerik yerine hata).
+    /// </summary>
+    private void ReadCrypted(Crypto.VolumeCrypto crypto, FileExtent ext, ulong within, Span<byte> dest)
+    {
+        if (_volume.Rolling is not { } er)
+        {
+            ReadEncrypted(crypto, ext, within, dest);
+            return;
+        }
+        if (!er.Understood)
+            throw new ApfsException(ApfsErrorCode.Unsupported, CoreText.T("Volume.EncryptionChangeUnreadable", er.Problem));
+        if (_streamId != er.FileId || ext.LogicalOffset + ext.Length <= er.FileOffset)
+        {
+            ReadEncrypted(crypto, ext, within, dest);
+            return;
+        }
+        if (ext.LogicalOffset >= er.FileOffset)
+            throw new ApfsException(ApfsErrorCode.Unsupported,
+                CoreText.T("Volume.EncryptionChangeUnreadable", CoreText.T("Er.ExtentAhead", ext.LogicalOffset, er.FileOffset)));
+        // İlerleme ofsetini içeren extent: [0, split) şifreli, [split, ...) henüz düz
+        ulong split = er.FileOffset - ext.LogicalOffset;
+        if (within < split)
+        {
+            int enc = (int)Math.Min((ulong)dest.Length, split - within);
+            ReadEncrypted(crypto, ext, within, dest[..enc]);
+            within += (ulong)enc;
+            dest = dest[enc..];
+        }
+        if (!dest.IsEmpty)
+        {
+            uint bs = _volume.Reader.BlockSize;
+            _volume.Reader.ReadBlocks(ext.PhysBlock + within / bs, (long)(within % bs), dest);
+        }
     }
 
     /// <summary>

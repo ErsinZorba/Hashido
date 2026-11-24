@@ -168,12 +168,61 @@ internal sealed class SpacemanWriter
                     SetMain(b, used: true);
                     _allocatedThisTx.Add(b, dataOwner);
                 }
+                AllocatedTotal += n;
                 _searchHint = c;
                 return (start, n);
             }
         }
         throw new ApfsException(ApfsErrorCode.DiskFull);
     }
+
+    /// <summary>
+    /// <see cref="Allocate"/>'in art arda çağrılarla <paramref name="blocks"/> bloğu kaç parçada vereceği (hiçbir şey değişmez):
+    /// aynı sıra — ipucu parçasından başlayarak parçalar sırayla, her parçada ilk boş bitten itibaren kesintisiz boş aralıklar.
+    /// Yetecek boş blok yoksa bulunan parça sayısı döner (çağıran yer denetiminde zaten reddeder).
+    /// </summary>
+    public ulong CountRuns(ulong blocks)
+    {
+        ulong runs = 0;
+        for (int pass = 0; pass < _chunks.Count && blocks > 0; pass++)
+        {
+            int c = (_searchHint + pass) % _chunks.Count;
+            var ch = _chunks[c];
+            if (ch.FreeCount == 0) continue;
+            var bm = Bitmap(c);
+            uint i = 0;
+            while (blocks > 0 && (i = NextFree(bm, i, ch.BlockCount)) < ch.BlockCount)
+            {
+                ulong n = 0;
+                while (n < blocks && i + n < ch.BlockCount && (bm[(i + n) >> 3] & (1 << (int)((i + n) & 7))) == 0) n++;
+                runs++;
+                blocks -= n;
+                i += (uint)n;
+            }
+        }
+        return runs;
+    }
+
+    /// <summary>Bitmap'te <paramref name="i"/>'den itibaren ilk boş bit (yoksa <paramref name="count"/>); dolu baytlar topluca atlanır.</summary>
+    private static uint NextFree(byte[] bm, uint i, uint count)
+    {
+        while (i < count)
+        {
+            if ((i & 7) == 0)
+            {
+                int skip = bm.AsSpan((int)(i >> 3), (int)((count + 7) >> 3) - (int)(i >> 3)).IndexOfAnyExcept((byte)0xFF);
+                if (skip < 0) return count;
+                i += (uint)skip * 8;
+                if (i >= count) return count;
+            }
+            if ((bm[i >> 3] & (1 << (int)(i & 7))) == 0) return i;
+            i++;
+        }
+        return count;
+    }
+
+    /// <summary>Oturum boyunca ana aygıttan ayrılan blokların toplamı (testler: commit'in ayırdığı ≤ <see cref="WriteSession.CommitNeed"/>).</summary>
+    internal ulong AllocatedTotal { get; private set; }
 
     /// <summary>Blok bu işlemde mi ayrıldı (henüz hiçbir kalıcı checkpoint göstermiyor; yerinde değiştirilebilir).</summary>
     public bool IsAllocatedThisTx(ulong paddr) => _allocatedThisTx.ContainsKey(paddr);

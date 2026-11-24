@@ -28,8 +28,9 @@ internal static class LauncherRegistration
         using var key = hklm32.CreateSubKey(ServicesKey, writable: true);
         key.SetValue("Executable", Path.Combine(installDir, "apfs.exe"), RegistryValueKind.String);
         key.SetValue("CommandLine", "launcher-mount %1 %2", RegistryValueKind.String);
-        // Herkes örnek başlatıp durdurabilir; komut satırı yalnızca APFS içeren fiziksel diskleri kabul eder.
-        key.SetValue("Security", "D:P(A;;RPWPLC;;;WD)", RegistryValueKind.String);
+        // Yalnız SYSTEM, Yöneticiler ve oturum açmış kullanıcılar örnek başlatıp durdurabilir; komut satırı yalnızca APFS içeren
+        // fiziksel diskleri kabul eder.
+        key.SetValue("Security", LauncherInstallDir.ServiceSecurity, RegistryValueKind.String);
         key.SetValue("JobControl", 1, RegistryValueKind.DWord);
 
         string launchctl = Path.Combine(winfsp, "bin", "launchctl-x64.exe");

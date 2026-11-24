@@ -24,25 +24,47 @@ public sealed class RawDiskWriter : IWritableBlockDevice
     private readonly SafeFileHandle _handle;
 
     public RawDiskWriter(int diskNumber, WriteGrant grant)
+        : this(OpenForWrite(DevicePath(diskNumber), grant), DevicePath(diskNumber), grant) { }
+
+    private static string DevicePath(int diskNumber) => $@"\\.\PhysicalDrive{diskNumber}";
+
+    /// <summary>
+    /// Açılmış tanıtıcıdan aygıt (testler: bilgi sorgusu başarısız olan tanıtıcı). Sorgu başarısız olursa tanıtıcı HEMEN kapanır
+    /// (1.8.2): önceden çöp toplayıcıya dek açık kalıyor, o sırada Windows'un diski çıkarmasını reddettiriyordu.
+    /// </summary>
+    internal RawDiskWriter(SafeFileHandle handle, string path, WriteGrant grant)
     {
         ArgumentNullException.ThrowIfNull(grant);
-        Path = $@"\\.\PhysicalDrive{diskNumber}";
-        _handle = CreateFileW(Path, GenericRead | GenericWrite, FileShareRead | FileShareWrite, IntPtr.Zero, OpenExisting, 0, IntPtr.Zero);
-        if (_handle.IsInvalid)
+        Path = path;
+        _handle = handle;
+        try
         {
-            int err = Marshal.GetLastPInvokeError();
-            _handle.Dispose();
-            throw err == 5
-                ? new ApfsException(ApfsErrorCode.AccessDenied, WinText.T("Raw.WriteAdminRequired", Path))
-                : new ApfsException(ApfsErrorCode.IoError, $"{Path}: {new Win32Exception(err).Message}");
+            Span<byte> len = stackalloc byte[8];
+            if (!DeviceIoControl(_handle, IoctlDiskGetLengthInfo, IntPtr.Zero, 0, ref MemoryMarshal.GetReference(len), 8, out _, IntPtr.Zero))
+                throw new ApfsException(ApfsErrorCode.IoError, WinText.T("Raw.LengthQueryFailed"));
+            Length = BitConverter.ToInt64(len);
+            Span<byte> geo = stackalloc byte[256];
+            SectorSize = DeviceIoControl(_handle, IoctlDiskGetDriveGeometryEx, IntPtr.Zero, 0, ref MemoryMarshal.GetReference(geo), 256, out _, IntPtr.Zero)
+                && BitConverter.ToInt32(geo[20..]) is 512 or 4096 ? BitConverter.ToInt32(geo[20..]) : 512;
         }
-        Span<byte> len = stackalloc byte[8];
-        if (!DeviceIoControl(_handle, IoctlDiskGetLengthInfo, IntPtr.Zero, 0, ref MemoryMarshal.GetReference(len), 8, out _, IntPtr.Zero))
-            throw new ApfsException(ApfsErrorCode.IoError, WinText.T("Raw.LengthQueryFailed"));
-        Length = BitConverter.ToInt64(len);
-        Span<byte> geo = stackalloc byte[256];
-        SectorSize = DeviceIoControl(_handle, IoctlDiskGetDriveGeometryEx, IntPtr.Zero, 0, ref MemoryMarshal.GetReference(geo), 256, out _, IntPtr.Zero)
-            && BitConverter.ToInt32(geo[20..]) is 512 or 4096 ? BitConverter.ToInt32(geo[20..]) : 512;
+        catch
+        {
+            _handle.Dispose();
+            throw;
+        }
+    }
+
+    /// <summary>Yazma haklı tanıtıcı; izin önce denetlenir (izinsiz hiçbir şey açılmaz).</summary>
+    private static SafeFileHandle OpenForWrite(string path, WriteGrant grant)
+    {
+        ArgumentNullException.ThrowIfNull(grant);
+        var handle = CreateFileW(path, GenericRead | GenericWrite, FileShareRead | FileShareWrite, IntPtr.Zero, OpenExisting, 0, IntPtr.Zero);
+        if (!handle.IsInvalid) return handle;
+        int err = Marshal.GetLastPInvokeError();
+        handle.Dispose();
+        throw err == 5
+            ? new ApfsException(ApfsErrorCode.AccessDenied, WinText.T("Raw.WriteAdminRequired", path))
+            : new ApfsException(ApfsErrorCode.IoError, $"{path}: {new Win32Exception(err).Message}");
     }
 
     public string Path { get; }

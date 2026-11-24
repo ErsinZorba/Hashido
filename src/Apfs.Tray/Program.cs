@@ -41,6 +41,8 @@ internal static class Program
         PipeProtocol.ClientLanguage = language.Name;
         if (shotLang is { Length: > 0 }) // düzenek: sayılar da görüntünün dilinde (README görselleri; 1,28 / 1.28)
             CultureInfo.DefaultThreadCurrentCulture = CultureInfo.CurrentCulture = CultureInfo.CreateSpecificCulture(shotLang);
+        // Bölge ayarı da her istekte (1.8.2): hizmetin yazdığı disk başlığı birim satırıyla aynı sayı biçiminde olsun ("1,81 TB")
+        PipeProtocol.ClientCulture = CultureInfo.CurrentCulture.Name;
 
         // Görüntü düzeneği: kurulu programda (varsayılan kanal) etkisiz; tek örnek kilidi ve tepsi simgesi yok (Ek A S5)
         var shot = dev ? Dev.ShotOptions.Parse(args) : null;

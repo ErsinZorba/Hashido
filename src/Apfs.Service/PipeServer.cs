@@ -1,3 +1,6 @@
+using System.IO.Pipes;
+using System.Runtime.InteropServices;
+using System.Security.Principal;
 using System.Text.Json;
 using Apfs.Windows;
 using Apfs.Windows.Ipc;
@@ -33,7 +36,18 @@ internal sealed class PipeServer(MountManager manager, ReportRecorder reports) :
                         listening = PipeProtocol.CreateServer(firstInstance: first);
                         first = false;
                     }
-                    await listening.WaitForConnectionAsync(ct);
+                    try { await listening.WaitForConnectionAsync(ct); }
+                    catch (IOException) when (!ct.IsCancellationRequested)
+                    {
+                        // Bağlanıp hemen kapanan istemci (1.8.2): bu örnek kullanılamaz. Yenisi beklemeden ve ESKİSİ atılmadan
+                        // açılır (ad hiç boş kalmaz; önceden örnek atılıyor, 1 sn hiç dinleyen örnek kalmıyordu). Açılamazsa
+                        // aşağıdaki genel yol (günlük + 1 sn) devralır.
+                        var broken = listening;
+                        listening = null;
+                        try { listening = PipeProtocol.CreateServer(); }
+                        finally { broken.Dispose(); }
+                        continue;
+                    }
                     var connected = listening;
                     listening = null;
                     try { listening = PipeProtocol.CreateServer(); }
@@ -58,7 +72,7 @@ internal sealed class PipeServer(MountManager manager, ReportRecorder reports) :
         finally { listening?.Dispose(); }
     }
 
-    private async Task HandleAsync(System.IO.Pipes.NamedPipeServerStream server, CancellationToken ct)
+    private async Task HandleAsync(NamedPipeServerStream server, CancellationToken ct)
     {
         using (server)
         {
@@ -71,12 +85,13 @@ internal sealed class PipeServer(MountManager manager, ReportRecorder reports) :
                 var line = await PipeProtocol.ReadLineAsync(server, readTimeout.Token);
                 if (line is null) return;
                 var req = JsonSerializer.Deserialize<Request>(line, PipeProtocol.Json);
-                ServiceLanguage.Apply(req?.Lang);
+                // Bu istek isteyenin dili ve sayı biçimiyle işlenir; varsayılanı yalnız etkin konsol oturumu değiştirir
+                ServiceLanguage.BeginRequest(req?.Lang, req?.Culture, FromConsoleSession(server));
                 object response = req?.Op switch
                 {
                     "status" => manager.Status(req.Since),
                     "unlock" when req.Disk is not null && req.Password is not null =>
-                        await Task.Run(() => manager.Unlock(req.Disk, req.Container, req.Volume, req.Password), ct),
+                        await manager.UnlockAsync(req.Disk, req.Container, req.Volume, req.Password, CallerOf(server)),
                     "rescan" => await Task.Run(() => { manager.ForgetReleased(); manager.Rescan(); return new UnlockResponse(true, WinText.T("Svc.Rescanned")); }, ct),
                     "eject" when req.Disk is not null => await Task.Run(() => manager.Eject(req.Disk, req.Force), ct),
                     "set-writable" when req.Disk is not null => await Task.Run(() => manager.SetWritable(req.Disk, req.Container, req.Enable, req.Force), ct),
@@ -99,6 +114,73 @@ internal sealed class PipeServer(MountManager manager, ReportRecorder reports) :
             }
         }
     }
+
+    /// <summary>
+    /// İstek etkin konsol oturumundan mı (hizmetin varsayılan dilini o belirler). Konsol oturumu yoksa (oturum geçişi) ya da
+    /// konsolda oturum açmış kimse yoksa (yalnız giriş ekranı; kullanıcı uzak masaüstüyle bağlı) her istek sayılır — önceki gibi;
+    /// istemcinin oturumu öğrenilemezse sayılmaz. Geliştirme kipinde "konsol" hizmetin kendi oturumudur
+    /// (<see cref="ServiceLanguage.ConsoleSessionOverride"/>; kullanıcı denetimi yok).
+    /// </summary>
+    private static bool FromConsoleSession(NamedPipeServerStream server)
+    {
+        uint console;
+        if (ServiceLanguage.ConsoleSessionOverride is uint dev) console = dev;
+        else
+        {
+            console = WTSGetActiveConsoleSessionId();
+            if (console == NoConsoleSession || !HasUser(console)) return true;
+        }
+        return GetNamedPipeClientSessionId(server.SafePipeHandle, out uint session) && session == console;
+    }
+
+    /// <summary>Oturumda oturum açmış bir kullanıcı var mı (öğrenilemezse yok sayılır: önceki davranış, her istek).</summary>
+    private static bool HasUser(uint session)
+    {
+        if (!WTSQuerySessionInformationW(IntPtr.Zero, session, WtsUserName, out IntPtr buffer, out _)) return false;
+        try { return !string.IsNullOrEmpty(Marshal.PtrToStringUni(buffer)); }
+        finally { WTSFreeMemory(buffer); }
+    }
+
+    private const int WtsUserName = 5;
+
+    [DllImport("wtsapi32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool WTSQuerySessionInformationW(IntPtr server, uint sessionId, int infoClass, out IntPtr buffer, out int bytesReturned);
+
+    [DllImport("wtsapi32.dll")]
+    private static extern void WTSFreeMemory(IntPtr memory);
+
+    /// <summary>
+    /// Kanaldaki istemcinin hesabı (SID): parola denemesi sınırının sayacı hesap başınadır, başka hesap sahibini bekletemez.
+    /// Öğrenilemezse (istemci kimliğini vermeyen anonim düzeyle bağlandıysa) "?" — bu istemciler ortak sayaçtadır.
+    /// </summary>
+    private static string CallerOf(NamedPipeServerStream server)
+    {
+        string? sid = null;
+        try
+        {
+            server.RunAsClient(() =>
+            {
+                try
+                {
+                    using var id = WindowsIdentity.GetCurrent(ifImpersonating: true);
+                    sid = id?.User?.Value;
+                }
+                catch (Exception) { } // anonim düzeyde belirteç açılamaz
+            });
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidOperationException) { }
+        return sid ?? "?";
+    }
+
+    private const uint NoConsoleSession = 0xFFFFFFFF;
+
+    [DllImport("kernel32.dll")]
+    private static extern uint WTSGetActiveConsoleSessionId();
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetNamedPipeClientSessionId(Microsoft.Win32.SafeHandles.SafePipeHandle pipe, out uint clientSessionId);
 
     private ReportsResponse PullReports(long after)
     {

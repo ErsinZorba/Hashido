@@ -66,11 +66,17 @@
   <data name="Cli.DepthExceeded" xml:space="preserve">
     <value>{0}: folder depth exceeded 256 (possible loop)</value>
   </data>
+  <data name="Cli.DirectoryLoop" xml:space="preserve">
+    <value>{0}: folder already visited (folder loop); not descended</value>
+  </data>
   <data name="Cli.EncryptedUnlocked" xml:space="preserve">
     <value> (encrypted, unlocked)</value>
   </data>
   <data name="Cli.Error" xml:space="preserve">
     <value>Error: {0}</value>
+  </data>
+  <data name="Cli.ExtractNotFile" xml:space="preserve">
+    <value>{0} is not a regular file ({1}); nothing was extracted</value>
   </data>
   <data name="Cli.FullClean" xml:space="preserve">
     <value>Result: structure fully consistent ({0:N1} s).</value>
@@ -146,6 +152,15 @@ Encrypted volumes: --password-prompt (asks for the password) or --password-stdin
   </data>
   <data name="Cli.InfoVolumeFailed" xml:space="preserve">
     <value>Volume {0}: could not be opened: {1}</value>
+  </data>
+  <data name="Cli.KindDirectory" xml:space="preserve">
+    <value>folder</value>
+  </data>
+  <data name="Cli.KindSpecial" xml:space="preserve">
+    <value>special file</value>
+  </data>
+  <data name="Cli.KindSymlink" xml:space="preserve">
+    <value>symbolic link</value>
   </data>
   <data name="Cli.InstallDirInUse" xml:space="preserve">
     <value>A program is already installed in {0} (no "apfs register" copy marker); it was not overwritten. Run "apfs register" from that folder instead.</value>
@@ -404,6 +419,18 @@ Encrypted volumes: --password-prompt (asks for the password) or --password-stdin
   </data>
   <data name="Svc.UnlockFailed" xml:space="preserve">
     <value>{0}: "{1}" unlock failed: {2}</value>
+  </data>
+  <data name="Svc.UnlockDiskGone" xml:space="preserve">
+    <value>{0}: the disk was released while "{1}" was being unlocked; the key was erased and the volume was not mounted.</value>
+  </data>
+  <data name="Svc.UnlockDelayed" xml:space="preserve">
+    <value>{0}: too many wrong passwords; this attempt waited {1} ms.</value>
+  </data>
+  <data name="Raw.OpenTimedOut" xml:space="preserve">
+    <value>{0}: the disk did not answer within {1} s while being opened; it is treated as unreadable.</value>
+  </data>
+  <data name="Raw.ReadTimedOut" xml:space="preserve">
+    <value>{0}: the disk did not answer a read within {1} s; it is treated as unreadable.</value>
   </data>
   <data name="Svc.UnmountError" xml:space="preserve">
     <value>{0}: unmount error: {1}</value>

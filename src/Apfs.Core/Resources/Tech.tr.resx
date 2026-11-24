@@ -315,6 +315,9 @@
   <data name="Check.LeakedUnchecked" xml:space="preserve">
     <value>alan yöneticisi: {0} blok denetlenmeyen yapılara ait görünüyor (dolu işaretli, sahibi çözümlenmedi)</value>
   </data>
+  <data name="Check.MarkedTooMuch" xml:space="preserve">
+    <value>{0}: kapsayıcıdaki bloklardan fazlası sahipleniliyor (üst üste binen yapılar); sahiplik daha fazla denetlenmiyor</value>
+  </data>
   <data name="Check.MarkedUsedNotUsed" xml:space="preserve">
     <value>dolu işaretli ama kullanılmıyor</value>
   </data>
@@ -603,6 +606,9 @@
   <data name="Cp.SuperblockNotAtEnd" xml:space="preserve">
     <value>süper blok tanımlayıcı aralığının sonunda değil (blok {0}, beklenen {1})</value>
   </data>
+  <data name="Crypto.IterationBudget" xml:space="preserve">
+    <value>kilit açma kayıtları toplam {0} parola yinelemesi istiyor (en çok {1} kabul edilir)</value>
+  </data>
   <data name="Crypto.KekIterationsInvalid" xml:space="preserve">
     <value>KEK yineleme sayısı geçersiz</value>
   </data>
@@ -627,8 +633,17 @@
   <data name="Crypto.PasswordHint" xml:space="preserve">
     <value>ipucu: {0}</value>
   </data>
+  <data name="Crypto.TooManyUnlockRecords" xml:space="preserve">
+    <value>birimin anahtar deposunda {0} kilit açma kaydı var (en çok {1} kabul edilir)</value>
+  </data>
+  <data name="Crypto.UnlockCancelled" xml:space="preserve">
+    <value>kilit açma durduruldu: disk çıkarıldı</value>
+  </data>
   <data name="Crypto.VekLength" xml:space="preserve">
     <value>VEK 32 bayt olmalı</value>
+  </data>
+  <data name="Crypto.VekLengthUnsupported" xml:space="preserve">
+    <value>parola doğru ama birimin anahtarı {0} bayt ({1} bekleniyordu); bu şifreleme türü desteklenmiyor</value>
   </data>
   <data name="Crypto.VolumeKeyNotInContainer" xml:space="preserve">
     <value>birimin şifreleme anahtarı kapsayıcıda yok (donanım şifrelemesi olabilir)</value>
@@ -909,6 +924,9 @@
   <data name="Fs.EntryUnreadable" xml:space="preserve">
     <value>"{0}" okunamadı: {1}</value>
   </data>
+  <data name="Fs.NamesSuffixed" xml:space="preserve">
+    <value>Bir klasörde {0} Mac adı Windows'ta başka bir girdiyle aynı ada düşüyor (ya da geri çevrilemiyor); uzantıdan önce bir sayı eklenerek gösteriliyor (ilki: "{1}"); yazılabilir sürücüde bu girdiler değiştirilemez.</value>
+  </data>
   <data name="Fs.NoFreeDriveLetter" xml:space="preserve">
     <value>boş sürücü harfi yok (F: – Z: arası hepsi kullanımda)</value>
   </data>
@@ -1152,6 +1170,9 @@
   <data name="Sm.CabWrongIndex" xml:space="preserve">
     <value>CAB {0}: sıra numarası yanlış</value>
   </data>
+  <data name="Sm.ChunkInvalid" xml:space="preserve">
+    <value>alan yöneticisinin {0} parçası bir parçadan büyük ya da kapsayıcının dışında</value>
+  </data>
   <data name="Sm.CibCountTooBig" xml:space="preserve">
     <value>CIB {0}: parça sayısı bloğa sığmıyor</value>
   </data>
@@ -1167,6 +1188,9 @@
   <data name="Sm.FreeQueueTreeNotMapped" xml:space="preserve">
     <value>boş kuyruk ağacı {0} checkpoint haritasında yok</value>
   </data>
+  <data name="Sm.InternalPoolInvalid" xml:space="preserve">
+    <value>alan yöneticisinin iç havuzu ya da bitmap'i kapsayıcının dışında ya da boyu tutmuyor</value>
+  </data>
   <data name="Sm.IpBitmapIndexOutside" xml:space="preserve">
     <value>iç havuz bitmap indeksi halkanın dışında</value>
   </data>
@@ -1175,6 +1199,9 @@
   </data>
   <data name="Sm.SizeInconsistent" xml:space="preserve">
     <value>alan yöneticisinin blok/parça boyutu tutarsız</value>
+  </data>
+  <data name="Sm.TooManyChunks" xml:space="preserve">
+    <value>alan yöneticisi kapsayıcının alabileceğinden çok parça listeliyor</value>
   </data>
   <data name="Sm.WrongType" xml:space="preserve">
     <value>alan yöneticisi nesnesinin türü yanlış</value>
@@ -1260,6 +1287,9 @@
   <data name="VolWriter.ExtentWithoutCryptoId" xml:space="preserve">
     <value>veri akışı {0}: şifreli birimde crypto_id'siz extent</value>
   </data>
+  <data name="VolWriter.FileTooLarge" xml:space="preserve">
+    <value>dosya çok büyük: boyut ya da konum bu sürümün yazabildiği en büyük boyu aşıyor ({0} bayt)</value>
+  </data>
   <data name="VolWriter.InvalidName" xml:space="preserve">
     <value>geçersiz ad</value>
   </data>
@@ -1305,6 +1335,9 @@
   <data name="VolWriter.ViewTooLate" xml:space="preserve">
     <value>görüntü, oturumun ilk değişikliğinden önce kurulmalı</value>
   </data>
+  <data name="Volume.DataBeyondAllocation" xml:space="preserve">
+    <value>dosya {0} bayt ama ona yalnız {1} bayt ayrılmış (seyrek dosya değil)</value>
+  </data>
   <data name="Volume.DirEntryKeyLength" xml:space="preserve">
     <value>dizin girdisi anahtarının uzunluğu tutarsız</value>
   </data>
@@ -1313,6 +1346,9 @@
   </data>
   <data name="Volume.DirectoryAsFile" xml:space="preserve">
     <value>klasör dosya olarak açılamaz</value>
+  </data>
+  <data name="Volume.EncryptionChangeUnreadable" xml:space="preserve">
+    <value>bu birimde macOS'un şifreleme değişikliği bitmemiş ve durumu anlaşılamadı ({0}); hiçbir dosya yanlış içerikle gösterilmesin diye şifreli dosya verisi okunmuyor. Şifrelemeyi macOS'un bitirmesini bekleyin (diski Mac'e takıp bekleyin)</value>
   </data>
   <data name="Volume.ExtentOutsideDisk" xml:space="preserve">
     <value>dosya parçası diskin dışını gösteriyor</value>
@@ -1410,6 +1446,15 @@
   <data name="Write.WrittenCheckpointInvalid" xml:space="preserve">
     <value>yazılan checkpoint geçersiz: {0}</value>
   </data>
+  <data name="Write.CommitUnverified" xml:space="preserve">
+    <value>Değişiklikler kaydedildi (işlem {0}) ama yeni kayıt noktası geri okunamadı: {1}</value>
+  </data>
+  <data name="Write.Block0Failed" xml:space="preserve">
+    <value>Değişiklikler kaydedildi (işlem {0}) ama düzgün kapatma işareti (blok 0) yazılamadı: {1}. Disk son kayıt noktasından açılır.</value>
+  </data>
+  <data name="Write.CommitStillUnverified" xml:space="preserve">
+    <value>Son kaydedilen işlem ({0}) hâlâ geri okunamıyor: {1}. Diske başka bir şey yazılmıyor; o zamandan beri yapılan değişiklikler kaydedilmedi.</value>
+  </data>
   <data name="Write.WrongObjectType" xml:space="preserve">
     <value>blok {0}: nesne türü yanlış</value>
   </data>
@@ -1427,5 +1472,20 @@
   </data>
   <data name="Zlib.Short" xml:space="preserve">
     <value>zlib verisi beklenenden kısa</value>
+  </data>
+  <data name="Er.ExtentAhead" xml:space="preserve">
+    <value>{0} ofsetindeki dosya parçası şifreleme ilerlemesinin ({1}) ötesinde ama şifreli işaretli</value>
+  </data>
+  <data name="Er.UnalignedOffset" xml:space="preserve">
+    <value>şifreleme ilerleme ofseti {0} tam blok değil</value>
+  </data>
+  <data name="Er.UnknownFlags" xml:space="preserve">
+    <value>desteklenmeyen bir şifreleme değişikliği sürüyor (bayraklar 0x{0:x})</value>
+  </data>
+  <data name="Er.UnknownVersion" xml:space="preserve">
+    <value>bilinmeyen şifreleme dönüşüm durumu (imza 0x{0:x8}, sürüm {1})</value>
+  </data>
+  <data name="Er.Unreadable" xml:space="preserve">
+    <value>şifreleme dönüşüm durumu nesnesi {0} okunamıyor</value>
   </data>
 </root>

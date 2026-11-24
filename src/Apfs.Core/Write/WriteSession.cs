@@ -176,12 +176,48 @@ public sealed class WriteSession : IDisposable
     public Lock SyncRoot { get; } = new();
 
     public ulong CommittedXid => _sb.Xid;
+
+    /// <summary>Açık işlemde kaydedilmemiş değişiklik var mı (herhangi bir birimde).</summary>
+    public bool HasUncommittedChanges => _volumes.Values.Any(v => v.IsDirty);
     internal ulong TotalBlocks => _sb.BlockCount;
     /// <summary>Kullanılabilir boş blok sayısı (bu işlemde bırakılanlar hariç).</summary>
     public ulong FreeBlocks => _spaceman.FreeBlocks;
     public ulong TransactionXid => _txXid;
     internal SpacemanWriter Spaceman => _spaceman;
     internal ObjectReader Reader => _reader;
+
+    /// <summary>
+    /// Commit'in ana aygıttan ayıracağı blokların üst sınırı: değişmiş birimlerin ayırmaları (<see cref="VolumeWriter.CommitNeed"/>)
+    /// ve kapsayıcı nesne haritası (her yazılan birim kaydını siler ve yeniden ekler; yeni omap nesnesi). <paramref name="actor"/>
+    /// verilirse onun <paramref name="cost"/> işlemi de yapılmış sayılır. Alan yöneticisinin kopyaları iç havuza, geçici nesneler
+    /// checkpoint halkasına yazılır (ana aygıtın boş alanından yemez).
+    /// </summary>
+    internal ulong CommitNeed(VolumeWriter? actor = null, OpCost cost = default)
+    {
+        ulong need = 0, volumes = 0;
+        foreach (var vw in _volumes.Values)
+        {
+            bool acting = ReferenceEquals(vw, actor);
+            ulong n = vw.CommitNeed(acting ? cost : default, acting);
+            if (n == 0) continue;
+            need += n;
+            volumes++;
+        }
+        if (volumes == 0) return 0;
+        ulong emptied = Math.Min(volumes, _cOmap.NodeCount);
+        var (touched, created) = _cOmap.Growth(2 * volumes, emptied, 0, emptied * VolumeWriter.OmapRecordBytes);
+        return need + _cOmap.DirtyCount + touched + created + 1;
+    }
+
+    /// <summary>
+    /// Değişmiş düğüm yokken (commit'ten hemen sonra) <paramref name="actor"/>'ın <paramref name="cost"/> işleminin commit üst sınırı
+    /// (kapsayıcı nesne haritası dahil; yalnız bu birim yazılır).
+    /// </summary>
+    internal ulong CleanCommitNeed(VolumeWriter actor, OpCost cost)
+    {
+        var (touched, created) = _cOmap.Growth(2, 1, 0, VolumeWriter.OmapRecordBytes, clean: true);
+        return actor.CommitNeed(cost, acting: true, clean: true) + touched + created + 1;
+    }
 
     /// <summary>Yeni geçici/sanal nesne kimliği (nx_next_oid).</summary>
     internal ulong NewOid() => _nextOid++;
@@ -194,10 +230,52 @@ public sealed class WriteSession : IDisposable
 
     /// <summary>
     /// <paramref name="owner"/> birimin dosya verisi için en fazla <paramref name="maxBlocks"/> ardışık blok ayırır; bu bloklara bu
-    /// işlemde yalnız o birim <see cref="WriteData"/> ile yazabilir.
+    /// işlemde yalnız o birim <see cref="WriteData"/> ile yazabilir. Son commit doğrulanamadıysa önce doğrulanır
+    /// (<see cref="EnsureLastCommitVerified"/>).
     /// </summary>
-    internal (ulong Start, ulong Count) AllocateData(VolumeWriter owner, ulong maxBlocks, ulong reserve = 0) =>
-        _spaceman.Allocate(maxBlocks, reserve, owner);
+    internal (ulong Start, ulong Count) AllocateData(VolumeWriter owner, ulong maxBlocks, ulong reserve = 0)
+    {
+        EnsureLastCommitVerified();
+        return _spaceman.Allocate(maxBlocks, reserve, owner);
+    }
+
+    /// <summary>Geri okunamayan (doğrulanamayan) son commit'in xid'i; 0 = yok.</summary>
+    private ulong _unverifiedXid;
+
+    /// <summary>
+    /// son commit'in checkpoint'i aygıt hatası yüzünden geri okunamadıysa (<see cref="CommitCore"/>), o commit'in bıraktığı
+    /// bloklar artık boş sayılır; checkpoint aslında bozuk yazılmışsa disk bir öncekinden açılır ve o blokların üstüne yazmak onu
+    /// bozardı. Bu yüzden yeni bir blok ayrılmadan (veri yazımı ya da commit) önce checkpoint yeniden okunur: geçerliyse devam;
+    /// okunamıyor ya da geçersizse IoError — değişiklik evresinde/commit'te oturum arızalı olur, aygıta yazılmaz (doğrulanan son
+    /// commit'e kadarki değişiklikler diskte kalır).
+    /// </summary>
+    private void EnsureLastCommitVerified()
+    {
+        if (!TryVerifyLastCommit(out var unreadable))
+            throw new ApfsException(ApfsErrorCode.IoError, CoreText.T("Write.CommitStillUnverified", _unverifiedXid, unreadable!.Message), unreadable);
+    }
+
+    /// <summary>
+    /// Doğrulanamamış son commit varsa checkpoint'ini yeniden okur: true = doğrulandı (ya da yoktu); false = hâlâ okunamıyor
+    /// (<paramref name="unreadable"/>); geçersizse IoError atar (o commit diskte sağlam değil).
+    /// </summary>
+    private bool TryVerifyLastCommit(out Exception? unreadable)
+    {
+        unreadable = null;
+        if (_unverifiedXid == 0) return true;
+        Checkpoint cp;
+        try { cp = Checkpoint.Read(_reader, _sb); }
+        catch (Exception e) when (IsDeviceFailure(e))
+        {
+            unreadable = e;
+            return false;
+        }
+        if (!cp.IsValid)
+            throw new ApfsException(ApfsErrorCode.IoError, CoreText.T("Write.WrittenCheckpointInvalid", string.Join("; ", cp.Problems)));
+        _cp = cp;
+        _unverifiedXid = 0;
+        return true;
+    }
 
     /// <summary>
     /// <paramref name="owner"/> birimin dosya verisini hemen yazar. Yalnızca bu işlemde O BİRİMİN verisi için ayrılmış bloklara
@@ -248,6 +326,20 @@ public sealed class WriteSession : IDisposable
     public Exception? FaultCause { get; private set; }
 
     /// <summary>
+    /// Commit diske işlendi (süper blok bariyerden geçti) ama ardından bir aygıt işlemi yapılamadı: yeni checkpoint geri
+    /// okunamadı ya da kapatırken blok 0 (düzgün kapatma işareti) yazılamadı. Değişiklikler KAYDEDİLDİ, oturum arızalı değildir;
+    /// ileti yalnız günlük içindir (hizmet ServiceLog'a yazar).
+    /// </summary>
+    public event Action<string>? Warning;
+
+    /// <summary>Uyarıyı iletir; dinleyicinin hatası kalıcı bir commit'i arızaya çevirmesin diye yutulur (yalnız günlük içindir).</summary>
+    private void Warn(string message)
+    {
+        try { Warning?.Invoke(message); }
+        catch (Exception) { }
+    }
+
+    /// <summary>
     /// Oturumu arızalı yapar (ilk neden saklanır): commit yarıda kaldı ya da değiştiren bir işlem değişiklik evresinde düştü
     /// (<c>VolumeWriter.Mutate</c>; 1.8.1). Bellekteki birim yarım olabilir; bundan sonra aygıta tek bayt yazılmaz.
     /// </summary>
@@ -281,6 +373,7 @@ public sealed class WriteSession : IDisposable
 
     private void CommitCore()
     {
+        EnsureLastCommitVerified(); // commit blok ayırır
         ulong xid = _txXid;
         uint bs = _reader.BlockSize;
 
@@ -392,22 +485,54 @@ public sealed class WriteSession : IDisposable
         _device.Flush();
 
         // ---- yeni durumu benimse ----
+        // Süper blok bariyerden geçti: commit diskte kalıcı. Bundan sonra aygıttan OKUNAMAMASI oturumu arızalı yapmaz (önceden
+        // kaydedilmiş değişiklikler "kaydedilemedi" diye bildiriliyordu; kablo bu anda çekilirse sonraki yazım zaten düşer), yalnız
+        // günlüğe gider. Geri okunan checkpoint GEÇERSİZSE aygıt yazdığını tutmuyor demektir: arıza (o commit'e güvenilemez ve
+        // sonraki commit eski checkpoint'in bıraktığı blokları yeniden kullanırdı).
         _nx = nx;
         _sb = NxSuperblock.Parse(nx, sbPaddr);
-        _cp = Checkpoint.Read(_reader, _sb);
-        if (!_cp.IsValid) throw new InvalidOperationException(CoreText.T("Write.WrittenCheckpointInvalid", string.Join("; ", _cp.Problems)));
         BeginTransaction();
+        Checkpoint written;
+        try { written = Checkpoint.Read(_reader, _sb); }
+        catch (Exception e) when (IsDeviceFailure(e))
+        {
+            _unverifiedXid = xid; // bıraktığı bloklar yeniden kullanılmadan önce yeniden okunur
+            Warn(CoreText.T("Write.CommitUnverified", xid, e.Message));
+            return;
+        }
+        if (!written.IsValid) throw new InvalidOperationException(CoreText.T("Write.WrittenCheckpointInvalid", string.Join("; ", written.Problems)));
+        _cp = written;
     }
+
+    /// <summary>Aygıta ulaşılamadı (okuma/yazma G/Ç hatası, aygıt kapatıldı) — verinin kendisiyle ilgili bir sorun değil.</summary>
+    private static bool IsDeviceFailure(Exception e) =>
+        e is IOException or ObjectDisposedException or UnauthorizedAccessException || e is ApfsException { Code: ApfsErrorCode.IoError };
 
     /// <summary>Oturumu kapatır: açık işlem kalıcı yapılır, blok 0'a süper blok kopyası yazılır (diskin "düzgün kapatıldı" işareti).</summary>
     public void Close()
     {
         if (_closed) return;
         ThrowIfFaulted();
-        Commit();
-        var copy = (byte[])_nx.Clone();
-        _device.Write(0, copy);
-        _device.Flush();
+        // Doğrulanamamış son commit'ten beri değişiklik yoksa kaydedilecek bir şey yok: yeniden commit (blok ayırır, doğrulama
+        // ister) yapılmaz, son commit diskteki son hâldir. Son commit hâlâ doğrulanamıyorsa blok 0'a "düzgün kapatıldı"
+        // işareti yazılmaz (uyarı commit'te günlüğe gitti; macOS sonraki bağlamada checkpoint'leri kendisi tarar).
+        if (_unverifiedXid == 0 || HasUncommittedChanges) Commit();
+        if (!TryVerifyLastCommit(out _))
+        {
+            _closed = true;
+            return;
+        }
+        // Son commit kalıcı: blok 0 (düzgün kapatma işareti) yazılamazsa da değişiklikler KAYDEDİLDİ (önceden Close hata
+        // atıyor, hizmet "kaydedilemedi" diyordu). Disk en son checkpoint'inden açılır; yalnız günlük.
+        try
+        {
+            _device.Write(0, (byte[])_nx.Clone());
+            _device.Flush();
+        }
+        catch (Exception e) when (IsDeviceFailure(e))
+        {
+            Warn(CoreText.T("Write.Block0Failed", _sb.Xid, e.Message));
+        }
         _closed = true;
     }
 

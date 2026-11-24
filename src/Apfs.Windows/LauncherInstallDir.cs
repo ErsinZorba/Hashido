@@ -13,6 +13,13 @@ namespace Apfs.Windows;
 /// </summary>
 public static class LauncherInstallDir
 {
+    /// <summary>
+    /// Launcher kaydının erişim listesi (<c>Security</c> değeri): örneği başlatma (RP), durdurma (WP) ve durum sorgulama (LC) yalnız
+    /// SYSTEM, Yöneticiler ve oturum açmış (etkileşimli) kullanıcılara (1.8.2). Önceden Everyone (WD) idi: ağ oturumları ve
+    /// hizmet hesapları da bağlama başlatıp başkasının bağlamasını durdurabiliyordu. Kanalın ve yazılabilir sürücünün modeliyle aynı.
+    /// </summary>
+    public const string ServiceSecurity = "D:P(A;;RPWPLC;;;SY)(A;;RPWPLC;;;BA)(A;;RPWPLC;;;IU)";
+
     /// <summary><c>apfs register</c>'ın kopyaladığı klasörü gösteren işaret dosyası.</summary>
     public const string MarkerFileName = "apfs-register-copy.txt";
 

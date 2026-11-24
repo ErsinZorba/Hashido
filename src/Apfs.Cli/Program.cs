@@ -127,18 +127,30 @@ static int List(CliOptions o)
         PrintEntry(v, path.Trim('/'), start, o.Has("--hash"));
         return 0;
     }
-    void Walk(Inode dir, string prefix)
+    // klasörler de "görüldü" kümesinde (APFS'te klasörün sert bağı yok: ikinci kez görülen klasör bozuk veridir, içine
+    // inilmez) ve derinlik `check` ile aynı sınırda (yığın taşmasın); ikisinde de liste sürer, çıkış 1
+    var seen = new HashSet<ulong> { start.Id };
+    int problems = 0;
+    void Walk(Inode dir, string prefix, int depth)
     {
         foreach (var e in v.ListDirectory(dir.Id).OrderBy(e => e.Name, StringComparer.Ordinal))
         {
             var ino = v.GetInode(e.FileId);
             string p = prefix.Length == 0 ? e.Name : $"{prefix}/{e.Name}";
             PrintEntry(v, p, ino, o.Has("--hash"));
-            if (ino.IsDirectory && o.Has("-r")) Walk(ino, p);
+            if (!ino.IsDirectory || !o.Has("-r")) continue;
+            if (!seen.Add(ino.Id)) { Problem(WinText.T("Cli.DirectoryLoop", p)); continue; }
+            if (depth + 1 > CheckCommand.MaxDepth) { Problem(WinText.T("Cli.DepthExceeded", p)); continue; }
+            Walk(ino, p, depth + 1);
         }
     }
-    Walk(start, path.Trim('/', '\\').Replace('\\', '/'));
-    return 0;
+    void Problem(string text)
+    {
+        problems++;
+        Console.Error.WriteLine(WinText.T("Cli.Warning", text));
+    }
+    Walk(start, path.Trim('/', '\\').Replace('\\', '/'), 0);
+    return problems == 0 ? 0 : 1;
 }
 
 static void PrintEntry(ApfsVolume v, string path, Inode ino, bool hash)
@@ -178,17 +190,35 @@ static int Extract(CliOptions o)
 {
     using var c = SourceOpener.OpenContainer(o.Require(0, WinText.T("Cli.ArgSource")), o.Partition);
     var v = OpenVolume(c, o.Volume, Passwords.FromOptions(o));
-    var ino = v.Lookup(o.Require(1, WinText.T("Cli.ArgPath")));
+    string source = o.Require(1, WinText.T("Cli.ArgPath"));
+    var ino = v.Lookup(source);
     string target = o.Require(2, WinText.T("Cli.ArgTarget"));
-    var reader = v.OpenFile(ino);
-    using var fs = new FileStream(target, FileMode.CreateNew, FileAccess.Write);
-    var buf = new byte[1 << 20];
-    ulong pos = 0;
-    while (pos < reader.Length)
+    // yalnız sıradan dosya (sembolik bağ ve özel dosya 0 baytlık "başarı" yazıyordu); okuma yarıda kalırsa yarım dosya silinir
+    if (!ino.IsRegularFile)
     {
-        int n = reader.Read(pos, buf);
-        fs.Write(buf, 0, n);
-        pos += (ulong)n;
+        string kind = ino.IsDirectory ? WinText.T("Cli.KindDirectory")
+            : ino.IsSymlink ? WinText.T("Cli.KindSymlink") : WinText.T("Cli.KindSpecial");
+        throw new ApfsException(ApfsErrorCode.InvalidArgument, WinText.T("Cli.ExtractNotFile", source, kind));
+    }
+    var reader = v.OpenFile(ino);
+    var fs = new FileStream(target, FileMode.CreateNew, FileAccess.Write);
+    try
+    {
+        var buf = new byte[1 << 20];
+        ulong pos = 0;
+        while (pos < reader.Length)
+        {
+            int n = reader.Read(pos, buf);
+            fs.Write(buf, 0, n);
+            pos += (ulong)n;
+        }
+        fs.Dispose();
+    }
+    catch
+    {
+        fs.Dispose();
+        try { File.Delete(target); } catch (IOException) { } catch (UnauthorizedAccessException) { }
+        throw;
     }
     Console.WriteLine(WinText.T("Cli.Copied", target, FormatSize((long)reader.Length)));
     return 0;

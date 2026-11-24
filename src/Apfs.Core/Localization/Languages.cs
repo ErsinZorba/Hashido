@@ -33,6 +33,17 @@ public static partial class Languages
         return Resolve(culture);
     }
 
+    /// <summary>
+    /// Sayı biçimi (bölge ayarı) için kültür: adı geçerli ve tanımlı bir kültürse o (salt okunur, önbellekten), değilse null.
+    /// Arayüz dilinden farklı olarak desteklenen dil şartı yoktur. Dışarıdan gelen değer (kanal isteği) için güvenlidir.
+    /// </summary>
+    public static CultureInfo? ResolveFormat(string? name)
+    {
+        if (string.IsNullOrEmpty(name) || name.Length > 35 || !CultureName().IsMatch(name)) return null;
+        try { return CultureInfo.GetCultureInfo(name, predefinedOnly: true); }
+        catch (CultureNotFoundException) { return null; }
+    }
+
     /// <summary>Kültürü (ya da ata kültürlerinden ilkini) desteklenen dile çevirir; hiçbiri desteklenmiyorsa null.</summary>
     public static CultureInfo? Resolve(CultureInfo culture)
     {

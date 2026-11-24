@@ -95,15 +95,24 @@ public static class FullCheck
 
         var used = new BlockSet(sb.BlockCount);
         var ipUsed = new BlockSet(sm.IpBlockCount);
+        // Sağlam diskte her blok bir kez işaretlenir: toplam işaret kümenin boyunu aşarsa üst üste binme kesindir; ondan sonra
+        // işaretlenmez (çakışan dev aralıklar denetimi saatlerce sürdürmesin) — tek hata yazılır
+        bool usedFull = false, ipFull = false;
         void Mark(ulong start, ulong count, string what)
         {
             if (count == 0) return;
             if (start >= sb.BlockCount || count > sb.BlockCount - start) { r.Error(CoreText.T("Check.RangeOutside", what, start, count)); return; }
+            if (!used.TryCharge(count)) { if (!usedFull) r.Error(CoreText.T("Check.MarkedTooMuch", what)); usedFull = true; return; }
             if (used.Mark(start, count) is ulong dup) r.Error(CoreText.T("Check.BlockUsedTwice", what, dup));
         }
         void MarkIp(ulong paddr, ulong count, string what)
         {
-            if (paddr < sm.IpBase || paddr - sm.IpBase + count > sm.IpBlockCount) { r.Error(CoreText.T("Check.BlockOutsideIp", what, paddr)); return; }
+            if (paddr < sm.IpBase || count > sm.IpBlockCount || paddr - sm.IpBase > sm.IpBlockCount - count)
+            {
+                r.Error(CoreText.T("Check.BlockOutsideIp", what, paddr));
+                return;
+            }
+            if (!ipUsed.TryCharge(count)) { if (!ipFull) r.Error(CoreText.T("Check.MarkedTooMuch", what)); ipFull = true; return; }
             if (ipUsed.Mark(paddr - sm.IpBase, count) is ulong dup) r.Error(CoreText.T("Check.IpBlockUsedTwice", what, sm.IpBase + dup));
         }
 
@@ -700,8 +709,17 @@ public static class FullCheck
     private sealed class BlockSet(ulong count)
     {
         private readonly ulong[] _bits = new ulong[(count + 63) / 64];
+        private ulong _charged;
 
         public bool Get(ulong b) => b < count && (_bits[b >> 6] & (1UL << (int)(b & 63))) != 0;
+
+        /// <summary>İşaret bütçesi: şimdiye dek işaretlenenlerle birlikte kümenin boyunu aşmıyorsa sayar ve true döner.</summary>
+        public bool TryCharge(ulong len)
+        {
+            if (len > count - _charged) return false;
+            _charged += len;
+            return true;
+        }
 
         /// <summary>Aralığı işaretler; zaten işaretli bir blok varsa ilkini döndürür (yine de tamamını işaretler).</summary>
         public ulong? Mark(ulong start, ulong len)

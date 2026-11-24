@@ -41,6 +41,66 @@ internal sealed class MutableBTree
     /// <summary>Silinen (diskte daha önce var olan) düğümlerin kimlikleri; yazılırken serbest bırakılır.</summary>
     public IReadOnlyList<ulong> DeletedOids => _deletedOids;
 
+    // ---------------- Commit'in yer ihtiyacı ----------------
+
+    // Değişmiş düğümler: işaret yalnız MarkDirty ile konur, yazılınca/ağaçtan çıkınca kalkar. Commit her birine yeni blok ayırır
+    // (fiziksel ve sanal ağaçta), bu yüzden sayı commit'in bu ağaç için ayıracağı blok sayısıdır (kesin).
+    private readonly HashSet<MNode> _dirtyNodes = new(ReferenceEqualityComparer.Instance);
+
+    private void MarkDirty(MNode n)
+    {
+        n.Dirty = true;
+        _dirtyNodes.Add(n);
+    }
+
+    /// <summary>Commit'te yazılacak (yeni blok isteyen) düğüm sayısı.</summary>
+    internal ulong DirtyCount => (ulong)_dirtyNodes.Count;
+
+    /// <summary>Bu işlemde oluşturulmuş, henüz yazılmamış sanal düğümler (her biri commit'te nesne haritasına kayıt ekler; üst sınır).</summary>
+    internal ulong CreatedCount => (ulong)_createdOids.Count;
+
+    /// <summary>Ağacın seviye sayısı (yaprak = 1).</summary>
+    internal ulong Levels => (ulong)_root.Level + 1;
+
+    /// <summary>
+    /// Bir işlem bu ağaçta en çok <paramref name="touchLeaves"/> yapraktaki kayıtları ekler, değiştirir ya da silerse — eklenen ya da
+    /// büyüyen kayıtlar en çok <paramref name="growLeaves"/> yaprağa girer, toplam <paramref name="insertedBytes"/> bayt; ilk anahtarı
+    /// değişebilen en çok <paramref name="ranges"/> ardışık anahtar aralığı (yalnız değişken boylu anahtarda; sabit boylu anahtarda 0)
+    /// — değişmiş düğüm sayısı en çok ne kadar artar: değişecek temiz düğümler ve yeni düğümler. Düğüm doluluğuna bakmayan KESİN
+    /// üst sınırdır:
+    /// <list type="bullet">
+    /// <item>Bir kayıt işlemi kökten yaprağa tek yolun düğümlerini değiştirir → yaprak başına en çok seviye sayısı kadar temiz düğüm.</item>
+    /// <item>Yaprak yalnız eklenen/büyüyen kayıtla taşar: kayıt alan her yaprak zaten dolu olabilir (bir bölünme), sonraki her bölünme
+    /// en az çeyrek düğüm yeni bayt ister.</item>
+    /// <item>Üst seviyedeki düğüm, alttaki bölünmenin yeni ayracıyla ya da ilk anahtarı değişen çocuğun uzayan ayracıyla taşar. Bir
+    /// aralıkta ilk anahtarı değişen en çok iki düğüm vardır (ilki ve sonuncusu; aradakiler ya tümüyle silinir ya ilk kaydını korur;
+    /// ekleme ilk anahtarın önüne girmez): seviye l'deki bölünme ≤ l-1'dekiler + 2 × aralık. Kök bir kez büyüyebilir.</item>
+    /// </list>
+    /// </summary>
+    /// <summary>Verilen anahtarların düştüğü (ya da ekleneceği) ayrı yaprak sayısı: düğümler yüklenir, hiçbir şey değişmez.</summary>
+    internal ulong DistinctLeaves(IEnumerable<byte[]> keys)
+    {
+        var leaves = new HashSet<MNode>(ReferenceEqualityComparer.Instance);
+        foreach (var k in keys) leaves.Add(FindLeaf(k, null));
+        return (ulong)leaves.Count;
+    }
+
+    /// <param name="clean">Değişmiş düğüm yokmuş gibi (commit'ten hemen sonraki durum).</param>
+    internal (ulong Touched, ulong Created) Growth(ulong touchLeaves, ulong growLeaves, ulong ranges, ulong insertedBytes, bool clean = false)
+    {
+        if (touchLeaves == 0 && insertedBytes == 0) return (0, 0);
+        ulong levels = Levels + 1; // kökün bir kez büyümesi
+        ulong nodes = NodeCount, dirty = clean ? 0 : DirtyCount;
+        ulong cleanNodes = nodes > dirty ? nodes - dirty : 0;
+        ulong touched = Math.Min(cleanNodes, touchLeaves * levels);
+        ulong quarter = (ulong)Math.Max(1, (_shape.BlockSize - TreeShape.HeaderSize - TreeShape.FooterSize) / 4);
+        ulong splits = insertedBytes == 0 ? 0 : Math.Min(Math.Max(growLeaves, 1), nodes) + (insertedBytes + quarter - 1) / quarter;
+        ulong separators = _shape.IsFixed ? 0 : 2 * ranges;
+        ulong created = splits + separators == 0 ? 0UL : 1UL; // kökün büyümesi
+        for (ulong l = 0; l < levels; l++, splits += separators) created += splits;
+        return (touched, created);
+    }
+
     // ---------------- Okuma ----------------
 
     private MNode Child(MNode n, int i)
@@ -212,13 +272,13 @@ internal sealed class MutableBTree
     /// <summary>Düğümü değişmiş işaretler; fiziksel ağaçta bütün ataları da (kimlikleri değişecek). Kök her zaman değişir (özet).</summary>
     private void Touch(MNode node, List<(MNode Node, int Index)> path)
     {
-        node.Dirty = true;
-        if (_physical) foreach (var (p, _) in path) p.Dirty = true;
-        _root.Dirty = true;
+        MarkDirty(node);
+        if (_physical) foreach (var (p, _) in path) MarkDirty(p);
+        MarkDirty(_root);
     }
 
     /// <summary>İç düğüm anahtarları çocuklarının ilk anahtarıyla aynı kalsın (aşağıdan yukarı).</summary>
-    private static void FixSeparators(MNode node, List<(MNode Node, int Index)> path)
+    private void FixSeparators(MNode node, List<(MNode Node, int Index)> path)
     {
         var child = node;
         for (int level = path.Count - 1; level >= 0; level--)
@@ -227,7 +287,7 @@ internal sealed class MutableBTree
             if (child.Count == 0) return;
             if (p.Keys[idx].AsSpan().SequenceEqual(child.Keys[0])) return;
             p.Keys[idx] = child.Keys[0];
-            p.Dirty = true;
+            MarkDirty(p);
             child = p;
             if (idx != 0) return; // üstteki ayraç yalnızca ilk çocuk değişince etkilenir
         }
@@ -250,7 +310,7 @@ internal sealed class MutableBTree
                 node.Keys.Add(left.Keys[0]);
                 node.Vals.Add(new byte[8]);
                 node.Children.Add(left);
-                node.Dirty = true;
+                MarkDirty(node);
                 path.Insert(0, (node, 0));
                 node = left;
                 continue;
@@ -264,7 +324,7 @@ internal sealed class MutableBTree
             parent.Keys.Insert(idx + 1, right.Keys[0]);
             parent.Vals.Insert(idx + 1, new byte[8]);
             parent.Children.Insert(idx + 1, right);
-            parent.Dirty = true;
+            MarkDirty(parent);
             node = parent;
         }
     }
@@ -283,7 +343,7 @@ internal sealed class MutableBTree
         return n.Count - 1;
     }
 
-    private static void Move(MNode from, MNode to, int start, int count)
+    private void Move(MNode from, MNode to, int start, int count)
     {
         to.Keys.AddRange(from.Keys.GetRange(start, count));
         to.Vals.AddRange(from.Vals.GetRange(start, count));
@@ -291,14 +351,15 @@ internal sealed class MutableBTree
         from.Keys.RemoveRange(start, count);
         from.Vals.RemoveRange(start, count);
         from.Children.RemoveRange(start, count);
-        from.Dirty = true;
-        to.Dirty = true;
+        MarkDirty(from);
+        MarkDirty(to);
     }
 
     private MNode NewNode(int level)
     {
         AdjustFooter(keys: 0, nodes: +1);
-        var node = new MNode { Oid = _newOid?.Invoke() ?? 0, Level = level, Dirty = true };
+        var node = new MNode { Oid = _newOid?.Invoke() ?? 0, Level = level };
+        MarkDirty(node);
         RegisterCreated(node);
         return node;
     }
@@ -313,7 +374,7 @@ internal sealed class MutableBTree
             parent.Keys.RemoveAt(idx);
             parent.Vals.RemoveAt(idx);
             parent.Children.RemoveAt(idx);
-            parent.Dirty = true;
+            MarkDirty(parent);
             Forget(node);
             node = parent;
         }
@@ -337,7 +398,7 @@ internal sealed class MutableBTree
             _root.Vals.AddRange(only.Vals);
             _root.Children.AddRange(only.Children);
             _root.Level = only.Level;
-            _root.Dirty = true;
+            MarkDirty(_root);
             Forget(only);
         }
     }
@@ -345,6 +406,7 @@ internal sealed class MutableBTree
     private void Forget(MNode node)
     {
         AdjustFooter(keys: 0, nodes: -1);
+        _dirtyNodes.Remove(node);
         if (node.Oid != 0 && !IsNewUnwritten(node)) _deletedOids.Add(node.Oid);
     }
 
@@ -357,7 +419,7 @@ internal sealed class MutableBTree
         var f = _root.Footer!;
         BinaryPrimitives.WriteUInt64LittleEndian(f.AsSpan(24), (ulong)((long)Bin.U64(f, 24) + keys));
         BinaryPrimitives.WriteUInt64LittleEndian(f.AsSpan(32), (ulong)((long)Bin.U64(f, 32) + nodes));
-        _root.Dirty = true;
+        MarkDirty(_root);
     }
 
     private void UpdateLongest(int keyLen, int valLen)
@@ -379,6 +441,7 @@ internal sealed class MutableBTree
         foreach (ulong oid in _deletedOids) free(oid);
         _deletedOids.Clear();
         if (_root.Dirty) FlushPhysicalNode(_root, isRoot: true, xid, allocate, free, write);
+        _dirtyNodes.Clear();
         return _root.Oid;
     }
 
@@ -411,6 +474,7 @@ internal sealed class MutableBTree
         _deletedOids.Clear();
         FlushVirtualNode(_root, isRoot: true, xid, allocate, relocate, write);
         _createdOids.Clear();
+        _dirtyNodes.Clear();
     }
 
     private void FlushVirtualNode(MNode n, bool isRoot, ulong xid, Func<ulong> allocate, Action<ulong, ulong> relocate, Action<ulong, byte[]> write)
@@ -438,6 +502,7 @@ internal sealed class MutableBTree
         _deletedOids.Clear();
         _createdOids.Clear();
         FlushEphemeralNode(_root, isRoot: true, xid, place);
+        _dirtyNodes.Clear();
     }
 
     private void FlushEphemeralNode(MNode n, bool isRoot, ulong xid, Action<ulong, byte[]> place)

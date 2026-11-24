@@ -315,6 +315,9 @@
   <data name="Check.LeakedUnchecked" xml:space="preserve">
     <value>space manager: {0} blocks appear to belong to unchecked structures (marked used, owner not resolved)</value>
   </data>
+  <data name="Check.MarkedTooMuch" xml:space="preserve">
+    <value>{0}: more blocks are claimed than the container has (overlapping structures); ownership is not checked further</value>
+  </data>
   <data name="Check.MarkedUsedNotUsed" xml:space="preserve">
     <value>marked used but not in use</value>
   </data>
@@ -603,6 +606,9 @@
   <data name="Cp.SuperblockNotAtEnd" xml:space="preserve">
     <value>superblock is not at the end of the descriptor range (block {0}, expected {1})</value>
   </data>
+  <data name="Crypto.IterationBudget" xml:space="preserve">
+    <value>the unlock records need {0} password iterations in total (at most {1} are accepted)</value>
+  </data>
   <data name="Crypto.KekIterationsInvalid" xml:space="preserve">
     <value>KEK iteration count invalid</value>
   </data>
@@ -627,8 +633,17 @@
   <data name="Crypto.PasswordHint" xml:space="preserve">
     <value>hint: {0}</value>
   </data>
+  <data name="Crypto.TooManyUnlockRecords" xml:space="preserve">
+    <value>the volume key store has {0} unlock records (at most {1} are accepted)</value>
+  </data>
+  <data name="Crypto.UnlockCancelled" xml:space="preserve">
+    <value>unlocking was stopped: the disk was removed</value>
+  </data>
   <data name="Crypto.VekLength" xml:space="preserve">
     <value>VEK must be 32 bytes</value>
+  </data>
+  <data name="Crypto.VekLengthUnsupported" xml:space="preserve">
+    <value>the password is correct but the volume key is {0} bytes ({1} expected); this kind of encryption is not supported</value>
   </data>
   <data name="Crypto.VolumeKeyNotInContainer" xml:space="preserve">
     <value>the volume's encryption key is not in the container (may be hardware encryption)</value>
@@ -909,6 +924,9 @@
   <data name="Fs.EntryUnreadable" xml:space="preserve">
     <value>"{0}" could not be read: {1}</value>
   </data>
+  <data name="Fs.NamesSuffixed" xml:space="preserve">
+    <value>{0} Mac name(s) in a folder fall on the same Windows name as another entry (or cannot be mapped back) and are shown with a number added before the extension (first: "{1}"); on a writable drive these entries cannot be changed.</value>
+  </data>
   <data name="Fs.NoFreeDriveLetter" xml:space="preserve">
     <value>no free drive letter (F: to Z: are all in use)</value>
   </data>
@@ -1152,6 +1170,9 @@
   <data name="Sm.CabWrongIndex" xml:space="preserve">
     <value>CAB {0}: wrong index</value>
   </data>
+  <data name="Sm.ChunkInvalid" xml:space="preserve">
+    <value>space manager chunk {0} is larger than a chunk or lies outside the container</value>
+  </data>
   <data name="Sm.CibCountTooBig" xml:space="preserve">
     <value>CIB {0}: chunk count does not fit in the block</value>
   </data>
@@ -1167,6 +1188,9 @@
   <data name="Sm.FreeQueueTreeNotMapped" xml:space="preserve">
     <value>free queue tree {0} is not in the checkpoint map</value>
   </data>
+  <data name="Sm.InternalPoolInvalid" xml:space="preserve">
+    <value>the space manager's internal pool or its bitmap lies outside the container or does not fit</value>
+  </data>
   <data name="Sm.IpBitmapIndexOutside" xml:space="preserve">
     <value>internal pool bitmap index is outside the ring</value>
   </data>
@@ -1175,6 +1199,9 @@
   </data>
   <data name="Sm.SizeInconsistent" xml:space="preserve">
     <value>space manager block/chunk size is inconsistent</value>
+  </data>
+  <data name="Sm.TooManyChunks" xml:space="preserve">
+    <value>the space manager lists more chunks than the container can have</value>
   </data>
   <data name="Sm.WrongType" xml:space="preserve">
     <value>space manager object has the wrong type</value>
@@ -1260,6 +1287,9 @@
   <data name="VolWriter.ExtentWithoutCryptoId" xml:space="preserve">
     <value>data stream {0}: extent without crypto_id on an encrypted volume</value>
   </data>
+  <data name="VolWriter.FileTooLarge" xml:space="preserve">
+    <value>file too large: the size or offset exceeds the largest size this version can write ({0} bytes)</value>
+  </data>
   <data name="VolWriter.InvalidName" xml:space="preserve">
     <value>invalid name</value>
   </data>
@@ -1305,6 +1335,9 @@
   <data name="VolWriter.ViewTooLate" xml:space="preserve">
     <value>the view must be set up before the session's first change</value>
   </data>
+  <data name="Volume.DataBeyondAllocation" xml:space="preserve">
+    <value>the file is {0} bytes but only {1} bytes are allocated to it (file is not sparse)</value>
+  </data>
   <data name="Volume.DirEntryKeyLength" xml:space="preserve">
     <value>directory entry key length inconsistent</value>
   </data>
@@ -1313,6 +1346,9 @@
   </data>
   <data name="Volume.DirectoryAsFile" xml:space="preserve">
     <value>a directory cannot be opened as a file</value>
+  </data>
+  <data name="Volume.EncryptionChangeUnreadable" xml:space="preserve">
+    <value>macOS's encryption change on this volume did not finish and its state is not understood ({0}); encrypted file data is not read so that no file is shown with wrong content. Let macOS finish the encryption (connect the disk to the Mac and wait)</value>
   </data>
   <data name="Volume.ExtentOutsideDisk" xml:space="preserve">
     <value>file extent points outside the disk</value>
@@ -1410,6 +1446,15 @@
   <data name="Write.WrittenCheckpointInvalid" xml:space="preserve">
     <value>written checkpoint invalid: {0}</value>
   </data>
+  <data name="Write.CommitUnverified" xml:space="preserve">
+    <value>Changes were saved (transaction {0}), but the new checkpoint could not be read back: {1}</value>
+  </data>
+  <data name="Write.Block0Failed" xml:space="preserve">
+    <value>Changes were saved (transaction {0}), but the clean-unmount mark (block 0) could not be written: {1}. The disk opens from its latest checkpoint.</value>
+  </data>
+  <data name="Write.CommitStillUnverified" xml:space="preserve">
+    <value>The last saved transaction ({0}) still cannot be read back: {1}. Nothing more is written to the disk; changes made since then were not saved.</value>
+  </data>
   <data name="Write.WrongObjectType" xml:space="preserve">
     <value>block {0}: wrong object type</value>
   </data>
@@ -1427,5 +1472,20 @@
   </data>
   <data name="Zlib.Short" xml:space="preserve">
     <value>zlib data shorter than expected</value>
+  </data>
+  <data name="Er.ExtentAhead" xml:space="preserve">
+    <value>a file part at offset {0} lies beyond the encryption progress ({1}) but is marked encrypted</value>
+  </data>
+  <data name="Er.UnalignedOffset" xml:space="preserve">
+    <value>the encryption progress offset {0} is not a whole block</value>
+  </data>
+  <data name="Er.UnknownFlags" xml:space="preserve">
+    <value>unsupported encryption change in progress (flags 0x{0:x})</value>
+  </data>
+  <data name="Er.UnknownVersion" xml:space="preserve">
+    <value>unknown encryption rolling state (magic 0x{0:x8}, version {1})</value>
+  </data>
+  <data name="Er.Unreadable" xml:space="preserve">
+    <value>encryption rolling state object {0} cannot be read</value>
   </data>
 </root>

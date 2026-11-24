@@ -33,13 +33,15 @@ public sealed class ApfsWritableMount : IDisposable
     /// <param name="onFaulted">Oturumun commit'i yarıda kaldı (<see cref="ApfsWritableFileSystem.Faulted"/>, oturum başına bir kez);
     /// verilirse bu hata <paramref name="onChangeLost"/>'a gitmez. Bir WinFsp geri çağrısının içinden gelir: dinleyici sürücü
     /// AYIRMAMALI (kilitlenir), işi başka bir iş parçacığına bırakmalı.</param>
+    /// <param name="onLog">Yalnız günlüğe gidecek bilgi (<see cref="ApfsWritableFileSystem.Log"/>; bildirim değil).</param>
     public static ApfsWritableMount Mount(WriteSession session, int volumeIndex, string? mountPoint, Action<string>? onError = null, bool closeSession = true,
-        Action<string>? onChangeLost = null, Action<string>? onFaulted = null)
+        Action<string>? onChangeLost = null, Action<string>? onFaulted = null, Action<string>? onLog = null)
     {
         var fs = new ApfsWritableFileSystem(session, volumeIndex);
         if (onError is not null) fs.Error += onError;
         if ((onChangeLost ?? onError) is { } lost) fs.ChangeLost += lost;
         if (onFaulted is not null) fs.Faulted += onFaulted;
+        if (onLog is not null) fs.Log += onLog;
         FileSystemHost host;
         try
         {

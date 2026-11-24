@@ -299,21 +299,22 @@ public sealed partial class VolumeWriter
         return dir;
     }
 
-    /// <summary>Yeni klasör oluşturur; kimliğini döndürür.</summary>
-    public ulong CreateDirectory(ulong parentId, string name) => CreateNode(parentId, name, isDirectory: true);
+    /// <summary>Yeni klasör oluşturur; kimliğini döndürür. <paramref name="hidden"/>: UF_HIDDEN ile (tek işlemde).</summary>
+    public ulong CreateDirectory(ulong parentId, string name, bool hidden = false) => CreateNode(parentId, name, isDirectory: true, hidden);
 
-    /// <summary>Yeni boş dosya oluşturur; kimliğini döndürür.</summary>
-    public ulong CreateFile(ulong parentId, string name) => CreateNode(parentId, name, isDirectory: false);
+    /// <summary>Yeni boş dosya oluşturur; kimliğini döndürür. <paramref name="hidden"/>: UF_HIDDEN ile (tek işlemde).</summary>
+    public ulong CreateFile(ulong parentId, string name, bool hidden = false) => CreateNode(parentId, name, isDirectory: false, hidden);
 
-    private ulong CreateNode(ulong parentId, string name, bool isDirectory)
+    private ulong CreateNode(ulong parentId, string name, bool isDirectory, bool hidden)
     {
         ValidateName(name);
         var parent = RequireDirectory(parentId);
         if (FindCollision(parentId, name) is not null) throw new ApfsException(ApfsErrorCode.AlreadyExists, name);
-        return Mutate(() => CreateNodeCore(parentId, parent, name, isDirectory));
+        EnsureSpace(Room.Metadata, CreateCost);
+        return Mutate(() => CreateNodeCore(parentId, parent, name, isDirectory, hidden));
     }
 
-    private ulong CreateNodeCore(ulong parentId, InodeRecord parent, string name, bool isDirectory)
+    private ulong CreateNodeCore(ulong parentId, InodeRecord parent, string name, bool isDirectory, bool hidden)
     {
         long now = NowNs();
         ulong id = NextObjId();
@@ -329,6 +330,7 @@ public sealed partial class VolumeWriter
             Mode = (ushort)(isDirectory ? ModeDir | 0x1ED : ModeFile | 0x1A4), // 0755 / 0644
             // Şifreli birimde dosyalar PROTECTION_CLASS_C (3), klasörler 0: macOS'un USBTEST'te yazdığı gibi (98/98 dosya, 18/18 klasör)
             DefaultProtectionClass = Crypto is not null && !isDirectory ? 3u : 0u,
+            BsdFlags = hidden ? UfHidden : 0,
         };
         ino.Set(Records.XtName, Records.XfDoNotCopy, Records.NameXField(name));
         PutInode(id, ino);

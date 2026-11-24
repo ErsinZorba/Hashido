@@ -12,7 +12,9 @@ namespace Apfs.Write;
 /// <item>Extent'ler 0'dan boşluksuz sürer; delik = fiziksel adresi 0 olan extent. Ayrılan boyut = extent'lerin toplamı
 /// (delikler dahil); delik baytları SPARSE_BYTES alanında ve INODE_IS_SPARSE bayrağındadır.</item>
 /// <item>Her veri bloğunun extentref ağacında bir fiziksel extent kaydı vardır (sahip = veri akışı kimliği, başvuru sayısı).</item>
-/// <item>Son bloğun dosya sonundan sonraki baytları her zaman sıfırdır (kısaltmada sıfırlanır).</item>
+/// <item>Son bloğun dosya sonundan sonraki baytları her zaman sıfırdır (kısaltmada sıfırlanır). Dosya büyürken eski sondan yeni
+/// sona dek sıfır okunur: dosya sonunun ötesindeki ayrılmış bloklar (macOS'un ön ayırması) deliğe çevrilir, kirli son blok yeniden
+/// yazılır (<see cref="PlanStaleZeroing"/>).</item>
 /// <item>Şifreli birimde (ONEKEY) her veri extent'i crypto_id taşır: yeni yazılan blokta crypto_id = ilk yazıldığı fiziksel blok
 /// (<see cref="NewCryptoId"/>, macOS kuralı: fixtures/crypto-survey.txt); bölünen extent'in sağ parçası +k alır, birleştirme yalnız
 /// crypto_id'ler de ardışıksa yapılır. Veri tweak = crypto_id × (blok/512) + birim ile şifrelenir (<see cref="WriteSession.WriteData"/>).</item>
@@ -135,35 +137,20 @@ public sealed partial class VolumeWriter
         AddAlloc(-(long)n);
     }
 
-    /// <summary>Yedek pay: diskin %1'i ya da 64 MiB'tan küçük olanı her zaman boş bırakılır (macOS'un kendi işleri için).</summary>
-    private ulong ReserveBlocks => Math.Min(_s.TotalBlocks / 100, 64UL * 1024 * 1024 / Bs);
-
     /// <summary>
-    /// <see cref="ReplaceBlocks"/>'un [first, last) için ayıracağı yeni blok sayısı: bu işlemde ayrılmış (yerinde yazılan) bloklar
-    /// dışındaki her blok (eski veri, delik ya da dosya sonu ötesi).
+    /// [<paramref name="blk"/>, <paramref name="last"/>) yazımında yeni bloğa gidecek kesintisiz aralığın sonu: bu işlemde ayrılmış
+    /// (yerinde yazılan) ilk blok ya da <paramref name="last"/>. Ayırma aralık aralık yapılır: ayrılan blok sayısı denetimde sayılanla
+    /// (<see cref="NewBlocksPlan"/>) birebir (önceden bir parça yerinde yazılacak blokların üstünü de kaplayabiliyordu).
     /// </summary>
-    private ulong NewBlocksNeeded(List<Ext> exts, ulong first, ulong last)
+    private ulong SegmentEnd(List<Ext> exts, ulong blk, ulong last)
     {
-        ulong inPlace = 0;
-        foreach (var x in exts)
+        foreach (var x in exts) // başlangıca göre sıralı, örtüşmeyen: bulunan ilk blok en küçüğüdür
         {
-            if (x.Phys == 0) continue;
-            for (ulong blk = Math.Max(x.Start, first), end = Math.Min(x.End, last); blk < end; blk++)
-                if (_s.Spaceman.IsAllocatedThisTx(x.Phys + (blk - x.Start))) inPlace++;
+            if (x.Phys == 0 || x.End <= blk + 1 || x.Start >= last) continue;
+            for (ulong b = Math.Max(x.Start, blk + 1), e = Math.Min(x.End, last); b < e; b++)
+                if (_s.Spaceman.IsAllocatedThisTx(x.Phys + (b - x.Start))) return b;
         }
-        return last - first - inPlace;
-    }
-
-    /// <summary>
-    /// Denetim evresinde (1.8.1): <paramref name="blocks"/> yeni veri bloğu yedek pay düşülmüş boş alana sığmıyorsa hiçbir
-    /// şey değişmeden DiskFull. Önceden parça parça ayırıp yarıda DiskFull atıyordu (extent bağlı, akış bilgisi eski). Bu işlemde
-    /// bırakılan kalıcı bloklar commit'e dek karantinada olduğundan boş sayılmaz (<see cref="WriteSession.FreeBlocks"/>).
-    /// </summary>
-    private void EnsureSpace(ulong blocks)
-    {
-        if (blocks == 0) return;
-        ulong free = _s.FreeBlocks, reserve = ReserveBlocks;
-        if (free <= reserve || blocks > free - reserve) throw new ApfsException(ApfsErrorCode.DiskFull);
+        return last;
     }
 
     // ---------------------------------------------------------------------------------------------------------------
@@ -271,6 +258,69 @@ public sealed partial class VolumeWriter
         Touch();
     }
 
+    // ---------------------------------------------------------------------------------------------------------------
+    // Uzatmada eski dosya sonunun ötesi
+
+    /// <summary>
+    /// Uzatmanın sıfırlaması. macOS dosya sonunun ötesinde blok ayırabilir (ön ayırma); o blokların içeriği sıfırlanmamıştır
+    /// (silinmiş başka bir dosyanın verisi). Dosya büyürken o bölge görünür olur: eski sondan sonraki tam bloklar deliğe çevrilir
+    /// (bloklar bırakılır, yazım yok); eski son blok kısmen doluysa ve sondan sonrası sıfır değilse o blok, sonu sıfırlanmış olarak
+    /// yeni bloğa yazılır (Windows'ta yazılmış dosyada zaten sıfırdır: yazım yok).
+    /// </summary>
+    private sealed record StalePlan(ulong HoleFrom, ulong HoleTo, ulong TailBlock, byte[]? Tail, OpCost Cost, ulong DataBlocks);
+
+    /// <summary>
+    /// Denetim evresinde (hiçbir şey değişmez): <paramref name="size"/> boylu dosya büyürken görünür olacak eski bölgenin planı;
+    /// sıfırlanacak bir şey yoksa null. <paramref name="upTo"/>: işlemin kendisinin baştan yazmadığı bölgenin sonu (blok; boy
+    /// büyütmede yeni blok sayısı, yazmada yazımın ilk bloğu — o blok tampona dosya sonundan sonrası sıfır okunarak yazılır).
+    /// Bedel: delik bir parçalık yazım gibi (kesişen extent'ler ve fiziksel kayıtları), son blok bir yazım ve bir parça daha
+    /// (ayırması işlemin kendi ayırmasından önce yapılır).
+    /// </summary>
+    private StalePlan? PlanStaleZeroing(List<Ext> exts, ulong size, ulong upTo)
+    {
+        ulong allocEnd = exts.Count == 0 ? 0 : exts[^1].End;
+        ulong holeFrom = (size + Bs - 1) / Bs, holeTo = Math.Min(upTo, allocEnd);
+        bool punch = holeTo > holeFrom && exts.Any(x => x.Phys != 0 && x.End > holeFrom && x.Start < holeTo);
+        ulong tailBlock = size / Bs;
+        byte[]? tail = null;
+        if (size % Bs != 0 && tailBlock < upTo && exts.FirstOrDefault(x => x.Phys != 0 && x.Start <= tailBlock && tailBlock < x.End) is { Phys: not 0 } t)
+        {
+            var block = new byte[Bs];
+            _s.Reader.ReadBlocks(t.Phys + (tailBlock - t.Start), 0, block);
+            Crypto?.DecryptData(block, t.CryptoAt(tailBlock - t.Start), 0);
+            var after = block.AsSpan((int)(size % Bs));
+            if (after.IndexOfAnyExcept((byte)0) >= 0)
+            {
+                after.Clear();
+                tail = block;
+            }
+            else System.Security.Cryptography.CryptographicOperations.ZeroMemory(block);
+        }
+        if (!punch && tail is null) return null;
+        var cost = default(OpCost);
+        ulong data = 0;
+        if (punch) cost += WriteCost(1, Overlap(exts, holeFrom, holeTo), MergeablePairs(exts));
+        if (tail is not null)
+        {
+            var (blocks, runs) = NewBlocksPlan(exts, tailBlock, tailBlock + 1);
+            // Yeniden yazımın ReplaceRange'i bütün listenin birleşebilen çiftlerini birleştirir; delik bunu zaten yaptıysa sayılmaz
+            cost += WriteCost(runs + 1, Overlap(exts, tailBlock, tailBlock + 1), punch ? 0 : MergeablePairs(exts));
+            data = blocks;
+        }
+        return new StalePlan(holeFrom, punch ? holeTo : holeFrom, tailBlock, tail, cost, data);
+    }
+
+    /// <summary>Değişiklik evresinde <see cref="PlanStaleZeroing"/>'in planı: delik, sonra son blok (boy henüz değişmez).</summary>
+    private void ApplyStaleZeroing(ulong id, ulong streamId, List<Ext> exts, StalePlan p, ulong size)
+    {
+        if (p.HoleTo > p.HoleFrom) ReplaceRange(streamId, exts, p.HoleFrom, p.HoleTo - p.HoleFrom, 0);
+        if (p.Tail is not null)
+        {
+            ReplaceBlocks(id, streamId, exts, p.TailBlock, p.Tail, size);
+            System.Security.Cryptography.CryptographicOperations.ZeroMemory(p.Tail);
+        }
+    }
+
     private InodeRecord RequireWritableFile(ulong id)
     {
         var ino = GetInode(id) ?? throw new ApfsException(ApfsErrorCode.NotFound, $"inode {id}");
@@ -295,6 +345,19 @@ public sealed partial class VolumeWriter
 
     /// <summary>Dosyanın görünen boyutu (oturumun güncel görüntüsü).</summary>
     public ulong GetSize(ulong id) => GetInode(id)?.Dstream?.Size ?? 0;
+
+    /// <summary>
+    /// Testler: macOS'un ön ayırmasını (F_PREALLOCATE) taklit eder — dosyanın boyu <paramref name="size"/> olur, blokları ve
+    /// içerikleri dosyada kalır (ayrılan boyut değişmez; dosya sonunun ötesindeki baytlar sıfırlanmaz). Ürün kodu kullanmaz.
+    /// </summary>
+    internal void SetSizeKeepingBlocks(ulong id, ulong size)
+    {
+        var ino = RequireWritableFile(id);
+        var exts = LoadExtents(ino.PrivateId);
+        if (size > (exts.Count == 0 ? 0 : exts[^1].End) * Bs) throw new ArgumentOutOfRangeException(nameof(size));
+        EnsureSpace(Room.Metadata, ResizeCost);
+        Mutate(() => UpdateStream(id, GetInode(id)!, size, exts));
+    }
 
     /// <summary>Dosyadan okur (delikler ve dosya sonu ötesi sıfır); okunan bayt sayısını döndürür.</summary>
     public int Read(ulong id, ulong offset, Span<byte> buffer)
@@ -334,6 +397,7 @@ public sealed partial class VolumeWriter
         if (data.IsEmpty) return;
         // Denetim (hiçbir şey değişmez; bkz. Mutate)
         var ino = RequireWritableFile(id);
+        if (offset > MaxFileSize || (ulong)data.Length > MaxFileSize - offset) RequireWithinMaxSize(ulong.MaxValue);
         ulong size = ino.Dstream?.Size ?? 0;
         ulong end = offset + (ulong)data.Length;
         ulong first = offset / Bs, last = (end + Bs - 1) / Bs;
@@ -344,14 +408,23 @@ public sealed partial class VolumeWriter
             Read(id, (last - 1) * Bs, buf.AsSpan((int)((last - 1 - first) * Bs), (int)Bs));
         data.CopyTo(buf.AsSpan((int)(offset - first * Bs)));
         var exts = LoadExtents(ino.PrivateId);
-        EnsureSpace(NewBlocksNeeded(exts, first, last));
-        Mutate(() => ReplaceBlocks(id, ino.PrivateId, exts, first, buf, Math.Max(size, end)));
+        var (newBlocks, runs) = NewBlocksPlan(exts, first, last);
+        var cost = WriteCost(runs, Overlap(exts, first, last), MergeablePairs(exts));
+        // Dosya sonunun ötesine yazım: aradaki eski bölge sıfır okunmalı
+        var stale = end > size ? PlanStaleZeroing(exts, size, first) : null;
+        if (stale is not null) { cost += stale.Cost; newBlocks += stale.DataBlocks; }
+        EnsureSpace(newBlocks > 0 ? Room.Data : Room.Metadata, cost, newBlocks);
+        Mutate(() =>
+        {
+            if (stale is not null) ApplyStaleZeroing(id, ino.PrivateId, exts, stale, size);
+            ReplaceBlocks(id, ino.PrivateId, exts, first, buf, Math.Max(size, end));
+        });
     }
 
     /// <summary>
     /// [first, first + buf/blok) mantıksal bloklarının içeriğini <paramref name="buf"/> ile değiştirir (tam bloklar) ve boyutu
     /// <paramref name="newSize"/> yapar. Bu işlemde ayrılmış bloklar yerinde, diğerleri yeni bloklara yazılır. Değişiklik evresidir:
-    /// çağıran yeni blok gereksinimini önceden denetlemiş olmalı (<see cref="EnsureSpace"/>); <paramref name="exts"/> akışın güncel
+    /// çağıran yeni blok gereksinimini önceden denetlemiş olmalı (<see cref="EnsureSpace"/>, <see cref="NewBlocksPlan"/>); <paramref name="exts"/> akışın güncel
     /// extent listesi (yerinde güncellenir).
     /// </summary>
     private void ReplaceBlocks(ulong id, ulong streamId, List<Ext> exts, ulong first, byte[] buf, ulong newSize)
@@ -370,7 +443,7 @@ public sealed partial class VolumeWriter
                 blk += run; pos += (int)(run * Bs);
                 continue;
             }
-            var (p, cnt) = AllocData(last - blk);
+            var (p, cnt) = AllocData(SegmentEnd(exts, blk, last) - blk);
             _s.WriteData(this, p, buf.AsSpan(pos, (int)(cnt * Bs)), NewCryptoId(p));
             ReplaceRange(streamId, exts, blk, cnt, p, NewCryptoId(p));
             blk += cnt; pos += (int)(cnt * Bs);
@@ -381,32 +454,64 @@ public sealed partial class VolumeWriter
     /// <summary>
     /// Dosya boyutunu değiştirir: kısaltmada sondaki bloklar bırakılır ve son bloğun kalan kısmı sıfırlanır; uzatmada delik eklenir.
     /// Kısaltmada sıfırlanan son kısmi blok yeni bloğa yazılır: o blok önceden denetlenir (disk tam doluysa hiçbir şey değişmeden
-    /// DiskFull; önceden kısaltma yapılıp sıfırlama yarıda kalıyordu).
+    /// DiskFull; önceden kısaltma yapılıp sıfırlama yarıda kalıyordu). Kesilen bloklardan bu işlemde ayrılmış olanlar hemen boşa
+    /// çıktığı için o bloğa sayılır (önceden paydaki diskte böyle kısaltma "disk dolu" alıyordu). Yer açan kısaltma payı
+    /// kullanabilir, seyrek uzatma yalnız üst veri büyütür (bkz. <see cref="Room"/>).
     /// </summary>
     public void SetSize(ulong id, ulong newSize)
     {
         // Denetim (hiçbir şey değişmez; bkz. Mutate)
         var ino = RequireWritableFile(id);
+        RequireWithinMaxSize(newSize);
         ulong size = ino.Dstream?.Size ?? 0;
         if (newSize == size && ino.Dstream is not null) return;
         var exts = LoadExtents(ino.PrivateId);
         ulong allocEnd = exts.Count == 0 ? 0 : exts[^1].End;
         ulong newBlocks = (newSize + Bs - 1) / Bs;
+
+        var room = newSize < size ? Room.Release : Room.Metadata;
+        var cost = ResizeCost;
+        ulong credit = 0;
+        if (newBlocks < allocEnd)
+        {
+            cost = TruncateCost(id, ino.PrivateId, exts, newBlocks);
+            room = Room.Release;
+            foreach (var x in exts)
+            {
+                if (x.Phys == 0 || x.End <= newBlocks) continue;
+                for (ulong blk = Math.Max(x.Start, newBlocks); blk < x.End; blk++)
+                    if (_s.Spaceman.IsAllocatedThisTx(x.Phys + (blk - x.Start))) credit++;
+            }
+        }
+        else if (newBlocks > allocEnd) cost = ExtendCost(MergeablePairs(exts));
+
         // Kısaltmada son kısmi bloğun dosya sonundan sonrası sıfırlanmalı (sonradan uzatılırsa eski bayt görünmesin).
         // Blok bir delikse zaten sıfırdır. İçeriği (yeni sona dek) değişiklikten önce okunur.
         ulong lastBlock = newSize / Bs;
         byte[]? tail = null;
+        ulong data = 0;
         if (newSize < size && newSize % Bs != 0 && exts.Any(x => x.Phys != 0 && x.Start <= lastBlock && lastBlock < x.End))
         {
             tail = new byte[Bs];
             Read(id, lastBlock * Bs, tail.AsSpan(0, (int)(newSize - lastBlock * Bs)));
-            EnsureSpace(NewBlocksNeeded(exts, lastBlock, lastBlock + 1));
+            var (tb, truns) = NewBlocksPlan(exts, lastBlock, lastBlock + 1);
+            cost += WriteCost(truns, Overlap(exts, lastBlock, lastBlock + 1), MergeablePairs(exts));
+            if (tb > 0) { data = tb; room = Room.Data; }
         }
+        // Uzatmada eski sondan yeni sona dek sıfır okunmalı: ön ayrılmış bloklar deliğe, kirli son blok yeniden
+        var stale = newSize > size ? PlanStaleZeroing(exts, size, newBlocks) : null;
+        if (stale is not null)
+        {
+            cost += stale.Cost;
+            if (stale.DataBlocks > 0) { data += stale.DataBlocks; room = Room.Data; }
+        }
+        EnsureSpace(room, cost, data, credit);
 
         Mutate(() =>
         {
             if (newBlocks < allocEnd) TruncateExtents(ino.PrivateId, exts, newBlocks);
-            else if (newBlocks > allocEnd) ReplaceRange(ino.PrivateId, exts, allocEnd, newBlocks - allocEnd, 0);
+            if (stale is not null) ApplyStaleZeroing(id, ino.PrivateId, exts, stale, size);
+            if (newBlocks > allocEnd) ReplaceRange(ino.PrivateId, exts, allocEnd, newBlocks - allocEnd, 0);
             UpdateStream(id, GetInode(id)!, newSize, exts);
             if (tail is not null) ReplaceBlocks(id, ino.PrivateId, exts, lastBlock, tail, newSize);
         });

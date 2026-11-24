@@ -38,25 +38,65 @@ public static class VolumeKeys
         }
     }
 
-    /// <summary>Parolayla birimin VEK'ini (32 bayt: XTS anahtar1 + anahtar2) açar. Yanlış parolada WrongPassword hatası.</summary>
-    public static byte[] Unlock(ApfsContainer container, Guid volumeUuid, string password)
+    /// <summary>Bir birimin anahtar deposunda kabul edilen en çok kilit açma (KEK) kaydı. Gerçekte 1–2 (kullanıcı + kurtarma
+    /// anahtarı; tamDuzeltmePlan P0 Mac ölçümü: FileVault veri birimi 2, harici disk birimleri 1); 16 = ×8 pay.</summary>
+    internal const int MaxUnlockRecords = 16;
+
+    /// <summary>Bir kilit açmada bütün KEK kayıtlarının PBKDF2 yinelemeleri toplamının üst sınırı (= kayıt başına sınırla iki tam
+    /// kayıt). Bu makinede 10^8 ≈ 10 sn → en kötü ≈ 20 sn: tepsinin 60 sn'lik kilit açma isteğine hizmetin deneme beklemesiyle
+    /// birlikte sığar. Gerçek Mac birimleri (tamDuzeltmePlan P1 ölçümü, diskutil ile şifrelenmiş): 1 kayıt, 100 000 yineleme.</summary>
+    internal const ulong MaxTotalIterations = 200_000_000;
+
+    private const ulong MaxIterations = 100_000_000;
+
+    /// <summary>
+    /// Parolayla birimin VEK'ini (32 bayt: XTS anahtar1 + anahtar2) açar. Yanlış parolada WrongPassword hatası.
+    /// <paramref name="cancel"/> kayıtlar arasında denetlenir (disk çıkarıldı): iptalde IoError.
+    /// </summary>
+    public static byte[] Unlock(ApfsContainer container, Guid volumeUuid, string password, CancellationToken cancel = default)
     {
         var bag = LoadContainerKeybag(container);
         var vekEntry = bag.FirstOrDefault(e => e.Tag == TagVolumeKey && e.Uuid == volumeUuid);
         if (vekEntry.Data is null)
             throw new ApfsException(ApfsErrorCode.Unsupported, CoreText.T("Crypto.VolumeKeyNotInContainer"));
         var recs = LoadVolumeKeybag(container, volumeUuid);
+        return UnlockRecords(recs, vekEntry.Data, volumeUuid, password, cancel);
+    }
+
+    /// <summary>Birim anahtar deposunun kayıtlarından VEK'i açar (sınırlar: <see cref="MaxUnlockRecords"/>, <see cref="MaxTotalIterations"/>).</summary>
+    internal static byte[] UnlockRecords(IReadOnlyList<KeybagEntry> recs, byte[] vekBlob, Guid volumeUuid, string password, CancellationToken cancel)
+    {
+        // Pahalı PBKDF2'den önce: kayıt sayısı ve toplam yineleme (bozuk/düşmanca depo saatlerce sürmesin)
+        // Okunamayan kayıt sırası gelince hata verir (önceki davranış: ondan önceki kayıt parolayı açtıysa açılış başarılı)
+        var keks = new List<(KekRecord? Rec, ApfsException? Error)>();
+        ulong total = 0;
+        foreach (var rec in recs)
+        {
+            if (rec.Tag != TagVolumeUnlockRecords) continue;
+            if (keks.Count == MaxUnlockRecords)
+                throw ApfsException.Corrupt(CoreText.T("Crypto.TooManyUnlockRecords", recs.Count(e => e.Tag == TagVolumeUnlockRecords), MaxUnlockRecords));
+            try
+            {
+                var kek = ParseKek(rec.Data);
+                total += kek.Iterations;
+                keks.Add((kek, null));
+            }
+            catch (ApfsException e) when (e.Code is not ApfsErrorCode.IoError) { keks.Add((null, e)); }
+        }
+        if (total > MaxTotalIterations) throw ApfsException.Corrupt(CoreText.T("Crypto.IterationBudget", total, MaxTotalIterations));
 
         var pw = System.Text.Encoding.UTF8.GetBytes(password);
         try
         {
-            foreach (var rec in recs.Where(e => e.Tag == TagVolumeUnlockRecords))
+            foreach (var (rec, error) in keks)
             {
-                var kek = TryUnwrapKek(rec.Data, pw);
+                if (cancel.IsCancellationRequested) throw new ApfsException(ApfsErrorCode.IoError, CoreText.T("Crypto.UnlockCancelled"));
+                if (rec is null) throw error!;
+                var kek = TryUnwrapKek(rec, pw);
                 if (kek is null) continue;
                 try
                 {
-                    var vek = UnwrapVek(vekEntry.Data, kek);
+                    var vek = UnwrapVek(vekBlob, kek);
                     if (vek is not null) return vek;
                 }
                 finally
@@ -153,22 +193,27 @@ public static class VolumeKeys
         return seq.Read(0xA3);
     }
 
-    private static byte[]? TryUnwrapKek(byte[] blob, byte[] password)
+    internal sealed record KekRecord(byte[] Wrapped, ulong Iterations, byte[] Salt, bool Aes128);
+
+    internal static KekRecord ParseKek(byte[] blob)
     {
         var inner = new Der(OpenBlob(blob));
         var hdr = ParseHeader(ref inner);
-        var wrapped = inner.Read(0x83);
+        var wrapped = inner.Read(0x83).ToArray();
         ulong iterations = Der.ToUInt(inner.Read(0x84));
-        var salt = inner.Read(0x85);
-        if (iterations is 0 or > 100_000_000) throw ApfsException.Corrupt(CoreText.T("Crypto.KekIterationsInvalid"));
+        var salt = inner.Read(0x85).ToArray();
+        if (iterations is 0 or > MaxIterations) throw ApfsException.Corrupt(CoreText.T("Crypto.KekIterationsInvalid"));
+        return new KekRecord(wrapped, iterations, salt, (hdr.Flags & 2) != 0);
+    }
 
-        bool aes128 = (hdr.Flags & 2) != 0;
-        var dk = Rfc2898DeriveBytes.Pbkdf2(password, salt, (int)iterations, HashAlgorithmName.SHA256, 32);
+    private static byte[]? TryUnwrapKek(KekRecord rec, byte[] password)
+    {
+        var dk = Rfc2898DeriveBytes.Pbkdf2(password, rec.Salt, (int)rec.Iterations, HashAlgorithmName.SHA256, 32);
         try
         {
-            return aes128
-                ? AesKeyWrap.Unwrap(dk.AsSpan(0, 16), wrapped[..Math.Min(24, wrapped.Length)])
-                : AesKeyWrap.Unwrap(dk, wrapped);
+            return rec.Aes128
+                ? AesKeyWrap.Unwrap(dk.AsSpan(0, 16), rec.Wrapped.AsSpan(0, Math.Min(24, rec.Wrapped.Length)))
+                : AesKeyWrap.Unwrap(dk, rec.Wrapped);
         }
         finally
         {
@@ -186,6 +231,7 @@ public static class VolumeKeys
             // 128 bit VEK: ikinci yarı SHA256(VEK || kayıttaki uuid)'nin ilk 16 baytı
             var vek16 = AesKeyWrap.Unwrap(kek, wrapped[..Math.Min(24, wrapped.Length)]);
             if (vek16 is null) return null;
+            if (vek16.Length != 16) throw VekLength(vek16, 16);
             var full = new byte[32];
             vek16.CopyTo(full, 0);
             var hash = SHA256.HashData([.. vek16, .. hdr.Uuid]);
@@ -193,7 +239,17 @@ public static class VolumeKeys
             CryptographicOperations.ZeroMemory(vek16);
             return full;
         }
-        return AesKeyWrap.Unwrap(kek, wrapped);
+        var vek = AesKeyWrap.Unwrap(kek, wrapped);
+        if (vek is not null && vek.Length != 32) throw VekLength(vek, 32);
+        return vek;
+    }
+
+    /// <summary>Parola doğru ama birim anahtarı beklenen uzunlukta değil: desteklenmeyen anahtar türü (yanıltıcı ileti yerine).</summary>
+    private static ApfsException VekLength(byte[] vek, int expected)
+    {
+        int length = vek.Length;
+        CryptographicOperations.ZeroMemory(vek);
+        return new ApfsException(ApfsErrorCode.Unsupported, CoreText.T("Crypto.VekLengthUnsupported", length, expected));
     }
 }
 
@@ -204,21 +260,30 @@ public static class VolumeKeys
 public sealed class VolumeKey : IDisposable
 {
     private readonly byte[] _vek;
-    private bool _disposed;
+    private int _disposed;
+    private static int s_live;
 
     private VolumeKey(Guid volumeUuid, byte[] vek)
     {
         if (vek.Length != 32) throw new ArgumentException(CoreText.T("Crypto.VekLength"), nameof(vek));
         VolumeUuid = volumeUuid;
         _vek = vek;
+        Interlocked.Increment(ref s_live);
     }
+
+    /// <summary>
+    /// Teşhis: bu süreçte oluşturulup henüz bırakılmamış (Dispose ile sıfırlanmamış) anahtar sayısı. Hizmetin geliştirme kipi
+    /// kilit açma ↔ çıkarma yarışından sonra bunu günlüğe yazar: bellekte anahtar kalmadığı sınanır.
+    /// </summary>
+    public static int LiveCount => Volatile.Read(ref s_live);
 
     /// <summary>Anahtarın ait olduğu birim.</summary>
     public Guid VolumeUuid { get; }
 
     /// <summary>Parolayla birimin anahtarını açar (yanlış parolada WrongPassword hatası, ipucuyla).</summary>
-    public static VolumeKey Unlock(ApfsContainer container, Guid volumeUuid, string password) =>
-        new(volumeUuid, VolumeKeys.Unlock(container, volumeUuid, password));
+    /// <param name="cancel">Disk bırakılınca iptal: kayıtlar arasında durur (IoError).</param>
+    public static VolumeKey Unlock(ApfsContainer container, Guid volumeUuid, string password, CancellationToken cancel = default) =>
+        new(volumeUuid, VolumeKeys.Unlock(container, volumeUuid, password, cancel));
 
     /// <summary>Testler ve araçlar için: verilen VEK baytlarının kopyasıyla anahtar.</summary>
     internal static VolumeKey FromBytes(Guid volumeUuid, ReadOnlySpan<byte> vek) => new(volumeUuid, vek.ToArray());
@@ -226,22 +291,22 @@ public sealed class VolumeKey : IDisposable
     /// <summary>Bağımsız kopya (ayrı ayrı bırakılabilir).</summary>
     public VolumeKey Clone()
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
         return new VolumeKey(VolumeUuid, (byte[])_vek.Clone());
     }
 
     /// <summary>Bu anahtarla şifreleyici/çözücü (kendi VEK kopyasını alır).</summary>
     internal VolumeCrypto CreateCrypto(uint blockSize)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
         return new VolumeCrypto((byte[])_vek.Clone(), blockSize);
     }
 
     public void Dispose()
     {
-        if (_disposed) return;
-        _disposed = true;
+        if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
         CryptographicOperations.ZeroMemory(_vek);
+        Interlocked.Decrement(ref s_live);
     }
 }
 

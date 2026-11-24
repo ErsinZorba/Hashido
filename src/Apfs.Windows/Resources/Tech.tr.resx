@@ -66,11 +66,17 @@
   <data name="Cli.DepthExceeded" xml:space="preserve">
     <value>{0}: klasör derinliği 256'yı aştı (döngü olabilir)</value>
   </data>
+  <data name="Cli.DirectoryLoop" xml:space="preserve">
+    <value>{0}: klasör zaten görüldü (klasör döngüsü); içine inilmedi</value>
+  </data>
   <data name="Cli.EncryptedUnlocked" xml:space="preserve">
     <value> (şifreli, kilidi açıldı)</value>
   </data>
   <data name="Cli.Error" xml:space="preserve">
     <value>Hata: {0}</value>
+  </data>
+  <data name="Cli.ExtractNotFile" xml:space="preserve">
+    <value>{0} sıradan bir dosya değil ({1}); hiçbir şey çıkarılmadı</value>
   </data>
   <data name="Cli.FullClean" xml:space="preserve">
     <value>Sonuç: yapısal tutarlılık tam ({0:N1} sn).</value>
@@ -146,6 +152,15 @@ Seçenekler: --volume N (birim sırası, varsayılan 0), --partition N (APFS bö
   </data>
   <data name="Cli.InfoVolumeFailed" xml:space="preserve">
     <value>Birim {0}: açılamadı: {1}</value>
+  </data>
+  <data name="Cli.KindDirectory" xml:space="preserve">
+    <value>klasör</value>
+  </data>
+  <data name="Cli.KindSpecial" xml:space="preserve">
+    <value>özel dosya</value>
+  </data>
+  <data name="Cli.KindSymlink" xml:space="preserve">
+    <value>sembolik bağ</value>
   </data>
   <data name="Cli.InstallDirInUse" xml:space="preserve">
     <value>{0} klasöründe kurulu bir program var ("apfs register" kopyası işareti yok); üzerine yazılmadı. "apfs register"ı o klasördeki apfs.exe ile çalıştırın.</value>
@@ -404,6 +419,18 @@ Seçenekler: --volume N (birim sırası, varsayılan 0), --partition N (APFS bö
   </data>
   <data name="Svc.UnlockFailed" xml:space="preserve">
     <value>{0}: "{1}" kilit açma başarısız: {2}</value>
+  </data>
+  <data name="Svc.UnlockDiskGone" xml:space="preserve">
+    <value>{0}: "{1}" kilidi açılırken disk bırakıldı; anahtar silindi, birim bağlanmadı.</value>
+  </data>
+  <data name="Svc.UnlockDelayed" xml:space="preserve">
+    <value>{0}: çok sayıda yanlış parola; bu deneme {1} ms bekletildi.</value>
+  </data>
+  <data name="Raw.OpenTimedOut" xml:space="preserve">
+    <value>{0}: disk açılırken {1} sn içinde yanıt vermedi; okunamıyor sayıldı.</value>
+  </data>
+  <data name="Raw.ReadTimedOut" xml:space="preserve">
+    <value>{0}: disk bir okumayı {1} sn içinde yanıtlamadı; okunamıyor sayıldı.</value>
   </data>
   <data name="Svc.UnmountError" xml:space="preserve">
     <value>{0}: ayırma hatası: {1}</value>

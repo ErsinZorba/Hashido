@@ -37,6 +37,7 @@ public static class ApfsConstants
     public const uint TypeNxReaper = 0x11;
     public const uint TypeNxReapList = 0x12;
     public const uint TypeOmapSnapshot = 0x13;
+    public const uint TypeErState = 0x18;
     public const uint TypeFextTree = 0x1F;
 
     // nx_incompatible_features

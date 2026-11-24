@@ -97,8 +97,23 @@ public sealed class Spaceman
         var sm = new Spaceman(reader, checkpoint, m, raw);
         if (sm.BlockSize != reader.BlockSize || sm.BlocksPerChunk != reader.BlockSize * 8)
             throw ApfsException.Corrupt(CoreText.T("Sm.SizeInconsistent"));
+        // Okuyanların (tam denetim, yazıcı, döküm) ayırmaları ve döngüleri kapsayıcının blok sayısıyla sınırlı kalsın:
+        // iç havuz ve bitmap halkası kapsayıcının içinde, bitmap iç havuzun tamamını kaplar ve ondan çok büyük değildir.
+        ulong blocks = sb.BlockCount, bits = (ulong)reader.BlockSize * 8;
+        if (!Inside(sm.IpBase, sm.IpBlockCount, blocks) || !Inside(sm.IpBmBase, sm.IpBmBlockCount, blocks)
+            || sm.IpBmSizeInBlocks > sm.IpBmBlockCount || (ulong)sm.IpBmSizeInBlocks * bits < sm.IpBlockCount
+            || sm.IpBmSizeInBlocks > 2 * ((sm.IpBlockCount + bits - 1) / bits) + 1)
+            throw ApfsException.Corrupt(CoreText.T("Sm.InternalPoolInvalid"));
+        sm._maxChunks = (blocks + sm.BlocksPerChunk - 1) / sm.BlocksPerChunk;
+        sm._containerBlocks = blocks;
         return sm;
     }
+
+    private static bool Inside(ulong start, ulong count, ulong blocks) => start <= blocks && count <= blocks - start;
+
+    /// <summary>Kapsayıcının blok sayısıyla mümkün olan en çok parça (her CIB/CAB en az bir parça taşır).</summary>
+    private ulong _maxChunks = ulong.MaxValue;
+    private ulong _containerBlocks = ulong.MaxValue;
 
     public static Spaceman Read(ApfsContainer c, Checkpoint checkpoint) => Read(c.Reader, c.Superblock, checkpoint);
 
@@ -118,6 +133,7 @@ public sealed class Spaceman
     public IReadOnlyList<ulong> MainCibAddresses()
     {
         var dev = Main;
+        if (dev.CibCount > _maxChunks || dev.CabCount > _maxChunks) throw ApfsException.Corrupt(CoreText.T("Sm.TooManyChunks"));
         var list = new List<ulong>((int)Math.Min(dev.CibCount, 1_000_000));
         if (dev.CabCount == 0)
         {
@@ -131,6 +147,7 @@ public sealed class Spaceman
             if (Bin.U32(cab, 32) != c) throw ApfsException.Corrupt(CoreText.T("Sm.CabWrongIndex", cabAddr));
             uint n = Bin.U32(cab, 36);
             if (40 + (long)n * 8 > cab.Length) throw ApfsException.Corrupt(CoreText.T("Sm.CabCountTooBig", cabAddr));
+            if ((ulong)list.Count + n > _maxChunks) throw ApfsException.Corrupt(CoreText.T("Sm.TooManyChunks"));
             for (uint i = 0; i < n; i++) list.Add(Bin.U64(cab, (int)(40 + i * 8)));
         }
         return list;
@@ -149,10 +166,15 @@ public sealed class Spaceman
             if (Bin.U32(cib, 32) != (uint)c) throw ApfsException.Corrupt(CoreText.T("Sm.CibWrongIndex", cibs[c]));
             uint n = Bin.U32(cib, 36);
             if (40 + (long)n * 32 > cib.Length) throw ApfsException.Corrupt(CoreText.T("Sm.CibCountTooBig", cibs[c]));
+            if ((ulong)list.Count + n > _maxChunks) throw ApfsException.Corrupt(CoreText.T("Sm.TooManyChunks"));
             for (uint i = 0; i < n; i++)
             {
                 int o = (int)(40 + i * 32);
-                list.Add(new ChunkInfo(Bin.U64(cib, o), Bin.U64(cib, o + 8), Bin.U32(cib, o + 16), Bin.U32(cib, o + 20), Bin.U64(cib, o + 24)));
+                var ch = new ChunkInfo(Bin.U64(cib, o), Bin.U64(cib, o + 8), Bin.U32(cib, o + 16), Bin.U32(cib, o + 20), Bin.U64(cib, o + 24));
+                // Parçanın bitmap'i tek bloktur: blok sayısı onu aşamaz, parça kapsayıcının içinde (yazıcı buradan ayırır)
+                if (ch.BlockCount > BlocksPerChunk || !Inside(ch.Addr, ch.BlockCount, _containerBlocks))
+                    throw ApfsException.Corrupt(CoreText.T("Sm.ChunkInvalid", ch.Addr));
+                list.Add(ch);
             }
         }
         return list;
