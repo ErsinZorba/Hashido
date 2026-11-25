@@ -33,6 +33,8 @@ internal sealed class SettingsView
     private readonly bool _reportsAtOpen;
     private readonly ActionButton _back;
     private readonly ScrollViewer _scroll;
+    private UpdateInfo? _found;       // Güncellemeler kartında "Kur"un kuracağı sürüm (bilinen ya da son denetimin bulduğu)
+    private readonly Action? _unsubscribe;
 
     public SettingsView(MainWindow main)
     {
@@ -46,15 +48,22 @@ internal sealed class SettingsView
         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         View = root;
 
-        // Üst: geri (= İptal) + başlık
-        var header = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(-8, 0, 0, 10) };
+        // Üst: geri (= İptal) + başlık. Izgara: başlık kalan genişliğe sığmazsa alt satıra sarılır (1.9.0; yatay yığında sınırsız
+        // genişlikle ölçülüyor, uzun dillerde dar pencerede sağdan kesiliyordu). Geri düğmesi ilk satırın hizasında kalır.
+        var header = new Grid { Margin = new Thickness(-8, 0, 0, 10) };
+        header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        header.ColumnDefinitions.Add(new ColumnDefinition());
         _back = new ActionButton(WinText.U("Action.CancelDialog"), ButtonKind.Quiet, "", iconOnly: true, iconSize: 17);
         _back.Invoked += Cancel;
+        _back.VerticalAlignment = VerticalAlignment.Top;
         header.Children.Add(_back);
         var heading = UiKit.Heading(WinText.U("Settings.Title", Branding.ProductName), 30);
         heading.VerticalAlignment = VerticalAlignment.Center;
         heading.Margin = new Thickness(6, 0, 0, 0);
+        Grid.SetColumn(heading, 1);
         header.Children.Add(heading);
+        // Geri düğmesi başlığın İLK satırının ortasında (tek satırda önceki yığın düzeniyle aynı yer)
+        _back.Margin = new Thickness(0, Math.Max(0, (heading.FontFamily.LineSpacing * heading.FontSize - _back.Height) / 2), 0, 0);
         root.Children.Add(header);
 
         var body = new StackPanel { MaxWidth = 720, Margin = new Thickness(0, 0, 4, 16) };
@@ -151,7 +160,8 @@ internal sealed class SettingsView
         }
 
         // Güncellemeler: bildirim; kendiliğinden indir ve kur (yalnız bildirim işaretliyken etkin; kayıtlı seçim korunur);
-        // "Şimdi denetle" (meşgul "Denetleniyor…") → sonuç düz metin (N7)
+        // "Şimdi denetle" (meşgul "Denetleniyor…") → sonuç düz metin (N7). Yeni sürüm biliniyorsa ya da denetim bulursa "X sürümü çıktı"
+        // + "Kur" (1.9.0): ana penceredeki bağlantıyla AYNI akış (UpdateNowAsync); indirme yüzdesi ve meşgulluk UpdateChanged'den
         body.Children.Add(Section(WinText.U("Settings.UpdatesHeading")));
         _updates = Check(WinText.U("Settings.UpdateNotify"), UserSettings.UpdateNotify);
         _autoInstall = Check(WinText.U("Settings.UpdateAutoInstall"), UserSettings.UpdateAutoInstall);
@@ -162,7 +172,34 @@ internal sealed class SettingsView
         var result = UiKit.Text("", 13, Role.InkSoft);
         result.Visibility = Visibility.Collapsed;
         result.VerticalAlignment = VerticalAlignment.Center;
+        result.TextWrapping = TextWrapping.Wrap;
         result.Margin = new Thickness(12, 0, 0, 0);
+        var install = new ActionButton(WinText.U("Action.Install")) { Visibility = Visibility.Collapsed, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(12, 0, 0, 0) };
+        _found = features?.AvailableUpdate;
+        void ShowFound()
+        {
+            if (features is null || _open.Task.IsCompleted) return;
+            // Ayarlar açıkken arka planda değişen sürüm de yansısın: bilinen sürüm (alt bağlantının gösterdiği) önce; bildirim kapalıyken elle
+            // bulunan sürüm, kayıttaki sürümle aynı kaldıkça (sunucu "güncel" deyince kayıt silinir: geri çekildi)
+            _found = features.AvailableUpdate
+                ?? (_found is { } f && System.Version.TryParse(UserSettings.UpdateNotifiedVersion, out var n) && UpdateChecker.Normalize(n) == UpdateChecker.Normalize(f.Version) ? f : null);
+            install.Visibility = UiKit.Vis(_found is not null);
+            if (_found is not { } u) return;
+            result.Text = features.DownloadPercent is { } p ? WinText.U("Update.Downloading", u.Version.ToString(3), p) : WinText.U("Update.Link", u.Version.ToString(3));
+            result.Visibility = Visibility.Visible;
+            install.Busy = features.Updating || features.SetupRunning;
+        }
+        install.Invoked += async () =>
+        {
+            if (features is null || install.Busy) return;
+            await features.UpdateNowAsync(_main.Controller, _main);
+            ShowFound();
+        };
+        if (features is not null)
+        {
+            features.UpdateChanged += ShowFound;
+            _unsubscribe = () => features.UpdateChanged -= ShowFound;
+        }
         checkNow.Invoked += async () =>
         {
             if (checkNow.Busy) return;
@@ -171,19 +208,26 @@ internal sealed class SettingsView
             {
                 var r = features is null ? new UpdateCheckResult(false, null) : await features.CheckNowAsync();
                 if (_open.Task.IsCompleted) return; // Ayarlar kapandı: sonuç atılır
+                if (r.Answered) _found = r.Update; // denetlenemediyse bilinen sürüm (ve Kur) kalır
                 result.Text = !r.Answered ? WinText.U("Settings.CheckFailed")
                     : r.Update is { } u ? WinText.U("Update.Link", u.Version.ToString(3))
                     : WinText.U("Settings.UpToDate", Branding.ProductName);
                 result.Visibility = Visibility.Visible;
+                if (r.Answered) ShowFound();
+                else install.Visibility = UiKit.Vis(_found is not null);
             }
             finally { checkNow.Busy = false; }
         };
         var checkRow = new Grid();
         checkRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         checkRow.ColumnDefinitions.Add(new ColumnDefinition());
+        checkRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         checkRow.Children.Add(checkNow);
         Grid.SetColumn(result, 1);
         checkRow.Children.Add(result);
+        Grid.SetColumn(install, 2);
+        checkRow.Children.Add(install);
+        ShowFound();
         body.Children.Add(Card(_updates, _autoInstall, checkRow));
 
         // Hakkında: sürüm (Hakkında kutusu; WinFsp notu orada), günlük, sahip
@@ -223,7 +267,11 @@ internal sealed class SettingsView
     public void Focus() => View.Dispatcher.BeginInvoke(() => _scroll.Focus());
 
     /// <summary>Ayarlar kapandı (Diskler'e dönüldü): açık-pencere sayacı düşer, "Şimdi denetle"nin geç sonucu atılır.</summary>
-    public void Closed() => _open.TrySetResult();
+    public void Closed()
+    {
+        _open.TrySetResult();
+        _unsubscribe?.Invoke();
+    }
 
     private static TextBlock Section(string text, double top = 20)
     {

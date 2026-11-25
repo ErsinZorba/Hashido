@@ -104,6 +104,13 @@ internal sealed class FlyoutWindow : Window
         _fade.Tick += (_, _) => FadeStep();
 
         Deactivated += (_, _) => { if (!Offscreen) HidePanel(); };
+        // Esc paneli kapatır (1.9.0; Windows'un açılır panelleri gibi)
+        PreviewKeyDown += (_, e) =>
+        {
+            if (e.Key != System.Windows.Input.Key.Escape) return;
+            e.Handled = true;
+            HidePanel();
+        };
         Closing += OnClosing;
         IsVisibleChanged += (_, _) =>
         {

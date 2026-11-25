@@ -114,6 +114,7 @@ public sealed class AppController : IDisposable
         // Sorgu başlarken yazma durumu değişen bölümler: yanıt geldiğinde geçiş bitmiş olsa da bu anlık görüntüde o bölümün
         // birimleri eksik olabilir (AskPasswordsAsync onların "soruldu" kaydını silmesin)
         var switchingAtStart = _switching.ToHashSet();
+        StatusResponse? asked = null;
         try
         {
             var s = await _services.Channel.SendAsync<StatusResponse>(new Request("status", Since: Math.Max(0, _lastNotice)), TimeSpan.FromSeconds(3));
@@ -131,7 +132,7 @@ public sealed class AppController : IDisposable
             if (_lastNotice >= 0) ShowNotices(s.Notices); // ilk açılışta eski bildirimleri gösterme
             _lastNotice = s.LastNoticeId;
             RaiseIfChanged();
-            await AskPasswordsAsync(s, switchingAtStart);
+            asked = s;
         }
         // Aşırı uzun ya da bozuk yanıt (InvalidData/Json) da "hizmete ulaşılamadı": zamanlayıcı async void, dışarı çıkan istisna
         // tepsiyi düşürüyordu
@@ -144,6 +145,9 @@ public sealed class AppController : IDisposable
         {
             _busy = false;
         }
+        // Parola/Hello penceresi açıkken yoklama sürer (1.9.0): durum tazelenir, yeni bildirimler balona çıkar. Aynı birime ikinci
+        // pencere açılmaz (_asked, _unlocking).
+        if (asked is not null) await AskPasswordsAsync(asked, switchingAtStart);
     }
 
     /// <summary>Son başarılı yoklamadaki hizmet çalışmasının kimliği (eski hizmette null).</summary>
@@ -270,6 +274,11 @@ public sealed class AppController : IDisposable
         // ya da Salt okunura dönünce) kilitli birimin parola penceresi yeniden açılırdı (1.7.0).
         var waiting = s.Disks.SelectMany(d => d.Volumes.Where(v => v.State == VolumeStatus.NeedsPassword).Select(v => AskKey(d, v))).ToHashSet();
         _asked.RemoveWhere(k => !waiting.Contains(k) && !_switching.Contains(k[..k.LastIndexOf('#')]) && !switchingAtStart.Contains(k[..k.LastIndexOf('#')]));
+        // Kayıtlı parolası tutmamış birim yeniden takılınca kayıtlı parola yine bir kez denenir
+        _savedRefused.IntersectWith(_asked);
+        // Aynı anda en çok bir kendiliğinden akış (H18): sürerken yeni kilitli birimler "soruldu" sayılmaz, akış bitince sonraki
+        // yoklama onları alır (yoklamanın kendisi artık durmaz)
+        if (_autoUnlocking) return;
         var due = new List<(DiskStatus D, VolumeStatus V)>();
         foreach (var d in s.Disks)
             foreach (var v in d.Volumes.Where(v => v.State == VolumeStatus.NeedsPassword))
@@ -281,8 +290,20 @@ public sealed class AppController : IDisposable
                 due.Add((d, v));
             }
         // Taramada bulunan bütün kilitli birimler birlikte: kayıtlı parolalar için tek Hello onayı (parolaPlan 2.2)
-        if (due.Count > 0) await UnlockVolumesAsync(due);
+        if (due.Count == 0) return;
+        _autoUnlocking = true;
+        try { await UnlockVolumesAsync(due); }
+        finally { _autoUnlocking = false; }
     }
+
+    /// <summary>Taramanın başlattığı kilit açma akışı (Hello + o taramadaki pencereler) sürüyor.</summary>
+    private bool _autoUnlocking;
+
+    /// <summary>
+    /// Kayıtlı parolası hizmetçe "yanlış" denen birimler (<see cref="AskKey"/>; 1.9.0): kayıt silinmez ama disk takılı kaldıkça o
+    /// birime bir daha kendiliğinden gönderilmez (elle "Kilidi aç" doğrudan parola penceresi açar). Birim beklemekten çıkınca unutulur.
+    /// </summary>
+    private readonly HashSet<string> _savedRefused = [];
 
     /// <summary>Birimin parola penceresi anahtarı: disk + APFS bölüm sırası + birim sırası.</summary>
     internal static string AskKey(DiskStatus d, VolumeStatus v) => $"{d.Id}#{v.Container}#{v.Index}";
@@ -307,9 +328,10 @@ public sealed class AppController : IDisposable
     /// <summary>
     /// Kilitli birimleri açar ("Bu bilgisayarda hatırla", parolaPlan 2.2). Kayıtlı parolası olan birimler için karar BİR kez
     /// verilir (<see cref="RememberPolicy"/>): Hello varsa tek onay penceresi (ileti birimleri sayar), Hello kesin yoksa
-    /// doğrudan; Hello bilinmiyorsa (uzak oturum, hata), onay verilmezse ya da kayıt yoksa parola penceresi. Kayıtlı parola
-    /// tutmazsa (hizmet <c>WrongPassword</c> derse) kayıt silinir, pencere "Kayıtlı parola artık geçerli değil" ile açılır;
-    /// başka her hatada (hizmete ulaşılamıyor dahil) kayıt kalır. Birimler sırayla açılır.
+    /// doğrudan (yalnız etkin oturumda); Hello bilinmiyorsa (uzak oturum, hata), onay verilmezse ya da kayıt yoksa parola
+    /// penceresi. Kayıtlı parola tutmazsa (hizmet <c>WrongPassword</c> derse) kayıt KALIR (aynı UUID'li başka bir disk gerçek
+    /// diskin kaydını silmesin; 1.9.0), pencere "Kayıtlı parola artık geçerli değil" ile kutu işaretli açılır ve kayıtlı parola
+    /// o birime disk takılı kaldıkça bir daha gönderilmez. Birimler sırayla açılır.
     /// </summary>
     private async Task UnlockVolumesAsync(List<(DiskStatus D, VolumeStatus V)> items)
     {
@@ -318,14 +340,19 @@ public sealed class AppController : IDisposable
         try
         {
             var saved = new Dictionary<string, string>(); // AskKey → kayıtlı parola (yalnız bu yöntemin ömrü boyunca bellekte)
+            var recorded = new HashSet<string>();         // kaydı olan birimler (kutu işaretli açılır)
             foreach (var (d, v) in mine)
-                if (ReadSaved(v) is { } p) saved[AskKey(d, v)] = p;
+                if (ReadSaved(v) is { } p)
+                {
+                    recorded.Add(AskKey(d, v));
+                    if (!_savedRefused.Contains(AskKey(d, v))) saved[AskKey(d, v)] = p;
+                }
             HelloAvailability? hello = null;
             bool useSaved = false, approved = false; // approved: kullanıcı Hello'da onayladı (yoksa kendiliğinden açılış)
             if (saved.Count > 0)
             {
                 hello = await _services.HelloAvailability();
-                var action = RememberPolicy.Decide(hasSaved: true, hello.Value, partitionWritable: false);
+                var action = RememberPolicy.Decide(hasSaved: true, hello.Value, partitionWritable: false, sessionActive: _services.IsSessionActive);
                 if (action == RememberAction.VerifyWithHello)
                 {
                     string names = string.Join(", ", mine.Where(x => saved.ContainsKey(AskKey(x.D, x.V))).Select(x => x.V.Name));
@@ -337,7 +364,8 @@ public sealed class AppController : IDisposable
             foreach (var (d, v) in mine)
             {
                 string? error = null;
-                bool hasSaved = saved.TryGetValue(AskKey(d, v), out var password);
+                bool hasSaved = recorded.Contains(AskKey(d, v));
+                saved.TryGetValue(AskKey(d, v), out var password);
                 if (useSaved && password is not null)
                 {
                     var r = await SendUnlockAsync(d, v, password);
@@ -349,11 +377,10 @@ public sealed class AppController : IDisposable
                             Notify(r!.Message, NoticeLevel.Info, requested: approved); // Hello'suz kendiliğinden açılış "önemli" değil
                             await PollAsync();
                             continue;
-                        case SavedAttemptOutcome.ForgetAndAsk:
-                            // Mac'te parola değişmiş: kayıt silinir, bir kez sorulur (döngü yok)
-                            ForgetSaved(v);
-                            _services.Log(WinText.T("Password.SavedRemoved", v.Name));
-                            hasSaved = false;
+                        case SavedAttemptOutcome.WrongAndAsk:
+                            // Mac'te parola değişmiş ya da aynı UUID'li başka disk: kayıt kalır, bir kez sorulur (döngü yok)
+                            _savedRefused.Add(AskKey(d, v));
+                            _services.Log(WinText.T("Password.SavedRefused", v.Name));
                             error = WinText.U("Password.SavedInvalid");
                             break;
                         default:
@@ -386,16 +413,22 @@ public sealed class AppController : IDisposable
             if (r is { Ok: true })
             {
                 // Yalnız tutan parola kaydedilir; kutu boş bırakıldıysa varsa eski kayıt silinir
+                bool remembered = true;
                 switch (RememberPolicy.AfterManualUnlock(remember))
                 {
-                    case RememberStore.Save: SaveOrLog(v, answer.Password); break;
+                    case RememberStore.Save: remembered = SaveOrLog(v, answer.Password); break;
                     case RememberStore.Delete: ForgetSaved(v); break;
                 }
-                Notify(r.Message, NoticeLevel.Info, requested: true); // parola penceresi: kullanıcının işi
+                // parola penceresi: kullanıcının işi; "hatırla" kasaya yazılamadıysa aynı balonda tek satırla söylenir (1.9.0)
+                if (remembered) Notify(r.Message, NoticeLevel.Info, requested: true);
+                else Notify(r.Message + "\n" + WinText.U("Password.NotRemembered"), NoticeLevel.Warning, requested: true);
                 await PollAsync();
                 return;
             }
             error = r is null ? WinText.U("Error.ServiceUnreachable") : r.Message;
+            // Pencere açıkken disk çekilmiş ya da birim başka yoldan açılmış olabilir ("artık parola beklemiyor"): kilitli beklemeyen
+            // birime pencere yeniden açılmaz (durum alınamazsa açılır)
+            if (!RememberPolicy.StillLocked(await FreshStatusAsync(), d.Id, v.Container, v.Index, v.Uuid)) return;
         }
     }
 
@@ -448,13 +481,19 @@ public sealed class AppController : IDisposable
         if (RememberPolicy.NeedsRename(stored, v.Name)) SaveOrLog(v, password);
     }
 
-    private void SaveOrLog(VolumeStatus v, string password)
+    /// <returns>Kaydedildi (UUID yoksa da true: kutu gösterilmemişti).</returns>
+    private bool SaveOrLog(VolumeStatus v, string password)
     {
-        if (v.Uuid is not { } uuid) return;
-        try { _services.Credentials.Save(uuid, v.Name, password); }
+        if (v.Uuid is not { } uuid) return true;
+        try
+        {
+            _services.Credentials.Save(uuid, v.Name, password);
+            return true;
+        }
         catch (Exception e) when (e is System.ComponentModel.Win32Exception or ArgumentException)
         {
             _services.Log(WinText.T("Password.SaveFailed", v.Name, e.Message));
+            return false;
         }
     }
 
@@ -570,16 +609,56 @@ public sealed class AppController : IDisposable
         }
     }
 
-    public static void OpenDrive(string mountPoint) =>
-        Process.Start(new ProcessStartInfo("explorer.exe", mountPoint.EndsWith('\\') ? mountPoint : mountPoint + "\\") { UseShellExecute = true });
+    public static void OpenDrive(string mountPoint) => OpenDrive(mountPoint, Process.Start, ServiceLog.Write);
+
+    /// <summary>
+    /// Birimin "Aç"ı: harf bu oturumda kullanıcının bir eşlemesine (ağ sürücüsü, subst) bağlıysa Gezgin Mac diskini değil o sürücüyü
+    /// açardı → açmak yerine açıklama (1.9.0; hizmet harfi bütün oturumlar için seçer, oturumun kendi eşlemesini göremez).
+    /// </summary>
+    public Task OpenVolumeAsync(object? owner, VolumeStatus v) => OpenVolumeAsync(owner, v, Process.Start);
+
+    internal async Task OpenVolumeAsync(object? owner, VolumeStatus v, Func<ProcessStartInfo, Process?> start)
+    {
+        if (v.MountPoint is not { Length: > 0 } mountPoint) return;
+        if (await Task.Run(() => _services.IsDriveShadowed(mountPoint)))
+        {
+            string letter = DriveMapping.Letter(mountPoint) ?? mountPoint;
+            await InformAsync(owner, null, WinText.U("Drive.Shadowed", letter, v.Name), InformIcon.Warning);
+            return;
+        }
+        OpenDrive(mountPoint, start, _services.Log);
+    }
+
+    internal static bool OpenDrive(string mountPoint, Func<ProcessStartInfo, Process?> start, Action<string> log) =>
+        TryStart(new ProcessStartInfo("explorer.exe", mountPoint.EndsWith('\\') ? mountPoint : mountPoint + "\\") { UseShellExecute = true }, start, log);
+
+    /// <summary>
+    /// Programı başlatır; başlatılamazsa (Not Defteri kaldırılmış, ilke engeli…) tepsi düşmez, günlüğe tek satır (1.9.0: çağıranlar
+    /// async void düğme işleyicileri, dışarı çıkan istisna tepsiyi kapatıyordu).
+    /// </summary>
+    internal static bool TryStart(ProcessStartInfo info, Func<ProcessStartInfo, Process?> start, Action<string> log)
+    {
+        try
+        {
+            start(info)?.Dispose();
+            return true;
+        }
+        catch (Exception e) when (e is System.ComponentModel.Win32Exception or InvalidOperationException or PlatformNotSupportedException)
+        {
+            log(WinText.T("Tray.StartFailed", info.FileName, e.Message));
+            return false;
+        }
+    }
 
     /// <summary>Günlüğü aç: hizmet günlüğü, yoksa yedek yol; hiçbiri yoksa "henüz günlük yok" kutusu (HER ZAMAN sahipsiz).</summary>
     public Task OpenLogAsync() => OpenLogAsync(_ui);
 
     /// <inheritdoc cref="OpenLogAsync()"/>
-    public static async Task OpenLogAsync(IUiHost ui)
+    public static Task OpenLogAsync(IUiHost ui) => OpenLogAsync(ui, LogPath(), Process.Start, ServiceLog.Write);
+
+    internal static async Task OpenLogAsync(IUiHost ui, string? path, Func<ProcessStartInfo, Process?> start, Action<string> log)
     {
-        if (LogPath() is { } path) Process.Start(new ProcessStartInfo("notepad.exe", $"\"{path}\"") { UseShellExecute = true });
+        if (path is not null) TryStart(new ProcessStartInfo("notepad.exe", $"\"{path}\"") { UseShellExecute = true }, start, log);
         else await ModalAsync(() => ui.InformAsync(null, null, WinText.U("Log.NoneYet"), InformIcon.Info));
     }
 

@@ -27,7 +27,7 @@ Diski takarsınız, birkaç saniye içinde Dosya Gezgini'nde sürücü harfi ola
 | 10 arayüz dili | Türkçe, English, Deutsch, Français, Español, Português (Brasil), Italiano, 日本語, 简体中文, 한국어 |
 
 ## Kurulum
-`Hashido-Setup-1.8.2.exe` dosyasını çalıştırın ve sihirbazı izleyin (İleri › Kur › Son). Windows 10/11 (64 bit) yeter;
+`Hashido-Setup-1.9.0.exe` dosyasını çalıştırın ve sihirbazı izleyin (İleri › Kur › Son). Windows 10/11 (64 bit) yeter;
 başka bir şey kurmanız gerekmez: .NET programla birlikte gelir, [WinFsp](https://winfsp.dev) sürücüsü yoksa sihirbaz onu da kurar.
 Kurulumdan sonra Başlat menüsünde **Hashido** bulunur ve tepsi simgesi her oturumda kendiliğinden açılır.
 
@@ -58,12 +58,15 @@ de silinir; dil, görünüm, bildirim ve güncelleme ayarlarınız kalır.
 - **Şifreli birimler:** **Kilidi aç**, Mac'te kullandığınız parolayı ipucuyla birlikte sorar. Parola yalnız bilgisayardaki hizmete
   gönderilir ve yalnız **Bu bilgisayarda hatırla** işaretlenirse kaydedilir: o zaman bu bilgisayarda Windows hesabınıza ait
   Windows Kimlik Bilgileri Yöneticisi'nde durur ve disk takılınca birim kendiliğinden açılır — Windows Hello kuruluysa önce Windows
-  Hello onayıyla; Windows Hello yoksa hesabınızla oturum açan herkes açabilir. Parola Mac'te değiştiyse kayıtlı olan silinir ve
-  yeniden sorulur. Kayıtlı parola yazma iznini hiçbir zaman açmaz. **Ayarlar › Hatırlanan parolalar › Unut** kaydı siler.
+  Hello onayıyla; Windows Hello yoksa hesabınızla oturum açan herkes açabilir ve birim kendiliğinden yalnız oturumunuz o an
+  ekranda kullanılıyorsa açılır. Kayıtlı parola artık tutmazsa (ör. Mac'te değiştiyse) silinmez ve disk takılı kaldıkça yeniden
+  denenmez; parola sorulur, yenisiyle **Bu bilgisayarda hatırla** işaretlenirse kaydın yerini alır. Kayıtlı parola yazma
+  iznini hiçbir zaman açmaz. **Ayarlar › Hatırlanan parolalar › Unut** kaydı siler.
   Kaydedilmeyen parola yeniden başlatmadan sonra yeniden sorulur.
 - **Güncellemeler:** yeni sürüm çıkınca program onu indirir ve takılı Mac diski yokken kurar; Windows bir kez izninizi ister.
-  Ana pencerenin altındaki bağlantı da yeni sürümü sunar ("Kur" önce diskleri güvenle çıkarır). Ayarlar › Güncellemeler'den
-  kendiliğinden kurulum kapatılır (o zaman yalnız haber verilir); "Şimdi denetle" de orada.
+  Disk takılıysa yeni sürümün hazır olduğu sürüm başına bir kez haber verilir. Ana pencerenin altındaki bağlantı ve Ayarlar › Güncellemeler
+  ("Şimdi denetle", sonra "Kur") da yeni sürümü sunar: önce güncelleme indirilir, sonra diskler güvenle çıkarılır; kurulmazsa
+  diskler yeniden bağlanır. Ayarlar › Güncellemeler'den kendiliğinden kurulum kapatılır (o zaman yalnız haber verilir).
 - **Bildirimler:** Ayarlar › Bildirimler (seçenekler tıklayınca görünür) saatin yanında hangi iletilerin çıkacağını belirler:
   **Tüm bildirimler** (varsayılan); **Yalnız önemli bildirimler** (uyarılar ve sizin başlattığınız işlerin sonucu, ör. **Güvenle
   çıkar**'dan sonra "Kabloyu şimdi çekebilirsiniz"; disk takılınca gelen "E: sürücüsü olarak bağlandı" değil) ya da **Bildirimleri
@@ -214,7 +217,8 @@ yüzden tek tek raporlar istek üzerine bulunamaz ya da silinemez. Raporları ka
 çalışırken günde bir kez ve "Şimdi denetle"ye tıkladığınızda. Size ya da disklerinize dair hiçbir şey gönderilmez; GitHub isteği kendi gizlilik açıklamasındaki
 gibi görür. "Güncellemeleri kendiliğinden indir ve kur" açıksa (varsayılan), yeni kurulum dosyası projenin GitHub
 sürümünden (`github.com`) indirilir, GitHub'ın o dosya için yayımladığı SHA-256 sağlama değeriyle karşılaştırılır, tutmazsa
-reddedilir; yalnız takılı Mac diski yokken ve Windows'un izin penceresinde siz onaylayınca kurulur. İndirilen dosya
+reddedilir; yalnız takılı Mac diski yokken ve Windows'un izin penceresinde siz onaylayınca kurulur (Kullanıcı Hesabı Denetimi yöneticileri
+sormadan yükseltecek biçimde ayarlıysa izin penceresi çıkmaz, güncelleme kendiliğinden kurulur). İndirilen dosya
 güncelleme kurulana dek `%LOCALAPPDATA%\APFS for Windows\updates` klasöründe durur. Seçeneği kapatırsanız yalnız bildirim kalır.
 
 **İletişim.** Sorular ve istekler: [GitHub Issues](https://github.com/ErsinZorba/Hashido/issues). Bu açıklamadaki

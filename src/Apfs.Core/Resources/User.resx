@@ -58,19 +58,19 @@
     <value>Wrong password.</value>
   </data>
   <data name="Gate.BlockSize" xml:space="preserve">
-    <value>Block size is {0}; only 4096-byte blocks are supported.</value>
+    <value>This disk was formatted with {0}-byte blocks; writing is supported only on disks with 4096-byte blocks.</value>
   </data>
   <data name="Gate.CheckpointArea" xml:space="preserve">
-    <value>The disk's checkpoint area is fragmented; this layout is not supported.</value>
+    <value>This disk keeps its save records in a split area; writing to such a disk is not supported.</value>
   </data>
   <data name="Gate.EncRolled" xml:space="preserve">
-    <value>The encryption of volume "{0}" was changed later (ENC_ROLLED); such a disk is not written to.</value>
+    <value>The encryption of volume "{0}" was changed on the Mac after it was set up; such a disk is not written to.</value>
   </data>
   <data name="Gate.EncryptionInProgress" xml:space="preserve">
     <value>An encryption operation started by macOS has not finished on volume "{0}"; such a disk is not written to.</value>
   </data>
   <data name="Gate.Fusion" xml:space="preserve">
-    <value>Writing to a Fusion Drive container is not supported.</value>
+    <value>Writing to a Fusion Drive is not supported.</value>
   </data>
   <data name="Gate.Inconsistent" xml:space="preserve">
     <value>An inconsistency was found in the disk's internal structure; writing was not enabled, for safety. Check the disk on a Mac with Disk Utility → First Aid.</value>
@@ -79,10 +79,10 @@
     <value>Volume "{0}" is encrypted; unlock it before allowing writing.</value>
   </data>
   <data name="Gate.OmapUnreadable" xml:space="preserve">
-    <value>The object map of volume "{0}" could not be read.</value>
+    <value>The table that locates the contents of volume "{0}" could not be read.</value>
   </data>
   <data name="Gate.OpenWarnings" xml:space="preserve">
-    <value>Problems were seen while opening the disk (the newest checkpoint may be unusable).</value>
+    <value>Problems were seen while opening the disk (its most recent saved state may be unusable).</value>
   </data>
   <data name="Gate.Sealed" xml:space="preserve">
     <value>"{0}" is a sealed system volume.</value>
@@ -103,7 +103,7 @@
     <value>Volume "{0}" uses an APFS feature this version does not recognize.</value>
   </data>
   <data name="Gate.Unresolvable" xml:space="preserve">
-    <value>The disk has a structure this version cannot interpret; writing was not enabled because the owner of every block could not be verified.</value>
+    <value>The disk has a structure this version cannot interpret; writing was not enabled because it could not be confirmed what every part of the disk is used for.</value>
   </data>
   <data name="Gate.UnsupportedEncryption" xml:space="preserve">
     <value>Volume "{0}" uses a kind of encryption this version cannot write (hardware encryption or per-file keys).</value>

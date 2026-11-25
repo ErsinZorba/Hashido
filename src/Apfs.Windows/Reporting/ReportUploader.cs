@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Apfs.Windows.Ipc;
+using Apfs.Windows.Localization;
 
 namespace Apfs.Windows.Reporting;
 
@@ -17,18 +18,23 @@ public interface IReportSource
     Task AckAsync(long upto, CancellationToken ct);
 }
 
-/// <summary>Hizmetin kuyruğu, kanal üzerinden ("reports-pull" / "reports-ack").</summary>
+/// <summary>
+/// Hizmetin kuyruğu, kanal üzerinden ("reports-pull" / "reports-ack"). Her örneğin kendi kira simgesi var
+/// (<see cref="ReportLease"/>): başka bir oturumun tepsisi kuyruğu çekerken boş sayfa gelir, olaylar iki kez gönderilmez.
+/// </summary>
 public sealed class ServiceReportSource : IReportSource
 {
+    private readonly string _lease = Guid.NewGuid().ToString("N");
+
     public async Task<ReportsResponse> PullAsync(long after, CancellationToken ct)
     {
-        // Eski hizmet bu isteği tanımaz ve UnlockResponse döner: Reports null → boş yığın
-        var r = await PipeProtocol.SendAsync<ReportsResponse>(new Request("reports-pull", ReportAfter: after), TimeSpan.FromSeconds(10), ct);
+        // Eski hizmet bu isteği tanımaz ve UnlockResponse döner: Reports null → boş yığın (kira alanını da yok sayar)
+        var r = await PipeProtocol.SendAsync<ReportsResponse>(new Request("reports-pull", ReportAfter: after, ReportLease: _lease), TimeSpan.FromSeconds(10), ct);
         return r is { Reports: not null } ? r : new ReportsResponse([], false, false);
     }
 
     public Task AckAsync(long upto, CancellationToken ct) =>
-        PipeProtocol.SendAsync<UnlockResponse>(new Request("reports-ack", ReportAfter: upto), TimeSpan.FromSeconds(10), ct);
+        PipeProtocol.SendAsync<UnlockResponse>(new Request("reports-ack", ReportAfter: upto, ReportLease: _lease), TimeSpan.FromSeconds(10), ct);
 }
 
 /// <summary>Bu sürecin kendi kuyruğu (tepsinin çökme olayları).</summary>
@@ -73,11 +79,14 @@ public sealed class ReportUploader : IDisposable
     private readonly Uri _endpoint;
     private readonly HttpClient _http;
     private readonly SentLog? _sent;
+    private readonly Action<string> _log;
 
-    public ReportUploader(Uri endpoint, SentLog? sent, TimeSpan? timeout = null, HttpMessageHandler? handler = null)
+    /// <param name="log">Teknik günlük (vekil sunucu kimlik isterse nedeni yazılır); null = <see cref="ServiceLog.Write"/>.</param>
+    public ReportUploader(Uri endpoint, SentLog? sent, TimeSpan? timeout = null, HttpMessageHandler? handler = null, Action<string>? log = null)
     {
         _endpoint = endpoint;
         _sent = sent;
+        _log = log ?? ServiceLog.Write;
         // Vekil sunucu: kullanıcının sistem ayarı (tepsi kullanıcı oturumunda çalışır). Çerez, kimlik bilgisi gönderilmez.
         _http = new HttpClient(handler ?? new SocketsHttpHandler { UseCookies = false, Credentials = null }) { Timeout = timeout ?? DefaultTimeout };
         _http.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("apfs-report", "1"));
@@ -162,12 +171,14 @@ public sealed class ReportUploader : IDisposable
             using var content = new StringContent(body, Encoding.UTF8, "application/json");
             using var resp = await _http.PostAsync(_endpoint, content, ct);
             if (resp.IsSuccessStatusCode) return true;
+            if (ProxyAuth.Required(resp)) _log(WinText.T("Reports.ProxyAuth"));
             return resp.StatusCode is HttpStatusCode.BadRequest or HttpStatusCode.RequestEntityTooLarge or HttpStatusCode.UnprocessableEntity
                 ? false : null;
         }
         catch (Exception e) when (e is HttpRequestException or TaskCanceledException or IOException)
         {
-            return null; // çevrimdışı, ad çözülemedi, zaman aşımı
+            if (ProxyAuth.Required(e)) _log(WinText.T("Reports.ProxyAuth"));
+            return null; // çevrimdışı, ad çözülemedi, zaman aşımı, kimlik isteyen vekil sunucu
         }
     }
 

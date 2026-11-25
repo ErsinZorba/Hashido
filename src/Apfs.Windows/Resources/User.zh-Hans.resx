@@ -12,6 +12,9 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
+  <data name="A11y.ForItem" xml:space="preserve">
+    <value>{0}：{1}</value>
+  </data>
   <data name="About.Text" xml:space="preserve">
     <value>在 Windows 中打开 Mac 格式的 APFS 磁盘：默认只读，可选择写入（实验性）。开源软件，GPLv3 许可证。</value>
   </data>
@@ -158,6 +161,9 @@
   <data name="Disk.PhysicalName" xml:space="preserve">
     <value>磁盘 {0}（{1}）</value>
   </data>
+  <data name="Drive.Shadowed" xml:space="preserve">
+    <value>在你的 Windows 会话中，{0} 指向另一个驱动器（映射的网络驱动器或 subst 驱动器），因此文件资源管理器会打开那个驱动器而不是 "{1}"。断开该映射后，"{1}" 将显示为 {0}。</value>
+  </data>
   <data name="Eject.Busy" xml:space="preserve">
     <value>{0} 上的某个文件当前处于打开状态或正在复制（{1}）。如果现在弹出，复制将被中断；你的 Mac 磁盘不会受到损害。</value>
   </data>
@@ -259,6 +265,9 @@
   </data>
   <data name="Password.Locked" xml:space="preserve">
     <value>"{0}" 已锁定</value>
+  </data>
+  <data name="Password.NotRemembered" xml:space="preserve">
+    <value>无法在此电脑上记住密码；下次仍会要求输入。</value>
   </data>
   <data name="Password.Prompt" xml:space="preserve">
     <value>此卷已加密。要打开它，请输入你在 Mac 上使用的密码。</value>
@@ -451,6 +460,9 @@
   </data>
   <data name="Update.Link" xml:space="preserve">
     <value>版本 {0} 已发布</value>
+  </data>
+  <data name="Update.Ready" xml:space="preserve">
+    <value>{0} {1} 已准备就绪。单击此处，然后选择"安装"。</value>
   </data>
   <data name="Update.Updated" xml:space="preserve">
     <value>{0} 已更新到版本 {1}。</value>

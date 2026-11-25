@@ -3,7 +3,7 @@
 ; WinFsp yoksa (veya 2.1'den eskiyse) içindeki resmi WinFsp kurulum paketini sessizce kurar.
 
 #ifndef AppVersion
-  #define AppVersion "1.8.2"
+  #define AppVersion "1.9.0"
 #endif
 ; Görünen ad: src/Apfs.Windows/Branding.cs ProductName ile aynı olmalı (BrandingTests). Metinler adı {#AppName} ile alır.
 #define AppName "Hashido"
@@ -127,6 +127,68 @@ Source: "redist\{#WinFspMsi}"; DestDir: "{tmp}"; Flags: deleteafterinstall; Chec
 [InstallDelete]
 ; 1.3.0 ve öncesinin Başlat menüsü kısayolu (ad değişti; yükseltmede eskisi kalmasın, yenisi [Icons]'ta).
 Type: files; Name: "{autoprograms}\APFS for Windows.lnk"
+; 1.7.1 ve öncesinin WinForms tepsisinin dosyaları (1.8.0 WPF tepsisi bunları kurmaz; Inno eski dosyayı kendisi silmez, yükseltmede
+; klasörde kalıyorlardı). Liste: v1.7.1 etiketinden derlenen klasör eksi bugünkü klasör (1.9.0); yalnız artık kurulmayan adlar
+; (SetupFileTests denetler).
+Type: files; Name: "{app}\Microsoft.VisualBasic.Forms.dll"
+Type: files; Name: "{app}\System.Design.dll"
+Type: files; Name: "{app}\System.Drawing.Design.dll"
+Type: files; Name: "{app}\System.Windows.Forms.Design.Editors.dll"
+Type: files; Name: "{app}\System.Windows.Forms.Design.dll"
+Type: files; Name: "{app}\System.Windows.Forms.Primitives.dll"
+Type: files; Name: "{app}\System.Windows.Forms.dll"
+Type: files; Name: "{app}\cs\Microsoft.VisualBasic.Forms.resources.dll"
+Type: files; Name: "{app}\cs\System.Windows.Forms.Design.resources.dll"
+Type: files; Name: "{app}\cs\System.Windows.Forms.Primitives.resources.dll"
+Type: files; Name: "{app}\cs\System.Windows.Forms.resources.dll"
+Type: files; Name: "{app}\de\Microsoft.VisualBasic.Forms.resources.dll"
+Type: files; Name: "{app}\de\System.Windows.Forms.Design.resources.dll"
+Type: files; Name: "{app}\de\System.Windows.Forms.Primitives.resources.dll"
+Type: files; Name: "{app}\de\System.Windows.Forms.resources.dll"
+Type: files; Name: "{app}\es\Microsoft.VisualBasic.Forms.resources.dll"
+Type: files; Name: "{app}\es\System.Windows.Forms.Design.resources.dll"
+Type: files; Name: "{app}\es\System.Windows.Forms.Primitives.resources.dll"
+Type: files; Name: "{app}\es\System.Windows.Forms.resources.dll"
+Type: files; Name: "{app}\fr\Microsoft.VisualBasic.Forms.resources.dll"
+Type: files; Name: "{app}\fr\System.Windows.Forms.Design.resources.dll"
+Type: files; Name: "{app}\fr\System.Windows.Forms.Primitives.resources.dll"
+Type: files; Name: "{app}\fr\System.Windows.Forms.resources.dll"
+Type: files; Name: "{app}\it\Microsoft.VisualBasic.Forms.resources.dll"
+Type: files; Name: "{app}\it\System.Windows.Forms.Design.resources.dll"
+Type: files; Name: "{app}\it\System.Windows.Forms.Primitives.resources.dll"
+Type: files; Name: "{app}\it\System.Windows.Forms.resources.dll"
+Type: files; Name: "{app}\ja\Microsoft.VisualBasic.Forms.resources.dll"
+Type: files; Name: "{app}\ja\System.Windows.Forms.Design.resources.dll"
+Type: files; Name: "{app}\ja\System.Windows.Forms.Primitives.resources.dll"
+Type: files; Name: "{app}\ja\System.Windows.Forms.resources.dll"
+Type: files; Name: "{app}\ko\Microsoft.VisualBasic.Forms.resources.dll"
+Type: files; Name: "{app}\ko\System.Windows.Forms.Design.resources.dll"
+Type: files; Name: "{app}\ko\System.Windows.Forms.Primitives.resources.dll"
+Type: files; Name: "{app}\ko\System.Windows.Forms.resources.dll"
+Type: files; Name: "{app}\pl\Microsoft.VisualBasic.Forms.resources.dll"
+Type: files; Name: "{app}\pl\System.Windows.Forms.Design.resources.dll"
+Type: files; Name: "{app}\pl\System.Windows.Forms.Primitives.resources.dll"
+Type: files; Name: "{app}\pl\System.Windows.Forms.resources.dll"
+Type: files; Name: "{app}\pt-BR\Microsoft.VisualBasic.Forms.resources.dll"
+Type: files; Name: "{app}\pt-BR\System.Windows.Forms.Design.resources.dll"
+Type: files; Name: "{app}\pt-BR\System.Windows.Forms.Primitives.resources.dll"
+Type: files; Name: "{app}\pt-BR\System.Windows.Forms.resources.dll"
+Type: files; Name: "{app}\ru\Microsoft.VisualBasic.Forms.resources.dll"
+Type: files; Name: "{app}\ru\System.Windows.Forms.Design.resources.dll"
+Type: files; Name: "{app}\ru\System.Windows.Forms.Primitives.resources.dll"
+Type: files; Name: "{app}\ru\System.Windows.Forms.resources.dll"
+Type: files; Name: "{app}\tr\Microsoft.VisualBasic.Forms.resources.dll"
+Type: files; Name: "{app}\tr\System.Windows.Forms.Design.resources.dll"
+Type: files; Name: "{app}\tr\System.Windows.Forms.Primitives.resources.dll"
+Type: files; Name: "{app}\tr\System.Windows.Forms.resources.dll"
+Type: files; Name: "{app}\zh-Hans\Microsoft.VisualBasic.Forms.resources.dll"
+Type: files; Name: "{app}\zh-Hans\System.Windows.Forms.Design.resources.dll"
+Type: files; Name: "{app}\zh-Hans\System.Windows.Forms.Primitives.resources.dll"
+Type: files; Name: "{app}\zh-Hans\System.Windows.Forms.resources.dll"
+Type: files; Name: "{app}\zh-Hant\Microsoft.VisualBasic.Forms.resources.dll"
+Type: files; Name: "{app}\zh-Hant\System.Windows.Forms.Design.resources.dll"
+Type: files; Name: "{app}\zh-Hant\System.Windows.Forms.Primitives.resources.dll"
+Type: files; Name: "{app}\zh-Hant\System.Windows.Forms.resources.dll"
 
 [UninstallDelete]
 ; Hizmetin rapor kuyruğu ve rapor ayarı (config.json): kaldırılıp yeniden kurulunca hizmet eski "açık" ayarıyla başlamasın.
@@ -197,10 +259,68 @@ begin
   if not Exec(FileName, Params, '', SW_HIDE, ewWaitUntilTerminated, Result) then Result := -1;
 end;
 
+function GetCurrentProcessId: DWORD; external 'GetCurrentProcessId@kernel32.dll stdcall';
+function ProcessIdToSessionId(ProcessId: DWORD; var SessionId: DWORD): BOOL; external 'ProcessIdToSessionId@kernel32.dll stdcall';
+
+{ "a","b","c" biçimli CSV satırının Index'inci (0'dan) alanı; yoksa ''. }
+function CsvField(Line: String; Index: Integer): String;
+var
+  P: Integer;
+begin
+  Result := '';
+  if (Length(Line) < 2) or (Line[1] <> '"') then Exit;
+  Line := Copy(Line, 2, Length(Line) - 1);
+  while Index > 0 do
+  begin
+    P := Pos('","', Line);
+    if P = 0 then Exit;
+    Line := Copy(Line, P + 3, Length(Line));
+    Index := Index - 1;
+  end;
+  P := Pos('"', Line);
+  if P > 0 then Result := Copy(Line, 1, P - 1);
+end;
+
+{ 1.9.0: tepsiler kapatılmadan önce, tepsisi açık olan ÖBÜR oturumlar HKLM'ye yazılır (ProgramData'ya değil: o klasörü hizmet
+  güvenceye alır). Kurulu hizmet açılışta değeri okur, siler ve yalnız bu oturumlarda tepsiyi o kullanıcı olarak yeniden açar
+  (Apfs.Windows/TrayRestart.cs; değer "1,3", yazıldığı an anahtarın UTC son yazma zamanı). Setup'ın kendi oturumu yazılmaz: onun
+  tepsisini sihirbazın son sayfası ya da güncellemede DeinitializeSetup açar (güncellemede hizmet önce açarsa "--updated" örneği
+  tek örnek kilidine takılır, "güncellendi" balonu kaybolurdu). Güncelleme olmayan SESSİZ kurulumda ([Run] skipifsilent,
+  DeinitializeSetup açmaz) kendi oturumu da yazılır. Tepsisini kendi kapatanın oturumu listede olmaz. }
+procedure RememberTraySessions;
+var
+  Csv, List, Field: String;
+  Lines: TArrayOfString;
+  I, Code, Session, OwnSession: Integer;
+  Own: DWORD;
+begin
+  RegDeleteValue(HKLM, 'SOFTWARE\{#DataDirName}', 'RestartTraySessions');
+  if ProcessIdToSessionId(GetCurrentProcessId, Own) then OwnSession := Own else OwnSession := -1;
+  Csv := ExpandConstant('{tmp}\trays.csv');
+  { Oturum numarası CSV'nin dördüncü alanı: "apfs-tray.exe","PID","Oturum adı","Oturum#","Bellek" }
+  if not Exec(ExpandConstant('{cmd}'), '/C ""' + ExpandConstant('{sys}\tasklist.exe') + '" /FI "IMAGENAME eq apfs-tray.exe" /FO CSV /NH > "' +
+    Csv + '""', '', SW_HIDE, ewWaitUntilTerminated, Code) then Exit;
+  if not LoadStringsFromFile(Csv, Lines) then Exit;
+  List := '';
+  for I := 0 to GetArrayLength(Lines) - 1 do
+  begin
+    if CompareText(CsvField(Lines[I], 0), 'apfs-tray.exe') <> 0 then Continue;
+    Session := StrToIntDef(CsvField(Lines[I], 3), -1);
+    if (Session <= 0) or ((Session = OwnSession) and not (WizardSilent and not UpdateMode)) then Continue;
+    Field := IntToStr(Session);
+    if Pos(',' + Field + ',', ',' + List + ',') > 0 then Continue;
+    if List <> '' then List := List + ',';
+    List := List + Field;
+  end;
+  if List <> '' then
+    RegWriteStringValue(HKLM, 'SOFTWARE\{#DataDirName}', 'RestartTraySessions', List);
+end;
+
 { Eski sürüm (veya install.ps1 kurulumu) çalışıyorsa dosyalar kilitli olmasın: tepsiyi kapat, hizmeti durdur (net stop bekler). }
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 begin
   TrayStopped := True;
+  RememberTraySessions;
   Run(ExpandConstant('{sys}\taskkill.exe'), '/F /IM apfs-tray.exe');
   Run(ExpandConstant('{sys}\net.exe'), 'stop {#ServiceName}');
   Run(ExpandConstant('{sys}\taskkill.exe'), '/F /IM apfs.exe');
@@ -269,4 +389,7 @@ begin
   if CurUninstallStep <> usPostUninstall then Exit;
   RegDeleteValue(HKCU, 'Software\APFS for Windows', 'Reports');
   RegDeleteKeyIfEmpty(HKCU, 'Software\APFS for Windows');
+  { Kurulumda yazılıp hizmetin okumadığı (yarıda kalmış kurulum) tepsi oturumları kaydı }
+  RegDeleteValue(HKLM, 'SOFTWARE\{#DataDirName}', 'RestartTraySessions');
+  RegDeleteKeyIfEmpty(HKLM, 'SOFTWARE\{#DataDirName}');
 end;

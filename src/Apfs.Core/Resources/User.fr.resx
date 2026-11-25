@@ -58,19 +58,19 @@
     <value>Mot de passe incorrect.</value>
   </data>
   <data name="Gate.BlockSize" xml:space="preserve">
-    <value>La taille de bloc est de {0} ; seuls les blocs de 4096 octets sont pris en charge.</value>
+    <value>Ce disque a été formaté avec des blocs de {0} octets ; l'écriture n'est prise en charge que sur les disques à blocs de 4096 octets.</value>
   </data>
   <data name="Gate.CheckpointArea" xml:space="preserve">
-    <value>La zone des points de contrôle du disque est fragmentée ; cette disposition n'est pas prise en charge.</value>
+    <value>Ce disque conserve ses informations d'enregistrement dans une zone fragmentée ; l'écriture sur un tel disque n'est pas prise en charge.</value>
   </data>
   <data name="Gate.EncRolled" xml:space="preserve">
-    <value>Le chiffrement du volume "{0}" a été modifié ultérieurement (ENC_ROLLED) ; aucune écriture n'est faite sur un tel disque.</value>
+    <value>Le chiffrement du volume "{0}" a été modifié sur le Mac après sa création ; aucune écriture n'est faite sur un tel disque.</value>
   </data>
   <data name="Gate.EncryptionInProgress" xml:space="preserve">
     <value>Une opération de chiffrement lancée par macOS n'est pas terminée sur le volume "{0}" ; aucune écriture n'est faite sur un tel disque.</value>
   </data>
   <data name="Gate.Fusion" xml:space="preserve">
-    <value>L'écriture sur un conteneur Fusion Drive n'est pas prise en charge.</value>
+    <value>L'écriture sur un Fusion Drive n'est pas prise en charge.</value>
   </data>
   <data name="Gate.Inconsistent" xml:space="preserve">
     <value>Une incohérence a été détectée dans la structure interne du disque ; par sécurité, l'écriture n'a pas été activée. Vérifiez le disque sur un Mac avec Utilitaire de disque → S.O.S.</value>
@@ -79,10 +79,10 @@
     <value>Le volume "{0}" est chiffré ; déverrouillez-le avant d'autoriser l'écriture.</value>
   </data>
   <data name="Gate.OmapUnreadable" xml:space="preserve">
-    <value>La table des objets du volume "{0}" n'a pas pu être lue.</value>
+    <value>La table qui permet de retrouver le contenu du volume "{0}" n'a pas pu être lue.</value>
   </data>
   <data name="Gate.OpenWarnings" xml:space="preserve">
-    <value>Des problèmes ont été constatés à l'ouverture du disque (le point de contrôle le plus récent est peut-être inutilisable).</value>
+    <value>Des problèmes ont été constatés à l'ouverture du disque (son dernier état enregistré est peut-être inutilisable).</value>
   </data>
   <data name="Gate.Sealed" xml:space="preserve">
     <value>"{0}" est un volume système scellé.</value>
@@ -103,7 +103,7 @@
     <value>Le volume "{0}" utilise une fonctionnalité APFS que cette version ne reconnaît pas.</value>
   </data>
   <data name="Gate.Unresolvable" xml:space="preserve">
-    <value>Le disque contient une structure que cette version ne sait pas interpréter ; l'écriture n'a pas été activée, car le propriétaire de chaque bloc n'a pas pu être vérifié.</value>
+    <value>Le disque contient une structure que cette version ne sait pas interpréter ; l'écriture n'a pas été activée, car l'usage de chaque partie du disque n'a pas pu être confirmé.</value>
   </data>
   <data name="Gate.UnsupportedEncryption" xml:space="preserve">
     <value>Le volume "{0}" utilise un type de chiffrement sur lequel cette version ne peut pas écrire (chiffrement matériel ou clés par fichier).</value>

@@ -27,7 +27,7 @@ Plug the disk in and within a few seconds it shows up in File Explorer with a dr
 | 10 interface languages | English, Türkçe, Deutsch, Français, Español, Português (Brasil), Italiano, 日本語, 简体中文, 한국어 |
 
 ## Installation
-Run `Hashido-Setup-1.8.2.exe` and follow the wizard (Next › Install › Finish). Windows 10/11 (64-bit) is all you need;
+Run `Hashido-Setup-1.9.0.exe` and follow the wizard (Next › Install › Finish). Windows 10/11 (64-bit) is all you need;
 nothing else has to be installed: .NET comes with the program, and if the [WinFsp](https://winfsp.dev) driver is missing the wizard
 installs it too. After installation, **Hashido** is in the Start menu and the tray icon starts automatically at every sign-in.
 
@@ -58,12 +58,16 @@ are deleted too; your language, appearance, notification and update settings are
 - **Encrypted volumes:** **Unlock** asks for the password you use on the Mac, with its hint. The password is sent only to the
   local service and is saved only if you tick **Remember on this computer**: it is then kept in Windows Credential Manager for
   your Windows account on this computer, and the volume opens by itself when the disk is connected — after a Windows Hello check
-  if Windows Hello is set up; without Windows Hello, anyone who signs in with your account can open it. If the password was
-  changed on the Mac, the saved one is deleted and you are asked again. A saved password never allows writing.
+  if Windows Hello is set up; without Windows Hello, anyone who signs in with your account can open it, and it opens by itself
+  only while your session is the one in use on the screen. If the saved password no longer works (for example, it was changed on
+  the Mac), it is not deleted and not tried again while the disk stays connected; you are asked for the password, and ticking
+  **Remember on this computer** with the new one replaces it. A saved password never allows writing.
   **Settings › Remembered passwords › Forget** deletes it. Without it, the password is asked again after a restart.
 - **Updates:** when a new version is released, the program downloads it and installs it while no Mac disk is attached; Windows
-  asks for your permission once. A link at the bottom of the main window also offers it ("Install" safely ejects the disks
-  first). Settings › Updates turns automatic installation off (then you are only notified) and has "Check now".
+  asks for your permission once. If a disk is attached, you are told once per version that it is ready. The link at the bottom
+  of the main window and Settings › Updates ("Check now", then "Install") also offer it: the update is downloaded first, then
+  the disks are safely ejected, and if it is not installed they are mounted again. Settings › Updates turns automatic
+  installation off (then you are only notified).
 - **Notifications:** Settings › Notifications (click it to see the choices) decides which messages appear next to the clock:
   **All notifications** (the default); **Only important notifications** (warnings and the results of what you start yourself,
   such as "You can unplug the cable now" after **Safely eject**; not "mounted as E:" when a disk is connected); or **Turn off
@@ -220,8 +224,8 @@ when you click "Check now".
 Nothing about you or your disks is sent; GitHub sees the request as described in GitHub's privacy statement. If
 "Download and install updates automatically" is on (the default), the new setup file is downloaded from the project's
 GitHub release (`github.com`), checked against the SHA-256 checksum GitHub publishes for that file and rejected if it does not
-match, and installed only while no Mac disk is attached and only after you allow it in Windows' permission prompt. The
-downloaded file is kept in `%LOCALAPPDATA%\APFS for Windows\updates` until the update is installed. Turning the option off
+match, and installed only while no Mac disk is attached and only after you allow it in Windows' permission prompt (if User Account Control is set to elevate administrators
+without prompting, no prompt appears and the update installs on its own). The downloaded file is kept in `%LOCALAPPDATA%\APFS for Windows\updates` until the update is installed. Turning the option off
 leaves only the notification.
 
 **Contact.** Questions and requests: [GitHub Issues](https://github.com/ErsinZorba/Hashido/issues). Changes to this

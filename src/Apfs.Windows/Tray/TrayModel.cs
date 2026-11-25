@@ -99,19 +99,14 @@ public static class TrayModel
             UserSettings.Design = c.Design;
             restart = true;
         }
-        if (LanguageSetting.Load()?.Name != c.Language?.Name)
-        {
-            LanguageSetting.Save(c.Language);
-            restart = true;
-        }
+        if (LanguageSetting.Load()?.Name != c.Language?.Name && LanguageSetting.Save(c.Language)) restart = true;
         return restart;
     }
 
     /// <summary>Alt çubuktaki dil menüsünden seçim: farklıysa kaydedilir ve true (program HEMEN yeniden başlar); aynıysa hiçbir şey.</summary>
     public static bool ChooseLanguage(CultureInfo? language)
     {
-        if (LanguageSetting.Load()?.Name == language?.Name) return false;
-        LanguageSetting.Save(language);
-        return true;
+        // Kaydedilemediyse yeniden başlamak eski dili açardı
+        return LanguageSetting.Load()?.Name != language?.Name && LanguageSetting.Save(language);
     }
 }

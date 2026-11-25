@@ -12,6 +12,9 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
+  <data name="A11y.ForItem" xml:space="preserve">
+    <value>{0}: {1}</value>
+  </data>
   <data name="About.Text" xml:space="preserve">
     <value>Öffnet auf dem Mac formatierte APFS-Datenträger in Windows: standardmäßig schreibgeschützt, Schreiben optional (experimentell). Open Source, Lizenz GPLv3.</value>
   </data>
@@ -158,6 +161,9 @@
   <data name="Disk.PhysicalName" xml:space="preserve">
     <value>Datenträger {0} ({1})</value>
   </data>
+  <data name="Drive.Shadowed" xml:space="preserve">
+    <value>In Ihrer Windows-Sitzung verweist {0} auf ein anderes Laufwerk (ein verbundenes Netzlaufwerk oder ein subst-Laufwerk), daher würde der Explorer dieses Laufwerk statt "{1}" öffnen. Trennen Sie diese Zuordnung, dann erscheint "{1}" als {0}.</value>
+  </data>
   <data name="Eject.Busy" xml:space="preserve">
     <value>Eine Datei auf {0} ist gerade geöffnet oder wird kopiert ({1}). Wenn Sie jetzt auswerfen, wird der Kopiervorgang abgebrochen; Ihr Mac-Datenträger wird dabei nicht beschädigt.</value>
   </data>
@@ -259,6 +265,9 @@
   </data>
   <data name="Password.Locked" xml:space="preserve">
     <value>"{0}" ist gesperrt</value>
+  </data>
+  <data name="Password.NotRemembered" xml:space="preserve">
+    <value>Das Passwort konnte auf diesem Computer nicht gespeichert werden; Sie werden beim nächsten Mal erneut danach gefragt.</value>
   </data>
   <data name="Password.Prompt" xml:space="preserve">
     <value>Dieses Volume ist verschlüsselt. Um es zu öffnen, geben Sie das Passwort ein, das Sie auf dem Mac verwenden.</value>
@@ -451,6 +460,9 @@
   </data>
   <data name="Update.Link" xml:space="preserve">
     <value>Version {0} ist verfügbar</value>
+  </data>
+  <data name="Update.Ready" xml:space="preserve">
+    <value>{0} {1} ist bereit. Klicken Sie hier und wählen Sie dann "Installieren".</value>
   </data>
   <data name="Update.Updated" xml:space="preserve">
     <value>{0} wurde auf Version {1} aktualisiert.</value>

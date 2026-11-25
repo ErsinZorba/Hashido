@@ -73,6 +73,21 @@ internal sealed class ApfsService(IReadOnlyList<string>? images, ReportRecorder 
             ScheduleScan(TimeSpan.FromSeconds(1));
         });
         _timer = new Timer(_ => ScheduleScan(TimeSpan.Zero), null, TimeSpan.Zero, TimeSpan.FromSeconds(15));
+        // Kurulu hizmet (LocalSystem): setup'ın kapattığı öbür oturumların tepsileri yeniden açılır (1.9.0; kanal artık dinliyor)
+        if (images is null && !ServiceLog.EchoToConsole) Task.Run(RestartTrays);
+    }
+
+    private static void RestartTrays()
+    {
+        try
+        {
+            using var me = System.Security.Principal.WindowsIdentity.GetCurrent();
+            if (me.IsSystem) TrayRestart.RunOnce(Path.Combine(AppContext.BaseDirectory, "apfs-tray.exe"), ServiceLog.Write);
+        }
+        catch (Exception e) // en iyi çabayla yapılan arka plan işi: hizmeti etkilemez, iz günlükte kalır
+        {
+            ServiceLog.Write(WinText.T("Svc.TrayRestartFailed", "?", e.Message));
+        }
     }
 
     private void ScheduleScan(TimeSpan delay)

@@ -58,19 +58,19 @@
     <value>Senha incorreta.</value>
   </data>
   <data name="Gate.BlockSize" xml:space="preserve">
-    <value>O tamanho do bloco é {0}; só há suporte para blocos de 4096 bytes.</value>
+    <value>Este disco foi formatado com blocos de {0} bytes; a gravação só é compatível com discos de blocos de 4096 bytes.</value>
   </data>
   <data name="Gate.CheckpointArea" xml:space="preserve">
-    <value>A área de pontos de verificação do disco está fragmentada; não há suporte para esse layout.</value>
+    <value>Este disco guarda suas informações de salvamento em uma área dividida; não há suporte para gravar em um disco assim.</value>
   </data>
   <data name="Gate.EncRolled" xml:space="preserve">
-    <value>A criptografia do volume "{0}" foi alterada posteriormente (ENC_ROLLED); não é feita gravação em discos assim.</value>
+    <value>A criptografia do volume "{0}" foi alterada no Mac depois de criada; não é feita gravação em discos assim.</value>
   </data>
   <data name="Gate.EncryptionInProgress" xml:space="preserve">
     <value>Uma operação de criptografia iniciada pelo macOS ainda não terminou no volume "{0}"; não é feita gravação em discos assim.</value>
   </data>
   <data name="Gate.Fusion" xml:space="preserve">
-    <value>Não há suporte para gravação em um contêiner Fusion Drive.</value>
+    <value>Não há suporte para gravação em um Fusion Drive.</value>
   </data>
   <data name="Gate.Inconsistent" xml:space="preserve">
     <value>Foi encontrada uma inconsistência na estrutura interna do disco; por segurança, a gravação não foi ativada. Verifique o disco em um Mac com Utilitário de Disco → Primeiros Socorros.</value>
@@ -79,10 +79,10 @@
     <value>O volume "{0}" está criptografado; desbloqueie-o antes de permitir a gravação.</value>
   </data>
   <data name="Gate.OmapUnreadable" xml:space="preserve">
-    <value>Não foi possível ler o mapa de objetos do volume "{0}".</value>
+    <value>Não foi possível ler a tabela que localiza o conteúdo do volume "{0}".</value>
   </data>
   <data name="Gate.OpenWarnings" xml:space="preserve">
-    <value>Foram encontrados problemas ao abrir o disco (o ponto de verificação mais recente pode estar inutilizável).</value>
+    <value>Foram encontrados problemas ao abrir o disco (o último estado salvo pode estar inutilizável).</value>
   </data>
   <data name="Gate.Sealed" xml:space="preserve">
     <value>"{0}" é um volume do sistema selado.</value>
@@ -103,7 +103,7 @@
     <value>O volume "{0}" usa um recurso do APFS que esta versão não reconhece.</value>
   </data>
   <data name="Gate.Unresolvable" xml:space="preserve">
-    <value>O disco tem uma estrutura que esta versão não consegue interpretar; a gravação não foi ativada porque não foi possível verificar o proprietário de cada bloco.</value>
+    <value>O disco tem uma estrutura que esta versão não consegue interpretar; a gravação não foi ativada porque não foi possível confirmar para que serve cada parte do disco.</value>
   </data>
   <data name="Gate.UnsupportedEncryption" xml:space="preserve">
     <value>O volume "{0}" usa um tipo de criptografia em que esta versão não consegue gravar (criptografia de hardware ou chaves por arquivo).</value>

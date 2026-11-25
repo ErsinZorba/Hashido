@@ -12,6 +12,9 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
+  <data name="A11y.ForItem" xml:space="preserve">
+    <value>{0}：{1}</value>
+  </data>
   <data name="About.Text" xml:space="preserve">
     <value>Mac でフォーマットされた APFS ディスクを Windows で開きます。既定では読み取り専用で、書き込みも選択できます（試験的）。オープンソース、GPLv3 ライセンス。</value>
   </data>
@@ -158,6 +161,9 @@
   <data name="Disk.PhysicalName" xml:space="preserve">
     <value>ディスク {0}（{1}）</value>
   </data>
+  <data name="Drive.Shadowed" xml:space="preserve">
+    <value>この Windows セッションでは {0} が別のドライブ (割り当てられたネットワーク ドライブまたは subst ドライブ) を指しているため、エクスプローラーは "{1}" ではなくそのドライブを開きます。その割り当てを解除すると、"{1}" が {0} として表示されます。</value>
+  </data>
   <data name="Eject.Busy" xml:space="preserve">
     <value>{0} 上のファイルが現在開かれているか、コピー中です（{1}）。今取り出すとコピーは途中で中断されますが、Mac のディスクが損傷することはありません。</value>
   </data>
@@ -259,6 +265,9 @@
   </data>
   <data name="Password.Locked" xml:space="preserve">
     <value>"{0}" はロックされています</value>
+  </data>
+  <data name="Password.NotRemembered" xml:space="preserve">
+    <value>このコンピューターにパスワードを記憶できませんでした。次回もパスワードを入力する必要があります。</value>
   </data>
   <data name="Password.Prompt" xml:space="preserve">
     <value>このボリュームは暗号化されています。開くには、Mac で使用しているパスワードを入力してください。</value>
@@ -451,6 +460,9 @@
   </data>
   <data name="Update.Link" xml:space="preserve">
     <value>バージョン {0} が公開されました</value>
+  </data>
+  <data name="Update.Ready" xml:space="preserve">
+    <value>{0} {1} の準備ができました。ここをクリックして "インストール" を選んでください。</value>
   </data>
   <data name="Update.Updated" xml:space="preserve">
     <value>{0} はバージョン {1} に更新されました。</value>

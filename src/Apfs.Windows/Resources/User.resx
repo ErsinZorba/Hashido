@@ -12,6 +12,9 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
+  <data name="A11y.ForItem" xml:space="preserve">
+    <value>{0}: {1}</value>
+  </data>
   <data name="About.Text" xml:space="preserve">
     <value>Opens Mac-formatted APFS disks in Windows: read-only by default, optional writing (experimental). Open source, GPLv3 license.</value>
   </data>
@@ -158,6 +161,9 @@
   <data name="Disk.PhysicalName" xml:space="preserve">
     <value>Disk {0} ({1})</value>
   </data>
+  <data name="Drive.Shadowed" xml:space="preserve">
+    <value>In your Windows session, {0} points to another drive (a mapped network drive or a subst drive), so File Explorer would open that drive instead of "{1}". Disconnect that mapping and "{1}" appears as {0}.</value>
+  </data>
   <data name="Eject.Busy" xml:space="preserve">
     <value>A file on {0} is open or being copied right now ({1}). If you eject now, the copy will be cut short; your Mac disk will not be harmed.</value>
   </data>
@@ -259,6 +265,9 @@
   </data>
   <data name="Password.Locked" xml:space="preserve">
     <value>"{0}" is locked</value>
+  </data>
+  <data name="Password.NotRemembered" xml:space="preserve">
+    <value>The password couldn't be remembered on this computer; you'll be asked for it next time.</value>
   </data>
   <data name="Password.Prompt" xml:space="preserve">
     <value>This volume is encrypted. To open it, enter the password you use on the Mac.</value>
@@ -451,6 +460,9 @@
   </data>
   <data name="Update.Link" xml:space="preserve">
     <value>Version {0} is available</value>
+  </data>
+  <data name="Update.Ready" xml:space="preserve">
+    <value>{0} {1} is ready. Click here, then choose "Install".</value>
   </data>
   <data name="Update.Updated" xml:space="preserve">
     <value>{0} has been updated to version {1}.</value>

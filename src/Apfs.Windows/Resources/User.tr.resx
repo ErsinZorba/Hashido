@@ -12,6 +12,9 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
+  <data name="A11y.ForItem" xml:space="preserve">
+    <value>{0}: {1}</value>
+  </data>
   <data name="About.Text" xml:space="preserve">
     <value>Mac'te biçimlendirilmiş APFS diskleri Windows'ta açar: varsayılan olarak salt okunur, isteğe bağlı yazma (deneysel). Açık kaynak, GPLv3 lisansı.</value>
   </data>
@@ -158,6 +161,9 @@
   <data name="Disk.PhysicalName" xml:space="preserve">
     <value>Disk {0} ({1})</value>
   </data>
+  <data name="Drive.Shadowed" xml:space="preserve">
+    <value>Windows oturumunuzda {0} başka bir sürücüye (eşlenmiş ağ sürücüsü ya da subst) bağlı; Dosya Gezgini "{1}" yerine o sürücüyü açardı. O eşlemeyi kaldırınca "{1}" {0} olarak görünür.</value>
+  </data>
   <data name="Eject.Busy" xml:space="preserve">
     <value>{0} üzerindeki bir dosya şu anda açık veya kopyalanıyor ({1}). Şimdi çıkarırsanız kopyalama yarıda kalır; Mac diskinize zarar gelmez.</value>
   </data>
@@ -259,6 +265,9 @@
   </data>
   <data name="Password.Locked" xml:space="preserve">
     <value>"{0}" kilitli</value>
+  </data>
+  <data name="Password.NotRemembered" xml:space="preserve">
+    <value>Parola bu bilgisayarda hatırlanamadı; bir dahaki sefere yine sorulacak.</value>
   </data>
   <data name="Password.Prompt" xml:space="preserve">
     <value>Bu birim şifreli. Açmak için Mac'te kullandığınız parolayı girin.</value>
@@ -451,6 +460,9 @@
   </data>
   <data name="Update.Link" xml:space="preserve">
     <value>{0} sürümü çıktı</value>
+  </data>
+  <data name="Update.Ready" xml:space="preserve">
+    <value>{0} {1} hazır; tıklayıp Kur'a basabilirsiniz.</value>
   </data>
   <data name="Update.Updated" xml:space="preserve">
     <value>{0} {1} sürümüne güncellendi.</value>

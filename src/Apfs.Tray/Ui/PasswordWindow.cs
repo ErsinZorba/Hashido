@@ -65,7 +65,13 @@ internal sealed class PasswordWindow : DialogWindow
         field.Children.Add(eye);
         body.Children.Add(field);
 
-        if (r.Error is not null) body.Children.Add(UiKit.Margin(UiKit.Text(r.Error, role: Role.Alert), 0, 8, 0, 0));
+        if (r.Error is not null)
+        {
+            body.Children.Add(UiKit.Margin(UiKit.Text(r.Error, role: Role.Alert), 0, 8, 0, 0));
+            // Ekran okuyucu hatayı alana gelince okusun (görünen satır alanın altında; 1.9.0)
+            AutomationProperties.SetHelpText(_hidden, r.Error);
+            AutomationProperties.SetHelpText(_shown, r.Error);
+        }
         if (r.Remember is { } on)
         {
             _remember = new CheckBox

@@ -27,12 +27,26 @@ public static class LanguageSetting
         catch (Exception e) when (e is System.Security.SecurityException or UnauthorizedAccessException or IOException) { return null; }
     }
 
-    /// <summary>Seçimi kaydeder; null "Windows dili"ne döner (değer silinir).</summary>
-    public static void Save(CultureInfo? language)
+    /// <summary>
+    /// Seçimi kaydeder; null "Windows dili"ne döner (değer silinir). Kayıt yazılamazsa false + günlüğe tek satır (1.9.0: istisna
+    /// dil menüsünden tepsiyi düşürüyordu; öbür ayarlar gibi).
+    /// </summary>
+    public static bool Save(CultureInfo? language) => Save(language, ServiceLog.Write);
+
+    internal static bool Save(CultureInfo? language, Action<string> log)
     {
-        using var key = Registry.CurrentUser.CreateSubKey(KeyPath);
-        if (language is null) key.DeleteValue(ValueName, throwOnMissingValue: false);
-        else key.SetValue(ValueName, language.Name, RegistryValueKind.String);
+        try
+        {
+            using var key = Registry.CurrentUser.CreateSubKey(KeyPath);
+            if (language is null) key.DeleteValue(ValueName, throwOnMissingValue: false);
+            else key.SetValue(ValueName, language.Name, RegistryValueKind.String);
+            return true;
+        }
+        catch (Exception e) when (e is System.Security.SecurityException or UnauthorizedAccessException or IOException)
+        {
+            log(WinText.T("Language.SaveFailed", e.Message));
+            return false;
+        }
     }
 
     /// <summary>

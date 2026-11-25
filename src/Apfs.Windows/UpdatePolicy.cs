@@ -68,6 +68,14 @@ public static class UpdatePolicy
     public static bool ShouldAutoInstall(UpdateInstallConditions c) =>
         c.AutoInstall && c.SetupReady && c.DiskCount == 0 && c.IsAdministrator && !c.DeclinedRecently && !c.SetupRunning;
 
+    /// <summary>
+    /// "Hazır, tıklayıp Kur'a basabilirsiniz" balonu (1.9.0): kendiliğinden kurulumu YALNIZ takılı Mac diski engelliyor (öbür her koşul
+    /// tutuyor). Disk hep takılı kalan yönetici yeni sürümü yoksa hiç duymazdı; kurulum anı değişmez, sürpriz izin penceresi yok.
+    /// Sürüm başına bir kez (tepsi hatırlar).
+    /// </summary>
+    public static bool ShouldAnnounceReady(UpdateInstallConditions c) =>
+        c.AutoInstall && c.SetupReady && c.DiskCount > 0 && c.IsAdministrator && !c.DeclinedRecently && !c.SetupRunning;
+
     /// <summary>Setup kendiliğinden indirilsin mi (kurulamayacaksa indirilmez: yönetici olmayan kullanıcı, setup bilgisi yok).</summary>
     public static bool ShouldDownload(bool autoInstall, bool hasSetup, bool isAdministrator) => autoInstall && hasSetup && isAdministrator;
 

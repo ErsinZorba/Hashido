@@ -41,6 +41,9 @@ internal sealed class App : Application
     {
         base.OnStartup(e);
         Look.Install(this); // hiçbir pencereden önce: Fluent teması, palet, rol fırçaları
+        // Korece arayüzde satır sözcük arasından kırılsın (1.9.0; temadan SONRA, hiçbir pencereden önce)
+        if (System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName == "ko")
+            Ui.KoreanLines.Install();
         if (_options.Shot is { } shot)
         {
             Dev.ShotRig.Run(shot);

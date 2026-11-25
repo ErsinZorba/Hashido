@@ -62,9 +62,11 @@ public sealed record ReportsResponse(List<QueuedReport>? Reports, bool More = fa
 /// öncekiler silinir), "reports-config" (Enable: kullanıcının onayı; kapatınca kuyruk silinir).
 /// Culture (1.8.2): tepsinin bölge ayarı (sayı biçimi, ör. "de-DE"); disk başlığındaki boyut ("1,81 TB" / "1.81 TB") Lang gibi
 /// isteğe ve konsol oturumundan geliyorsa varsayılana uygulanır. Eski tepside yok → hizmetin kendi kültürü (sistem yereli).
+/// ReportLease (1.9.0): "reports-pull"/"reports-ack"te tepsinin kira simgesi (<see cref="Reporting.ReportLease"/>): kuyruğu aynı anda
+/// tek tepsi çeker. Eski tepside yok → kiraya bakılmaz (önceki davranış).
 /// </summary>
 public sealed record Request(string Op, long Since = 0, string? Disk = null, int Volume = 0, string? Password = null, bool Force = false, bool Enable = false,
-    int Container = 0, string? Lang = null, long ReportAfter = 0, string? Culture = null);
+    int Container = 0, string? Lang = null, long ReportAfter = 0, string? Culture = null, string? ReportLease = null);
 
 /// <summary>
 /// Adlandırılmış kanal: her bağlantıda tek satır JSON istek, tek satır JSON yanıt. Erişim listesi yalnızca SYSTEM, Yöneticiler ve

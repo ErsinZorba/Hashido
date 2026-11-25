@@ -12,6 +12,7 @@ namespace Apfs.Service;
 internal sealed class PipeServer(MountManager manager, ReportRecorder reports) : IDisposable
 {
     private readonly CancellationTokenSource _cts = new();
+    private readonly ReportLease _lease = new();
     private Task? _loop;
 
     public void Start() => _loop = Task.Run(() => LoopAsync(_cts.Token));
@@ -95,8 +96,8 @@ internal sealed class PipeServer(MountManager manager, ReportRecorder reports) :
                     "rescan" => await Task.Run(() => { manager.ForgetReleased(); manager.Rescan(); return new UnlockResponse(true, WinText.T("Svc.Rescanned")); }, ct),
                     "eject" when req.Disk is not null => await Task.Run(() => manager.Eject(req.Disk, req.Force), ct),
                     "set-writable" when req.Disk is not null => await Task.Run(() => manager.SetWritable(req.Disk, req.Container, req.Enable, req.Force), ct),
-                    "reports-pull" => PullReports(req.ReportAfter),
-                    "reports-ack" => Ack(req.ReportAfter),
+                    "reports-pull" => PullReports(req.ReportAfter, req.ReportLease),
+                    "reports-ack" => Ack(req.ReportAfter, req.ReportLease),
                     "reports-config" => Configure(req.Enable),
                     _ => new UnlockResponse(false, WinText.T("Svc.UnknownRequest")),
                 };
@@ -182,14 +183,18 @@ internal sealed class PipeServer(MountManager manager, ReportRecorder reports) :
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool GetNamedPipeClientSessionId(Microsoft.Win32.SafeHandles.SafePipeHandle pipe, out uint clientSessionId);
 
-    private ReportsResponse PullReports(long after)
+    /// <summary>Başka bir tepsi kuyruğu çekerken (kira) boş sayfa: olaylar iki kez gönderilmesin.</summary>
+    private ReportsResponse PullReports(long after, string? lease)
     {
+        if (!_lease.TryHold(lease)) return new ReportsResponse([], false, reports.Enabled);
         var (list, more) = reports.Queue.Pull(after, PipeProtocol.MaxReportPageBytes);
         return new ReportsResponse(list, more, reports.Enabled);
     }
 
-    private UnlockResponse Ack(long upto)
+    /// <summary>Onay her zaman uygulanır (o olaylar gönderildi); kirayı tutan tepside süreyi yeniler.</summary>
+    private UnlockResponse Ack(long upto, string? lease)
     {
+        _lease.TryHold(lease);
         reports.Queue.Ack(upto);
         return new UnlockResponse(true, "");
     }

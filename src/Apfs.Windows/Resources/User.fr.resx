@@ -12,6 +12,9 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
+  <data name="A11y.ForItem" xml:space="preserve">
+    <value>{0} : {1}</value>
+  </data>
   <data name="About.Text" xml:space="preserve">
     <value>Ouvre dans Windows les disques APFS formatés sur Mac : lecture seule par défaut, écriture facultative (expérimentale). Open source, licence GPLv3.</value>
   </data>
@@ -158,6 +161,9 @@
   <data name="Disk.PhysicalName" xml:space="preserve">
     <value>Disque {0} ({1})</value>
   </data>
+  <data name="Drive.Shadowed" xml:space="preserve">
+    <value>Dans votre session Windows, {0} désigne un autre lecteur (un lecteur réseau connecté ou un lecteur subst) : l'Explorateur de fichiers ouvrirait ce lecteur au lieu de "{1}". Déconnectez ce lecteur et "{1}" apparaîtra en {0}.</value>
+  </data>
   <data name="Eject.Busy" xml:space="preserve">
     <value>Un fichier sur {0} est ouvert ou en cours de copie ({1}). Si vous éjectez maintenant, la copie sera interrompue ; votre disque Mac ne sera pas endommagé.</value>
   </data>
@@ -259,6 +265,9 @@
   </data>
   <data name="Password.Locked" xml:space="preserve">
     <value>"{0}" est verrouillé</value>
+  </data>
+  <data name="Password.NotRemembered" xml:space="preserve">
+    <value>Le mot de passe n'a pas pu être mémorisé sur cet ordinateur ; il vous sera redemandé la prochaine fois.</value>
   </data>
   <data name="Password.Prompt" xml:space="preserve">
     <value>Ce volume est chiffré. Pour l'ouvrir, saisissez le mot de passe que vous utilisez sur le Mac.</value>
@@ -451,6 +460,9 @@
   </data>
   <data name="Update.Link" xml:space="preserve">
     <value>Version {0} disponible</value>
+  </data>
+  <data name="Update.Ready" xml:space="preserve">
+    <value>{0} {1} est prêt. Cliquez ici, puis choisissez "Installer".</value>
   </data>
   <data name="Update.Updated" xml:space="preserve">
     <value>{0} a été mis à jour vers la version {1}.</value>

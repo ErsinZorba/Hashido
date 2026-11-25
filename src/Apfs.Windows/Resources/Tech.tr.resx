@@ -300,11 +300,14 @@ Seçenekler: --volume N (birim sırası, varsayılan 0), --partition N (APFS bö
   <data name="Ipc.UntrustedServer" xml:space="preserve">
     <value>{0} kanalının sunucusu kurulu hizmet değil (hizmetlerin oturumunda çalışmıyor); hiçbir şey gönderilmedi</value>
   </data>
+  <data name="Language.SaveFailed" xml:space="preserve">
+    <value>Dil seçimi kaydedilemedi ({0}).</value>
+  </data>
+  <data name="Password.SavedRefused" xml:space="preserve">
+    <value>{0}: kayıtlı parola tutmadı; kayıt korunuyor, parola soruluyor.</value>
+  </data>
   <data name="Password.SaveFailed" xml:space="preserve">
     <value>{0}: parola kaydedilemedi ({1}).</value>
-  </data>
-  <data name="Password.SavedRemoved" xml:space="preserve">
-    <value>{0}: kayıtlı parola artık geçerli değil; silindi.</value>
   </data>
   <data name="Password.SavedUnlocked" xml:space="preserve">
     <value>{0}: kayıtlı parolayla açıldı.</value>
@@ -338,6 +341,9 @@ Seçenekler: --volume N (birim sırası, varsayılan 0), --partition N (APFS bö
   </data>
   <data name="Raw.WriteOutOfRange" xml:space="preserve">
     <value>disk sınırı dışında yazma: {0}+{1}</value>
+  </data>
+  <data name="Reports.ProxyAuth" xml:space="preserve">
+    <value>Raporlar gönderilemedi: vekil sunucu kimlik istiyor (HTTP 407). Hashido vekil sunucuya kimlik bilgisi göndermez.</value>
   </data>
   <data name="Service.LanguageSet" xml:space="preserve">
     <value>Dil: {0}</value>
@@ -414,6 +420,15 @@ Seçenekler: --volume N (birim sırası, varsayılan 0), --partition N (APFS bö
   <data name="Svc.Stopped" xml:space="preserve">
     <value>Hizmet durdu.</value>
   </data>
+  <data name="Svc.TrayRestartFailed" xml:space="preserve">
+    <value>Setup'ın kapattığı tepsi {0} numaralı Windows oturumunda yeniden açılamadı (hata {1}).</value>
+  </data>
+  <data name="Svc.TrayRestartSkipped" xml:space="preserve">
+    <value>Setup'ın yeniden açılacak tepsi listesi kullanılmadı ("{0}", yazıldığı an {1} UTC): çok eski, okunamıyor ya da tepsi programı yok.</value>
+  </data>
+  <data name="Svc.TrayRestarted" xml:space="preserve">
+    <value>Setup {0} numaralı Windows oturumundaki tepsiyi kapatmıştı; yeniden açıldı.</value>
+  </data>
   <data name="Svc.UnknownRequest" xml:space="preserve">
     <value>bilinmeyen istek</value>
   </data>
@@ -456,6 +471,9 @@ Seçenekler: --volume N (birim sırası, varsayılan 0), --partition N (APFS bö
   <data name="Svc.WriteSessionClosed" xml:space="preserve">
     <value>{0}: bölüm {1} yazma oturumu kapatıldı (son kayıt xid {2}).</value>
   </data>
+  <data name="Tray.StartFailed" xml:space="preserve">
+    <value>{0} başlatılamadı ({1}).</value>
+  </data>
   <data name="Update.BadHash" xml:space="preserve">
     <value>Güncelleme reddedildi: SHA-256 özeti Release'tekiyle aynı değil.</value>
   </data>
@@ -471,6 +489,9 @@ Seçenekler: --volume N (birim sırası, varsayılan 0), --partition N (APFS bö
   <data name="Update.DownloadFailed" xml:space="preserve">
     <value>Güncelleme indirilemedi: {0}</value>
   </data>
+  <data name="Update.Held" xml:space="preserve">
+    <value>{0} güncellemesi doğrulanamadı; 24 saat kendiliğinden yeniden indirilmez.</value>
+  </data>
   <data name="Update.HttpStatus" xml:space="preserve">
     <value>Güncelleme indirilemedi: sunucu {0} yanıtı verdi.</value>
   </data>
@@ -479,6 +500,9 @@ Seçenekler: --volume N (birim sırası, varsayılan 0), --partition N (APFS bö
   </data>
   <data name="Update.NotApplied" xml:space="preserve">
     <value>{0} güncellemesi uygulanmadı (kurulu sürüm {1}); 24 saat kendiliğinden önerilmez.</value>
+  </data>
+  <data name="Update.ProxyAuth" xml:space="preserve">
+    <value>Güncelleme GitHub'a ulaşamadı: vekil sunucu kimlik istiyor (HTTP 407). Hashido vekil sunucuya kimlik bilgisi göndermez.</value>
   </data>
   <data name="Update.Stalled" xml:space="preserve">
     <value>Güncelleme indirmesi durdu: {0} sn ilerleme yok.</value>

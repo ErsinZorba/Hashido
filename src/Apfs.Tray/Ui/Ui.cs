@@ -183,6 +183,7 @@ internal sealed class ActionButton : Button
     private readonly object _idle;
     private readonly bool _iconOnly;
     private bool _busy;
+    private string? _context;
 
     /// <param name="icon">Simge (Segoe Fluent Icons); <paramref name="iconOnly"/> ise metin yalnız araç ipucu ve erişilebilir ad.</param>
     public ActionButton(string text, ButtonKind kind = ButtonKind.Secondary, string? icon = null, bool iconOnly = false, double iconSize = 16)
@@ -221,6 +222,20 @@ internal sealed class ActionButton : Button
     /// <summary>Meşgulken gösterilecek metin (yoksa düğmenin metni).</summary>
     public string? BusyText { get; set; }
 
+    /// <summary>
+    /// Düğmenin neye ait olduğu (birim ya da disk adı): ekran okuyucu her satırdaki aynı "Aç"ı/"Güvenle çıkar"ı ayırt etsin diye
+    /// erişilebilir ada eklenir ("Aç: Macintosh HD"; 1.9.0). Görünen metin ve araç ipucu değişmez.
+    /// </summary>
+    public string? Context
+    {
+        get => _context;
+        set
+        {
+            _context = value;
+            SetLabel(_busy ? BusyText ?? _text : _text);
+        }
+    }
+
     public bool Busy
     {
         get => _busy;
@@ -246,7 +261,7 @@ internal sealed class ActionButton : Button
 
     private void SetLabel(string name)
     {
-        AutomationProperties.SetName(this, name);
+        AutomationProperties.SetName(this, _context is { Length: > 0 } c ? Apfs.WinText.U("A11y.ForItem", name, c) : name);
         if (_iconOnly) ToolTip = name;
     }
 }

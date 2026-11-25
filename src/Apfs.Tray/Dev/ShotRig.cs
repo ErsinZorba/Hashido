@@ -43,7 +43,7 @@ internal sealed record ShotOptions(string Png, string View, string Fake, string?
 /// <c>APFS_DEV_THEME</c>), dil <c>--lang</c> ya da <c>HKCU</c> seçimi / Windows diliyle. Odak kullanıcının penceresinde kalır (Guard).
 /// <c>--switch-theme</c>: ilk çekimden sonra tema ortam değişkeni ters çevrilip tepsinin Windows teması değişiminde kullandığı yol
 /// (<see cref="Look.Refresh"/>) çağrılır, aynı pencere yeniden çekilir (açık/koyu yeniden başlatmadan; Ek A R2 ⟳).
-/// <para>Görünümler: main, settings, flyout, write, write-many, eject-busy, update, inform, details, about, unlock, unlock-wrong,
+/// <para>Görünümler: main, settings, settings-update (Güncellemeler kartında "Kur"; -narrow: en dar pencere), flyout, write, write-many, eject-busy, update, inform, details, about, unlock, unlock-wrong,
 /// unlock-saved-invalid, hello, consent, sent. Senaryolar: mixed, multi, busy, empty, down, connecting, readme (README görselleri:
 /// adlar ve sayılar dile göre; <c>localization-tool/v180/readme-shots.ps1</c>).</para>
 /// </summary>
@@ -120,7 +120,14 @@ internal static class ShotRig
             case "main":
             case "settings":
             case "settings-notify":
-                var main = new MainWindow(app, null);
+            case "settings-update":
+            case "settings-update-narrow":
+            case "settings-narrow": // 1.9.0: başlık en dar pencerede sarılır, kesilmez
+                // settings-update: Güncellemeler kartında bilinen yeni sürüm + "Kur" (1.9.0). Kullanıcı ayarları geçici bir HKCU anahtarında
+                // (gerçek Update* değerlerine dokunulmaz; çıkışta silinir), güncelleme hizmeti sahte (ağ yok, setup başlamaz)
+                TrayFeatures? features = o.View.StartsWith("settings-update", StringComparison.Ordinal) ? ShotFeatures(host) : null;
+                var main = new MainWindow(app, features);
+                if (o.View is "settings-update-narrow" or "settings-narrow") main.Width = main.MinWidth;
                 if (o.Fake == "readme") main.Height = main.Height * 107 / 100; // README: üç disk kaydırma çubuğusuz sığsın
                 OffScreen(main);
                 await Task.Delay(800);
@@ -135,6 +142,11 @@ internal static class ShotRig
                     expander.IsExpanded = true;
                     await Task.Delay(300);
                     expander.BringIntoView();
+                    await Task.Delay(500);
+                }
+                if (features is not null) // Güncellemeler kartı görünür yere kaydırılır
+                {
+                    Descendants(main).OfType<ActionButton>().First(b => b.IsVisible && AutomationName(b) == WinText.U("Action.Install")).BringIntoView();
                     await Task.Delay(500);
                 }
                 target = main;
@@ -164,6 +176,29 @@ internal static class ShotRig
             await Task.Delay(900);
             await CaptureAsync(target, Path.Combine(Path.GetDirectoryName(Path.GetFullPath(o.Png))!, Path.GetFileNameWithoutExtension(o.Png) + "-switched.png"));
         }
+    }
+
+    private static string AutomationName(DependencyObject o) => System.Windows.Automation.AutomationProperties.GetName(o);
+
+    /// <summary>
+    /// "settings-update" için: ayarlar geçici HKCU anahtarında ("9.9.9 sürümü çıktı" bilinir), güncelleme hizmetleri sahte. Geçici
+    /// anahtar süreç çıkarken silinir.
+    /// </summary>
+    private static TrayFeatures ShotFeatures(IUiHost host)
+    {
+        string old = LanguageSetting.KeyPath, temp = old + " Shot " + Guid.NewGuid().ToString("N")[..8];
+        LanguageSetting.KeyPath = temp;
+        AppDomain.CurrentDomain.ProcessExit += (_, _) =>
+        {
+            try { Microsoft.Win32.Registry.CurrentUser.DeleteSubKeyTree(temp, throwOnMissingSubKey: false); } catch (Exception e) when (e is IOException or UnauthorizedAccessException or System.Security.SecurityException) { }
+        };
+        UserSettings.UpdateNotifiedVersion = "9.9.9";
+        UserSettings.UpdateUrl = "https://github.com/ErsinZorba/Hashido/releases/tag/v9.9.9";
+        string dir = Path.Combine(Path.GetTempPath(), "hashido-shot-" + Guid.NewGuid().ToString("N")[..8]);
+        var services = new UpdateServices((_, _) => null, () => new Version(1, 9, 0), _ => Task.FromResult(new UpdateCheckResult(true, null)),
+            Path.Combine(dir, "updates"), d => new UpdateDownloader(d), () => true, () => false, (_, _) => null, _ => { }, _ => { });
+        return new TrayFeatures(SynchronizationContext.Current!, host, new Apfs.Windows.Reporting.ReportRecorder(Path.Combine(dir, "reports")),
+            () => Task.FromResult<int?>(0), services);
     }
 
     private static async Task CaptureAsync(Window target, string png)
@@ -224,6 +259,8 @@ internal static class ShotRig
         "details" => app.ShowDetailsAsync(null, new VolumeStatus(1, "System data", VolumeStatus.Failed, null, null, FakeChannel.FailedText)),
         "about" => MessageWindow.AboutAsync(null, "1.8.0"),
         "unlock" => host.AskPasswordAsync(new PasswordRequest(locked?.Name ?? "Archive", locked?.Hint ?? "first holiday", null, false, true)),
+        // 1.9.0: Mac'te yazılmış çok uzun ipucu: kutu ekrana sığar, üst alan kaydırılır, düğmeler görünür
+        "unlock-long-hint" => host.AskPasswordAsync(new PasswordRequest("Archive", string.Join(" ", Enumerable.Repeat("first holiday by the sea, the blue house", 120)), null, true, true)),
         "unlock-wrong" => host.AskPasswordAsync(new PasswordRequest("Archive", "first holiday", WinText.U("Unlock.Failed"), true, true)),
         "unlock-saved-invalid" => host.AskPasswordAsync(new PasswordRequest("Archive", null, WinText.U("Password.SavedInvalid"), false, false)),
         "consent" => ConsentWindow.AskAsync(null),

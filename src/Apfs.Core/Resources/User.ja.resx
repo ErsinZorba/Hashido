@@ -58,19 +58,19 @@
     <value>パスワードが正しくありません。</value>
   </data>
   <data name="Gate.BlockSize" xml:space="preserve">
-    <value>ブロック サイズが {0} です。サポートされているのは 4096 バイトのブロックのみです。</value>
+    <value>このディスクは {0} バイトのブロックでフォーマットされています。書き込みは 4096 バイトのブロックのディスクでのみサポートされます。</value>
   </data>
   <data name="Gate.CheckpointArea" xml:space="preserve">
-    <value>ディスクのチェックポイント領域が断片化しています。このレイアウトはサポートされていません。</value>
+    <value>このディスクは保存情報を分割された領域に記録しています。このようなディスクへの書き込みはサポートされていません。</value>
   </data>
   <data name="Gate.EncRolled" xml:space="preserve">
-    <value>ボリューム "{0}" の暗号化は後から変更されています（ENC_ROLLED）。このようなディスクには書き込みません。</value>
+    <value>ボリューム "{0}" の暗号化は、作成後に Mac で変更されています。このようなディスクには書き込みません。</value>
   </data>
   <data name="Gate.EncryptionInProgress" xml:space="preserve">
     <value>ボリューム "{0}" で macOS が開始した暗号化処理がまだ完了していません。このようなディスクには書き込みません。</value>
   </data>
   <data name="Gate.Fusion" xml:space="preserve">
-    <value>Fusion Drive コンテナへの書き込みはサポートされていません。</value>
+    <value>Fusion Drive への書き込みはサポートされていません。</value>
   </data>
   <data name="Gate.Inconsistent" xml:space="preserve">
     <value>ディスクの内部構造に不整合が見つかりました。安全のため、書き込みは有効にしませんでした。Mac のディスクユーティリティ → First Aid でディスクを確認してください。</value>
@@ -79,10 +79,10 @@
     <value>ボリューム "{0}" は暗号化されています。書き込みを許可する前にロックを解除してください。</value>
   </data>
   <data name="Gate.OmapUnreadable" xml:space="preserve">
-    <value>ボリューム "{0}" のオブジェクト マップを読み取れませんでした。</value>
+    <value>ボリューム "{0}" の内容の場所を示す表を読み取れませんでした。</value>
   </data>
   <data name="Gate.OpenWarnings" xml:space="preserve">
-    <value>ディスクを開く際に問題が見つかりました（最新のチェックポイントが使用できない可能性があります）。</value>
+    <value>ディスクを開く際に問題が見つかりました（最後に保存された状態が使用できない可能性があります）。</value>
   </data>
   <data name="Gate.Sealed" xml:space="preserve">
     <value>"{0}" は署名済みシステムボリュームです。</value>
@@ -103,7 +103,7 @@
     <value>ボリューム "{0}" は、このバージョンでは認識できない APFS の機能を使用しています。</value>
   </data>
   <data name="Gate.Unresolvable" xml:space="preserve">
-    <value>このディスクには、このバージョンでは解釈できない構造があります。すべてのブロックの所有者を確認できなかったため、書き込みは有効にしませんでした。</value>
+    <value>このディスクには、このバージョンでは解釈できない構造があります。ディスクの各部分の用途を確認できなかったため、書き込みは有効にしませんでした。</value>
   </data>
   <data name="Gate.UnsupportedEncryption" xml:space="preserve">
     <value>ボリューム "{0}" は、このバージョンでは書き込めない種類の暗号化（ハードウェア暗号化またはファイルごとのキー）を使用しています。</value>

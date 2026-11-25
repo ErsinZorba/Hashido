@@ -58,19 +58,19 @@
     <value>Falsches Passwort.</value>
   </data>
   <data name="Gate.BlockSize" xml:space="preserve">
-    <value>Die Blockgröße beträgt {0}; nur Blöcke mit 4096 Byte werden unterstützt.</value>
+    <value>Dieser Datenträger wurde mit {0}-Byte-Blöcken formatiert; Schreiben wird nur auf Datenträgern mit 4096-Byte-Blöcken unterstützt.</value>
   </data>
   <data name="Gate.CheckpointArea" xml:space="preserve">
-    <value>Der Prüfpunktbereich des Datenträgers ist fragmentiert; dieses Layout wird nicht unterstützt.</value>
+    <value>Dieser Datenträger speichert seine Sicherungsdaten in einem geteilten Bereich; das Schreiben auf einen solchen Datenträger wird nicht unterstützt.</value>
   </data>
   <data name="Gate.EncRolled" xml:space="preserve">
-    <value>Die Verschlüsselung des Volumes "{0}" wurde nachträglich geändert (ENC_ROLLED); auf einen solchen Datenträger wird nicht geschrieben.</value>
+    <value>Die Verschlüsselung des Volumes "{0}" wurde auf dem Mac nachträglich geändert; auf einen solchen Datenträger wird nicht geschrieben.</value>
   </data>
   <data name="Gate.EncryptionInProgress" xml:space="preserve">
     <value>Ein von macOS gestarteter Verschlüsselungsvorgang auf dem Volume "{0}" ist noch nicht abgeschlossen; auf einen solchen Datenträger wird nicht geschrieben.</value>
   </data>
   <data name="Gate.Fusion" xml:space="preserve">
-    <value>Das Schreiben auf einen Fusion Drive-Container wird nicht unterstützt.</value>
+    <value>Das Schreiben auf ein Fusion Drive wird nicht unterstützt.</value>
   </data>
   <data name="Gate.Inconsistent" xml:space="preserve">
     <value>In der internen Struktur des Datenträgers wurde eine Unstimmigkeit gefunden; das Schreiben wurde aus Sicherheitsgründen nicht aktiviert. Überprüfen Sie den Datenträger auf einem Mac mit dem Festplattendienstprogramm → Erste Hilfe.</value>
@@ -79,10 +79,10 @@
     <value>Das Volume "{0}" ist verschlüsselt; entsperren Sie es, bevor Sie das Schreiben erlauben.</value>
   </data>
   <data name="Gate.OmapUnreadable" xml:space="preserve">
-    <value>Die Objektzuordnung des Volumes "{0}" konnte nicht gelesen werden.</value>
+    <value>Die Tabelle, über die der Inhalt des Volumes "{0}" gefunden wird, konnte nicht gelesen werden.</value>
   </data>
   <data name="Gate.OpenWarnings" xml:space="preserve">
-    <value>Beim Öffnen des Datenträgers sind Probleme aufgetreten (der neueste Prüfpunkt ist möglicherweise unbrauchbar).</value>
+    <value>Beim Öffnen des Datenträgers sind Probleme aufgetreten (der zuletzt gespeicherte Zustand ist möglicherweise unbrauchbar).</value>
   </data>
   <data name="Gate.Sealed" xml:space="preserve">
     <value>"{0}" ist ein versiegeltes Systemvolume.</value>
@@ -103,7 +103,7 @@
     <value>Das Volume "{0}" verwendet eine APFS-Funktion, die diese Version nicht kennt.</value>
   </data>
   <data name="Gate.Unresolvable" xml:space="preserve">
-    <value>Der Datenträger enthält eine Struktur, die diese Version nicht auswerten kann; das Schreiben wurde nicht aktiviert, da der Besitzer jedes Blocks nicht überprüft werden konnte.</value>
+    <value>Der Datenträger enthält eine Struktur, die diese Version nicht auswerten kann; das Schreiben wurde nicht aktiviert, weil nicht für jeden Teil des Datenträgers bestätigt werden konnte, wofür er verwendet wird.</value>
   </data>
   <data name="Gate.UnsupportedEncryption" xml:space="preserve">
     <value>Das Volume "{0}" verwendet eine Verschlüsselungsart, auf die diese Version nicht schreiben kann (Hardwareverschlüsselung oder Schlüssel pro Datei).</value>

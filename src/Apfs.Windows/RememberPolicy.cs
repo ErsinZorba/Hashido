@@ -32,8 +32,12 @@ public enum SavedAttemptOutcome
 {
     /// <summary>Açıldı.</summary>
     Unlocked,
-    /// <summary>Hizmet parolanın yanlış olduğunu söyledi (Mac'te değişmiş): kayıt silinir, pencere "geçersiz" iletisiyle bir kez.</summary>
-    ForgetAndAsk,
+    /// <summary>
+    /// Hizmet parolanın yanlış olduğunu söyledi (Mac'te değişmiş ya da aynı UUID'li başka bir disk, ör. eski bir kopya): kayıt
+    /// SİLİNMEZ (1.9.0; silmek gerçek diskin kaydını da götürüyordu), pencere "geçersiz" iletisiyle bir kez, kutu işaretli; disk
+    /// takılı kaldıkça kayıtlı parola o birime bir daha gönderilmez.
+    /// </summary>
+    WrongAndAsk,
     /// <summary>Başka her hata (hizmete ulaşılamıyor, birim beklemiyor, bölüm yazılabilir…): kayıt KALIR, parola penceresi.</summary>
     KeepAndAsk,
 }
@@ -48,13 +52,16 @@ public enum RememberStore { None, Save, Delete }
 /// </summary>
 public static class RememberPolicy
 {
-    public static RememberAction Decide(bool hasSaved, HelloAvailability hello, bool partitionWritable) =>
+    /// <param name="sessionActive">Tepsinin Windows oturumu etkin (<see cref="Tray.SessionState.IsActive"/>). Arka plandaki oturum
+    /// (hızlı kullanıcı değiştirmede bağlantısı kesik) kayıtlı parolayı Hello'suz KENDİLİĞİNDEN kullanmaz: açılan disk makinedeki
+    /// herkese açık olurdu, o sırada bilgisayarın başındaki başka bir kullanıcı da okurdu (1.9.0). Hello akışı değişmez.</param>
+    public static RememberAction Decide(bool hasSaved, HelloAvailability hello, bool partitionWritable, bool sessionActive) =>
         partitionWritable ? RememberAction.None
         : !hasSaved ? RememberAction.Ask
         : hello switch
         {
             HelloAvailability.Available => RememberAction.VerifyWithHello,
-            HelloAvailability.NotAvailable => RememberAction.Unlock,
+            HelloAvailability.NotAvailable => sessionActive ? RememberAction.Unlock : RememberAction.Ask,
             _ => RememberAction.Ask,
         };
 
@@ -63,14 +70,15 @@ public static class RememberPolicy
         result == HelloResult.Verified ? RememberAction.Unlock : RememberAction.Ask;
 
     /// <summary>
-    /// Kayıtlı parolayla <c>unlock</c> yanıtı → ne yapılacağı. Kayıt YALNIZ hizmet kesin "parola yanlış" derse silinir
-    /// (<c>UnlockResponse.Code == "WrongPassword"</c>); ulaşılamayan hizmet ya da başka bir ret kaydı silmez.
+    /// Kayıtlı parolayla <c>unlock</c> yanıtı → ne yapılacağı. Hizmet kesin "parola yanlış" derse
+    /// (<c>UnlockResponse.Code == "WrongPassword"</c>) pencere "geçersiz" iletisiyle; ulaşılamayan hizmet ya da başka bir ret
+    /// yalnız hatayla. Kayıt hiçbirinde silinmez; yalnız "hatırla" ile tutan parola değiştirir, kutusu boş tutan parola siler.
     /// </summary>
     /// <param name="reached">Hizmet yanıt verdi (zaman aşımı / kanal hatası değil).</param>
     public static SavedAttemptOutcome AfterSavedAttempt(bool reached, bool ok, string? code) =>
         !reached ? SavedAttemptOutcome.KeepAndAsk
         : ok ? SavedAttemptOutcome.Unlocked
-        : code == nameof(ApfsErrorCode.WrongPassword) ? SavedAttemptOutcome.ForgetAndAsk
+        : code == nameof(ApfsErrorCode.WrongPassword) ? SavedAttemptOutcome.WrongAndAsk
         : SavedAttemptOutcome.KeepAndAsk;
 
     /// <summary>

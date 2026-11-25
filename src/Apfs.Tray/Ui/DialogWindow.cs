@@ -91,12 +91,17 @@ internal static class OpenWindows
     /// Enter varsayılan düğmeye mi gider: odak bir düğmede (onay kutusu sayılmaz) ya da bağlantıda değilse evet. Düğme ve bağlantı
     /// Enter'la kendisi basılır (<see cref="PressFocused"/>).
     /// </summary>
-    public static bool EnterGoesToDefault(object? focused) => focused is not (Hyperlink or ButtonBase) || focused is ToggleButton;
+    public static bool EnterGoesToDefault(object? focused) =>
+        focused is not (Hyperlink or ButtonBase) || focused is ToggleButton && !IsExpanderHeader(focused);
+
+    /// <summary>Açılır kartın (Expander) başlığı: Enter onu açıp kapatır (1.9.0; önceden Ayarlar'ın Tamam'ını uyguluyordu).</summary>
+    private static bool IsExpanderHeader(object? focused) => focused is ToggleButton { TemplatedParent: Expander };
 
     /// <summary>Enter odaktaki düğmeyi ya da bağlantıyı basar (WPF'in kendi Enter davranışına bırakılmaz: tek ve belirli tık).</summary>
     public static void PressFocused(object? focused)
     {
-        if (focused is ButtonBase { IsEnabled: true } b) b.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent, b));
+        if (focused is ToggleButton { IsEnabled: true, TemplatedParent: Expander e }) e.IsExpanded = !e.IsExpanded;
+        else if (focused is ButtonBase { IsEnabled: true } b) b.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent, b));
         else if (focused is Hyperlink { IsEnabled: true } h) h.RaiseEvent(new RoutedEventArgs(Hyperlink.ClickEvent, h));
     }
 }
@@ -116,6 +121,7 @@ internal class DialogWindow : Window
     private readonly bool _modal;
     private readonly bool _centerOnScreen;
     private Action? _unlock;
+    private ScrollViewer? _bodyScroll; // üst alan: kutu ekrana sığmazsa yalnız o kaydırılır, düğmeler görünür kalır
 
     /// <summary>İçeriğin genişliği (DIP; pencerenin iç genişliği).</summary>
     protected double ContentWidth { get; set; } = 448;
@@ -234,6 +240,7 @@ internal class DialogWindow : Window
             Show();
             await LoadedAsync();
             FitSize();
+            (focus as FrameworkElement)?.BringIntoView();
             if (_modal) _unlock = OpenWindows.Lock(this);
             Shown?.Invoke(this);
             return;
@@ -264,6 +271,7 @@ internal class DialogWindow : Window
         double delta = Height - before;
         if (Math.Abs(delta) >= 1) Top = Math.Max(work.Top / scale, Top - delta / 2);
         if (focus is not null) Keyboard.Focus(focus); // varsayılan düğme odakta (Enter/Esc); halkası yalnız klavye kullanılırken (FocusRing)
+        (focus as FrameworkElement)?.BringIntoView(); // üst alan kaydırılıyorsa (uzun ipucu) parola alanı görünsün
         Shown?.Invoke(this);
     }
 
@@ -286,10 +294,45 @@ internal class DialogWindow : Window
             frameW = (outer.Width - inner.Width) / scale;
             frameH = (outer.Height - inner.Height) / scale;
         }
+        SetBodyMaxHeight(double.PositiveInfinity);
         Root.Measure(new Size(ContentWidth, double.PositiveInfinity));
         double content = Root.DesiredSize.Height > 0 ? Root.DesiredSize.Height : 160;
+        // Çalışma alanından uzun kutu (ör. Mac'te yazılmış çok uzun parola ipucu): üst alan kısalır ve kaydırılır; önceden pencere
+        // ekrandan taşıyor, düğmeler görünmüyordu (1.9.0). Çalışma alanı: pencerenin yerleştiği (ya da yerleşeceği) ekran.
+        double room = WorkHeight(h) / scale - frameH;
+        if (_bodyScroll is not null && room > 0 && content > room)
+        {
+            SetBodyMaxHeight(Math.Max(120, _bodyScroll.DesiredSize.Height - (content - room)));
+            Root.Measure(new Size(ContentWidth, double.PositiveInfinity));
+            content = Root.DesiredSize.Height;
+        }
         Width = ContentWidth + frameW;
         Height = Math.Ceiling(content) + frameH;
+    }
+
+    /// <summary>
+    /// Üst alanın en çok boyu; kaydırma alanından köke kadar ölçü geçersiz kılınır (yalnız alan geçersiz kalırsa aynı boyutla
+    /// yapılan <c>Root.Measure</c> eski ölçüyü döndürüyordu).
+    /// </summary>
+    private void SetBodyMaxHeight(double value)
+    {
+        if (_bodyScroll is null || _bodyScroll.MaxHeight.Equals(value)) return;
+        _bodyScroll.MaxHeight = value;
+        // Yalnız gerçekten kaydırılırken Tab ile odak alır (klavyeyle oklarla kaydırılsın); sığan kutuda fazladan sekme durağı yok
+        _bodyScroll.Focusable = !double.IsPositiveInfinity(value);
+        for (DependencyObject? e = _bodyScroll; e is not null; e = System.Windows.Media.VisualTreeHelper.GetParent(e) ?? LogicalTreeHelper.GetParent(e))
+        {
+            if (e is UIElement u) u.InvalidateMeasure();
+            if (ReferenceEquals(e, Root)) break;
+        }
+    }
+
+    /// <summary>Pencerenin ekranındaki çalışma alanının yüksekliği (fiziksel piksel); pencere ekran dışındaysa (düzenek) etkin ekran.</summary>
+    private static int WorkHeight(IntPtr h)
+    {
+        if (h != IntPtr.Zero && GetWindowRect(h, out var r) && r.Left < OpenWindows.OffScreen.X - 100 && IsWindowVisible(h))
+            return OpenWindows.WorkAreaOf(r).Height;
+        return OpenWindows.ActiveWorkArea().Height;
     }
 
     // ---- Windows 11 kutusu düzeni ----
@@ -299,7 +342,12 @@ internal class DialogWindow : Window
     {
         Root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         Root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        var top = new Border { Padding = new Thickness(24, 22, 24, 22), BorderThickness = new Thickness(0, 0, 0, 1), Child = body };
+        _bodyScroll = new ScrollViewer
+        {
+            Content = body, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+            Focusable = false,
+        };
+        var top = new Border { Padding = new Thickness(24, 22, 24, 22), BorderThickness = new Thickness(0, 0, 0, 1), Child = _bodyScroll };
         top.SetResourceReference(Border.BackgroundProperty, "LayerFillColorAltBrush");
         top.SetResourceReference(Border.BorderBrushProperty, "CardStrokeColorDefaultBrush");
         Root.Children.Add(top);

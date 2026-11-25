@@ -83,7 +83,7 @@ internal sealed class DiskList
 
         // Başlık: disk adı ("Disk 3 (298 GB)"), sağda "Güvenle çıkar" (geri alınmaz eylem: Alert tonu; panelde yalnız ikon)
         var header = new DockPanel { Margin = Compact ? new Thickness(0) : new Thickness(4, 0, 0, 8), MinHeight = Compact ? 32 : 36 };
-        var eject = Look.Tone(new ActionButton(m.EjectText, ButtonKind.Quiet, EjectGlyph, iconOnly: Compact) { BusyText = m.EjectBusyText }, Role.Alert);
+        var eject = Look.Tone(new ActionButton(m.EjectText, ButtonKind.Quiet, EjectGlyph, iconOnly: Compact) { BusyText = m.EjectBusyText, Context = m.Title }, Role.Alert);
         eject.Busy = m.Ejecting;
         eject.Invoked += async () => await _app.EjectAsync(d, Owner());
         eject.VerticalAlignment = VerticalAlignment.Center;
@@ -116,7 +116,12 @@ internal sealed class DiskList
 
         var actions = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
         // Denetlenen bölümün birimleri o sırada listede olmaz: düğmesi meşgul olarak dursun (tek gösterge; B18)
-        if (!m.MultiPartition && m.Partitions.Count == 1 && m.Partitions[0].Toggle is { } single) actions.Children.Add(WriteToggle(d, single));
+        if (!m.MultiPartition && m.Partitions.Count == 1 && m.Partitions[0].Toggle is { } single)
+        {
+            var toggle = WriteToggle(d, single);
+            toggle.Context = m.Title; // çok bölümlüde düğme metni bölümün adını zaten taşır
+            actions.Children.Add(toggle);
+        }
         if (m.Checking) actions.Children.Add(new ActionButton(m.CheckingText, ButtonKind.Quiet) { BusyText = m.CheckingText, Busy = true }); // en sağda
         if (actions.Children.Count > 0) block.Children.Add(Right(actions));
         return block;
@@ -173,8 +178,8 @@ internal sealed class DiskList
         // "Kilidi aç" vurgulu; bölüm yazmaya açıkken (kilit açılamaz, "önce Salt okunura dön") sakin
         bool blocked = v.Action == VolumeAction.Unlock && d.Volumes.Any(x => x.Container == volume.Container && x.Writable);
         var kind = v.Action == VolumeAction.Unlock && !blocked ? ButtonKind.Accent : ButtonKind.Secondary;
-        var b = new ActionButton(v.ActionText, kind);
-        if (v.Action == VolumeAction.Open) b.Invoked += () => AppController.OpenDrive(volume.MountPoint!);
+        var b = new ActionButton(v.ActionText, kind) { Context = v.Drive is { Length: > 0 } letter ? $"{volume.Name} ({letter})" : volume.Name };
+        if (v.Action == VolumeAction.Open) b.Invoked += async () => await _app.OpenVolumeAsync(Owner(), volume);
         else if (v.Action == VolumeAction.Unlock) b.Invoked += async () => await _app.UnlockAsync(d, volume, Owner());
         else b.Invoked += async () => await _app.ShowDetailsAsync(Owner(), volume);
         if (v.Action == VolumeAction.Open) b.IsEnabled = v.ActionEnabled;

@@ -12,6 +12,9 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
+  <data name="A11y.ForItem" xml:space="preserve">
+    <value>{0}: {1}</value>
+  </data>
   <data name="About.Text" xml:space="preserve">
     <value>Apre in Windows i dischi APFS formattati su Mac: in sola lettura per impostazione predefinita, con scrittura opzionale (sperimentale). Open source, licenza GPLv3.</value>
   </data>
@@ -158,6 +161,9 @@
   <data name="Disk.PhysicalName" xml:space="preserve">
     <value>Disco {0} ({1})</value>
   </data>
+  <data name="Drive.Shadowed" xml:space="preserve">
+    <value>Nella tua sessione di Windows, {0} punta a un'altra unità (un'unità di rete connessa o un'unità subst), quindi Esplora file aprirebbe quell'unità invece di "{1}". Disconnetti quella unità e "{1}" comparirà come {0}.</value>
+  </data>
   <data name="Eject.Busy" xml:space="preserve">
     <value>Un file su {0} è aperto o in fase di copia in questo momento ({1}). Se espelli ora, la copia verrà interrotta; il disco del Mac non subirà danni.</value>
   </data>
@@ -259,6 +265,9 @@
   </data>
   <data name="Password.Locked" xml:space="preserve">
     <value>"{0}" è bloccato</value>
+  </data>
+  <data name="Password.NotRemembered" xml:space="preserve">
+    <value>Non è stato possibile ricordare la password su questo computer; verrà richiesta di nuovo la prossima volta.</value>
   </data>
   <data name="Password.Prompt" xml:space="preserve">
     <value>Questo volume è crittografato. Per aprirlo, inserisci la password che usi sul Mac.</value>
@@ -451,6 +460,9 @@
   </data>
   <data name="Update.Link" xml:space="preserve">
     <value>Versione {0} disponibile</value>
+  </data>
+  <data name="Update.Ready" xml:space="preserve">
+    <value>{0} {1} è pronto. Fai clic qui, poi scegli "Installa".</value>
   </data>
   <data name="Update.Updated" xml:space="preserve">
     <value>{0} è stato aggiornato alla versione {1}.</value>

@@ -58,19 +58,19 @@
     <value>Parola yanlış.</value>
   </data>
   <data name="Gate.BlockSize" xml:space="preserve">
-    <value>Blok boyutu {0}; yalnızca 4096 baytlık bloklar destekleniyor.</value>
+    <value>Bu disk {0} baytlık bloklarla biçimlendirilmiş; yazma yalnızca 4096 baytlık bloklu disklerde destekleniyor.</value>
   </data>
   <data name="Gate.CheckpointArea" xml:space="preserve">
-    <value>Diskin kontrol noktası alanı parçalı; bu düzen desteklenmiyor.</value>
+    <value>Bu disk kayıt bilgilerini bölünmüş bir alanda tutuyor; böyle bir diske yazma desteklenmiyor.</value>
   </data>
   <data name="Gate.EncRolled" xml:space="preserve">
-    <value>"{0}" biriminin şifrelemesi sonradan değiştirilmiş (ENC_ROLLED); böyle bir diske yazılmaz.</value>
+    <value>"{0}" biriminin şifrelemesi Mac'te sonradan değiştirilmiş; böyle bir diske yazılmaz.</value>
   </data>
   <data name="Gate.EncryptionInProgress" xml:space="preserve">
     <value>"{0}" biriminde macOS'un başlattığı bir şifreleme işlemi henüz bitmemiş; böyle bir diske yazılmaz.</value>
   </data>
   <data name="Gate.Fusion" xml:space="preserve">
-    <value>Fusion Drive kapsayıcısına yazma desteklenmiyor.</value>
+    <value>Fusion Drive'a yazma desteklenmiyor.</value>
   </data>
   <data name="Gate.Inconsistent" xml:space="preserve">
     <value>Diskin iç yapısında tutarsızlık bulundu; güvenlik için yazmaya açılmadı. Diski Mac'te Disk İzlencesi → İlk Yardım ile denetleyin.</value>
@@ -79,10 +79,10 @@
     <value>"{0}" birimi şifreli; yazmaya açmak için önce kilidini açın.</value>
   </data>
   <data name="Gate.OmapUnreadable" xml:space="preserve">
-    <value>"{0}" biriminin nesne haritası okunamadı.</value>
+    <value>"{0}" biriminin içeriğinin yerini gösteren tablo okunamadı.</value>
   </data>
   <data name="Gate.OpenWarnings" xml:space="preserve">
-    <value>Disk açılırken sorun görüldü (en yeni kontrol noktası kullanılamıyor olabilir).</value>
+    <value>Disk açılırken sorun görüldü (en son kaydedilmiş hâli kullanılamıyor olabilir).</value>
   </data>
   <data name="Gate.Sealed" xml:space="preserve">
     <value>"{0}" mühürlü bir sistem birimi.</value>
@@ -103,7 +103,7 @@
     <value>"{0}" birimi bu sürümün tanımadığı bir APFS özelliği kullanıyor.</value>
   </data>
   <data name="Gate.Unresolvable" xml:space="preserve">
-    <value>Diskte bu sürümün çözümleyemediği bir yapı var; her bloğun sahibi doğrulanamadığı için yazmaya açılmadı.</value>
+    <value>Diskte bu sürümün çözümleyemediği bir yapı var; diskin her parçasının ne için kullanıldığı doğrulanamadığı için yazmaya açılmadı.</value>
   </data>
   <data name="Gate.UnsupportedEncryption" xml:space="preserve">
     <value>"{0}" birimi bu sürümün yazamadığı bir türde şifreli (donanım şifrelemesi ya da dosya başına anahtar).</value>

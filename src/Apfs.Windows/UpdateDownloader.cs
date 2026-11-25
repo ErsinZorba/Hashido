@@ -27,8 +27,15 @@ public sealed class DownloadedSetup : IDisposable
     public void Dispose() => _handle.Dispose();
 }
 
-/// <summary>Setup indirilemedi ya da doğrulanamadı; ileti teknik (günlük) metnidir.</summary>
-public sealed class UpdateDownloadException(string message, Exception? inner = null) : Exception(message, inner);
+/// <summary>
+/// Setup indirilemedi ya da doğrulanamadı; ileti teknik (günlük) metnidir. <see cref="Unverifiable"/>: dosya Release'in tarif
+/// ettiğiyle tutmuyor (tam inmiş dosyada boyut, SHA-256, sürüm): yeniden indirmek aynı sonucu verir. Ağ hataları (kopma, durma, sunucu
+/// yanıtı, indirme sırasında tutmayan boy — araya giren bir ağ geçidi sayfası olabilir) değil.
+/// </summary>
+public sealed class UpdateDownloadException(string message, Exception? inner = null, bool unverifiable = false) : Exception(message, inner)
+{
+    public bool Unverifiable { get; } = unverifiable;
+}
 
 /// <summary>
 /// Release'teki setup'ı indirir ve doğrular (1.8.0, <c>guncellemePlan</c> Risk 1): kendi HttpClient'ı (genel süre yok; 60 sn
@@ -86,6 +93,7 @@ public sealed class UpdateDownloader : IDisposable
         {
             throw new UpdateDownloadException(WinText.T("Update.DownloadFailed", e.Message), e);
         }
+        RemoveOtherSetups(_directory, setup.FileName);
         string part = final + ".part";
         try
         {
@@ -112,9 +120,10 @@ public sealed class UpdateDownloader : IDisposable
         try
         {
             using var resp = await _http.GetAsync(setup.Url, HttpCompletionOption.ResponseHeadersRead, stall.Token).ConfigureAwait(false);
+            if (ProxyAuth.Required(resp)) throw new UpdateDownloadException(WinText.T("Update.ProxyAuth"));
             if (!resp.IsSuccessStatusCode) throw new UpdateDownloadException(WinText.T("Update.HttpStatus", (int)resp.StatusCode));
             if (resp.Content.Headers.ContentLength is long announced && announced != setup.Size)
-                throw new UpdateDownloadException(WinText.T("Update.BadSize", announced, setup.Size));
+                throw new UpdateDownloadException(WinText.T("Update.BadSize", announced, setup.Size)); // ağ geçidinin sayfası olabilir: beklemeye alınmaz
             await using var source = await resp.Content.ReadAsStreamAsync(stall.Token).ConfigureAwait(false);
             await using var target = new FileStream(part, FileMode.Create, FileAccess.Write, FileShare.None, 1 << 16, useAsync: true);
             var buffer = new byte[1 << 16];
@@ -139,7 +148,7 @@ public sealed class UpdateDownloader : IDisposable
         }
         catch (HttpRequestException e)
         {
-            throw new UpdateDownloadException(WinText.T("Update.DownloadFailed", e.Message), e);
+            throw new UpdateDownloadException(ProxyAuth.Required(e) ? WinText.T("Update.ProxyAuth") : WinText.T("Update.DownloadFailed", e.Message), e);
         }
     }
 
@@ -151,12 +160,12 @@ public sealed class UpdateDownloader : IDisposable
         try
         {
             handle = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
-            if (handle.Length != setup.Size) throw new UpdateDownloadException(WinText.T("Update.BadSize", handle.Length, setup.Size));
+            if (handle.Length != setup.Size) throw new UpdateDownloadException(WinText.T("Update.BadSize", handle.Length, setup.Size), unverifiable: true);
             byte[] hash = SHA256.HashData(handle);
-            if (!CryptographicOperations.FixedTimeEquals(hash, setup.Sha256)) throw new UpdateDownloadException(WinText.T("Update.BadHash"));
+            if (!CryptographicOperations.FixedTimeEquals(hash, setup.Sha256)) throw new UpdateDownloadException(WinText.T("Update.BadHash"), unverifiable: true);
             string? product = FileVersionInfo.GetVersionInfo(path).ProductVersion;
             if (ParseVersion(product) is not { } v || UpdateChecker.Normalize(v) != UpdateChecker.Normalize(info.Version))
-                throw new UpdateDownloadException(WinText.T("Update.BadVersion", product ?? "-", info.Version.ToString(3)));
+                throw new UpdateDownloadException(WinText.T("Update.BadVersion", product ?? "-", info.Version.ToString(3)), unverifiable: true);
             handle.Position = 0;
             return new DownloadedSetup(info.Version, path, handle);
         }
@@ -188,6 +197,23 @@ public sealed class UpdateDownloader : IDisposable
                 var m = SetupName.Match(System.IO.Path.GetFileName(f));
                 if (!m.Success) continue;
                 if (m.Groups[2].Success || UpdateChecker.Normalize(Version.Parse(m.Groups[1].Value)) <= UpdateChecker.Normalize(installed)) TryDelete(f);
+            }
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }
+    }
+
+    /// <summary>
+    /// Yeni bir sürüm indirilirken başka sürümlerin setup'ları ve yarım indirmeleri silinir (kurulmayan setup'lar sürüm başına
+    /// birikmesin). Açık tutulan dosya (başlamış setup) silinemez, kalır.
+    /// </summary>
+    private static void RemoveOtherSetups(string directory, string keep)
+    {
+        try
+        {
+            foreach (string f in Directory.EnumerateFiles(directory))
+            {
+                string name = System.IO.Path.GetFileName(f);
+                if (SetupName.IsMatch(name) && !string.Equals(name, keep, StringComparison.OrdinalIgnoreCase)) TryDelete(f);
             }
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }

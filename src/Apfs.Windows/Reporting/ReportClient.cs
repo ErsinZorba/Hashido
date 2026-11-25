@@ -14,8 +14,12 @@ public sealed class ReportClient : IDisposable
     /// <summary>Gizlilik açıklaması: açık depodaki README "Privacy" bölümü.</summary>
     public const string PrivacyUrl = "https://github.com/ErsinZorba/Hashido#privacy";
 
-    /// <summary>Sunucu adresi; <c>APFS_REPORTS_URL</c> ortam değişkeni geliştirme ve testler için değiştirir.</summary>
-    public static Uri Endpoint => new(Environment.GetEnvironmentVariable("APFS_REPORTS_URL") is { Length: > 0 } u ? u : DefaultEndpoint);
+    /// <summary>Sunucu adresi; <c>APFS_REPORTS_URL</c> ortam değişkeni yalnız geliştirme kanalında (<c>--pipe</c>) değiştirir.</summary>
+    public static Uri Endpoint => EndpointFor(PipeProtocol.PipeName, Environment.GetEnvironmentVariable("APFS_REPORTS_URL"));
+
+    /// <summary>Kurulu kanal adıyla her zaman <see cref="DefaultEndpoint"/> (<see cref="UpdateChecker.ApiFor"/> gibi).</summary>
+    internal static Uri EndpointFor(string pipeName, string? env) =>
+        pipeName != PipeProtocol.DefaultPipeName && Uri.TryCreate(env, UriKind.Absolute, out var u) ? u : new Uri(DefaultEndpoint);
 
     private readonly Func<bool?> _consent;
     private readonly ReportRecorder _local;

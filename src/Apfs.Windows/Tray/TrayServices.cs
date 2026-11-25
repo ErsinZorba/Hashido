@@ -25,6 +25,8 @@ public sealed class PipeChannel : ITrayChannel
 /// <param name="HelloVerify">Hello onayı: sahip pencerenin tutamacı ve ileti.</param>
 /// <param name="ReadSpace">Sürücü harfinin toplam/boş alanı; okunamazsa null (arka plan iş parçacığında çağrılır).</param>
 /// <param name="Notifications">Hangi balonlar gösterilir (Ayarlar › Bildirimler); null = kayıtlı seçim (<see cref="UserSettings.Notifications"/>).</param>
+/// <param name="SessionActive">Tepsinin Windows oturumu etkin mi; null = gerçek sorgu (<see cref="SessionState.IsActive"/>).</param>
+/// <param name="DriveShadowed">Harf bu oturumda başka bir aygıta (ağ, subst) bağlı mı; null = gerçek sorgu (<see cref="DriveMapping.IsShadowed"/>).</param>
 public sealed record TrayServices(
     ITrayChannel Channel,
     CredentialStore Credentials,
@@ -32,8 +34,16 @@ public sealed record TrayServices(
     Func<IntPtr, string, Task<HelloResult>> HelloVerify,
     Action<string> Log,
     Func<string, DriveSpace?> ReadSpace,
-    Func<NotificationMode>? Notifications = null)
+    Func<NotificationMode>? Notifications = null,
+    Func<bool>? SessionActive = null,
+    Func<string, bool>? DriveShadowed = null)
 {
+    /// <summary>Harf bu oturumda başka bir aygıta bağlı mı (her "Aç"ta yeniden sorulur); null = <see cref="DriveMapping.IsShadowed"/>.</summary>
+    public bool IsDriveShadowed(string mountPoint) => DriveShadowed?.Invoke(mountPoint) ?? DriveMapping.IsShadowed(mountPoint);
+
+    /// <summary>Tepsinin oturumu şu an etkin mi (her kilit açma kararında yeniden sorulur); null = <see cref="SessionState.IsActive"/>.</summary>
+    public bool IsSessionActive => SessionActive?.Invoke() ?? SessionState.IsActive();
+
     /// <summary>Şu anki bildirim seçimi (her balonda yeniden okunur: Ayarlar'da değişince hemen geçerli).</summary>
     public NotificationMode NotificationMode => Notifications?.Invoke() ?? UserSettings.Notifications;
 
@@ -50,6 +60,7 @@ public sealed record TrayServices(
     {
         try
         {
+            if (DriveMapping.IsShadowed(mountPoint)) return null; // harf bu oturumda başka sürücüyü gösteriyor: doluluk onunki olurdu
             var d = new DriveInfo(mountPoint);
             long total = d.TotalSize;
             return total > 0 ? new DriveSpace(total, Math.Clamp(d.AvailableFreeSpace, 0, total)) : null;
@@ -98,5 +109,5 @@ public sealed record UpdateServices(
         UpdatePolicy.AnySetupRunning,
         (path, args) => Process.Start(new ProcessStartInfo(path, args) { UseShellExecute = true }),
         ServiceLog.Write,
-        page => Process.Start(new ProcessStartInfo(page.ToString()) { UseShellExecute = true }));
+        page => AppController.TryStart(new ProcessStartInfo(page.ToString()) { UseShellExecute = true }, Process.Start, ServiceLog.Write));
 }

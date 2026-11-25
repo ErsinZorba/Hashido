@@ -300,11 +300,14 @@ Encrypted volumes: --password-prompt (asks for the password) or --password-stdin
   <data name="Ipc.UntrustedServer" xml:space="preserve">
     <value>the server of pipe {0} is not the installed service (it is not running in the services session); nothing was sent</value>
   </data>
+  <data name="Language.SaveFailed" xml:space="preserve">
+    <value>The language choice could not be saved ({0}).</value>
+  </data>
+  <data name="Password.SavedRefused" xml:space="preserve">
+    <value>{0}: the saved password did not work; the record is kept and the password is asked for.</value>
+  </data>
   <data name="Password.SaveFailed" xml:space="preserve">
     <value>{0}: the password could not be saved ({1}).</value>
-  </data>
-  <data name="Password.SavedRemoved" xml:space="preserve">
-    <value>{0}: the saved password no longer works; it was deleted.</value>
   </data>
   <data name="Password.SavedUnlocked" xml:space="preserve">
     <value>{0}: unlocked with the saved password.</value>
@@ -338,6 +341,9 @@ Encrypted volumes: --password-prompt (asks for the password) or --password-stdin
   </data>
   <data name="Raw.WriteOutOfRange" xml:space="preserve">
     <value>write outside the disk bounds: {0}+{1}</value>
+  </data>
+  <data name="Reports.ProxyAuth" xml:space="preserve">
+    <value>Reports could not be sent: the proxy server requires sign-in (HTTP 407). Hashido does not send credentials to a proxy.</value>
   </data>
   <data name="Service.LanguageSet" xml:space="preserve">
     <value>Language: {0}</value>
@@ -414,6 +420,15 @@ Encrypted volumes: --password-prompt (asks for the password) or --password-stdin
   <data name="Svc.Stopped" xml:space="preserve">
     <value>Service stopped.</value>
   </data>
+  <data name="Svc.TrayRestartFailed" xml:space="preserve">
+    <value>The tray app closed by setup could not be opened again in Windows session {0} (error {1}).</value>
+  </data>
+  <data name="Svc.TrayRestartSkipped" xml:space="preserve">
+    <value>Setup's list of tray apps to reopen was not used ("{0}", written {1} UTC): it is too old, unreadable or the tray app is missing.</value>
+  </data>
+  <data name="Svc.TrayRestarted" xml:space="preserve">
+    <value>Setup had closed the tray app in Windows session {0}; it was opened again.</value>
+  </data>
   <data name="Svc.UnknownRequest" xml:space="preserve">
     <value>unknown request</value>
   </data>
@@ -456,6 +471,9 @@ Encrypted volumes: --password-prompt (asks for the password) or --password-stdin
   <data name="Svc.WriteSessionClosed" xml:space="preserve">
     <value>{0}: partition {1} write session closed (last commit xid {2}).</value>
   </data>
+  <data name="Tray.StartFailed" xml:space="preserve">
+    <value>{0} could not be started ({1}).</value>
+  </data>
   <data name="Update.BadHash" xml:space="preserve">
     <value>Update rejected: the SHA-256 checksum does not match the release.</value>
   </data>
@@ -471,6 +489,9 @@ Encrypted volumes: --password-prompt (asks for the password) or --password-stdin
   <data name="Update.DownloadFailed" xml:space="preserve">
     <value>Update download failed: {0}</value>
   </data>
+  <data name="Update.Held" xml:space="preserve">
+    <value>Update {0} could not be verified; it is not downloaded automatically again for 24 hours.</value>
+  </data>
   <data name="Update.HttpStatus" xml:space="preserve">
     <value>Update download failed: the server answered {0}.</value>
   </data>
@@ -479,6 +500,9 @@ Encrypted volumes: --password-prompt (asks for the password) or --password-stdin
   </data>
   <data name="Update.NotApplied" xml:space="preserve">
     <value>Update {0} was not applied (installed version {1}); it is not offered automatically for 24 hours.</value>
+  </data>
+  <data name="Update.ProxyAuth" xml:space="preserve">
+    <value>Update could not reach GitHub: the proxy server requires sign-in (HTTP 407). Hashido does not send credentials to a proxy.</value>
   </data>
   <data name="Update.Stalled" xml:space="preserve">
     <value>Update download stopped: no progress for {0} s.</value>

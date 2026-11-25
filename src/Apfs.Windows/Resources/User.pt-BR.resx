@@ -12,6 +12,9 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
+  <data name="A11y.ForItem" xml:space="preserve">
+    <value>{0}: {1}</value>
+  </data>
   <data name="About.Text" xml:space="preserve">
     <value>Abre no Windows discos APFS formatados em um Mac: somente leitura por padrão, com gravação opcional (experimental). Código aberto, licença GPLv3.</value>
   </data>
@@ -158,6 +161,9 @@
   <data name="Disk.PhysicalName" xml:space="preserve">
     <value>Disco {0} ({1})</value>
   </data>
+  <data name="Drive.Shadowed" xml:space="preserve">
+    <value>Na sua sessão do Windows, {0} aponta para outra unidade (uma unidade de rede mapeada ou uma unidade subst), então o Explorador de Arquivos abriria essa unidade em vez de "{1}". Desconecte esse mapeamento e "{1}" aparecerá como {0}.</value>
+  </data>
   <data name="Eject.Busy" xml:space="preserve">
     <value>Um arquivo em {0} está aberto ou sendo copiado agora ({1}). Se você ejetar agora, a cópia será interrompida; seu disco do Mac não será danificado.</value>
   </data>
@@ -259,6 +265,9 @@
   </data>
   <data name="Password.Locked" xml:space="preserve">
     <value>"{0}" está bloqueado</value>
+  </data>
+  <data name="Password.NotRemembered" xml:space="preserve">
+    <value>Não foi possível lembrar a senha neste computador; ela será pedida novamente na próxima vez.</value>
   </data>
   <data name="Password.Prompt" xml:space="preserve">
     <value>Este volume está criptografado. Para abri-lo, digite a senha que você usa no Mac.</value>
@@ -451,6 +460,9 @@
   </data>
   <data name="Update.Link" xml:space="preserve">
     <value>Versão {0} disponível</value>
+  </data>
+  <data name="Update.Ready" xml:space="preserve">
+    <value>O {0} {1} está pronto. Clique aqui e escolha "Instalar".</value>
   </data>
   <data name="Update.Updated" xml:space="preserve">
     <value>O {0} foi atualizado para a versão {1}.</value>

@@ -58,19 +58,19 @@
     <value>암호가 올바르지 않습니다.</value>
   </data>
   <data name="Gate.BlockSize" xml:space="preserve">
-    <value>블록 크기가 {0}입니다. 4096바이트 블록만 지원됩니다.</value>
+    <value>이 디스크는 {0}바이트 블록으로 포맷되었습니다. 쓰기는 4096바이트 블록 디스크에서만 지원됩니다.</value>
   </data>
   <data name="Gate.CheckpointArea" xml:space="preserve">
-    <value>디스크의 체크포인트 영역이 조각나 있습니다. 이러한 구조는 지원되지 않습니다.</value>
+    <value>이 디스크는 저장 정보를 나뉜 영역에 기록합니다. 이러한 디스크에는 쓰기가 지원되지 않습니다.</value>
   </data>
   <data name="Gate.EncRolled" xml:space="preserve">
-    <value>"{0}" 볼륨의 암호화가 나중에 변경되었습니다(ENC_ROLLED). 이러한 디스크에는 쓰지 않습니다.</value>
+    <value>"{0}" 볼륨의 암호화가 생성 후 Mac에서 변경되었습니다. 이러한 디스크에는 쓰지 않습니다.</value>
   </data>
   <data name="Gate.EncryptionInProgress" xml:space="preserve">
     <value>"{0}" 볼륨에서 macOS가 시작한 암호화 작업이 아직 끝나지 않았습니다. 이러한 디스크에는 쓰지 않습니다.</value>
   </data>
   <data name="Gate.Fusion" xml:space="preserve">
-    <value>Fusion Drive 컨테이너에 쓰는 기능은 지원되지 않습니다.</value>
+    <value>Fusion Drive에 쓰는 기능은 지원되지 않습니다.</value>
   </data>
   <data name="Gate.Inconsistent" xml:space="preserve">
     <value>디스크의 내부 구조에서 불일치가 발견되어, 안전을 위해 쓰기를 사용하도록 설정하지 않았습니다. Mac의 디스크 유틸리티 → 검사/복구로 디스크를 검사하세요.</value>
@@ -79,10 +79,10 @@
     <value>"{0}" 볼륨은 암호화되어 있습니다. 쓰기를 허용하기 전에 잠금을 해제하세요.</value>
   </data>
   <data name="Gate.OmapUnreadable" xml:space="preserve">
-    <value>"{0}" 볼륨의 개체 맵을 읽을 수 없습니다.</value>
+    <value>"{0}" 볼륨의 내용 위치를 알려 주는 표를 읽을 수 없습니다.</value>
   </data>
   <data name="Gate.OpenWarnings" xml:space="preserve">
-    <value>디스크를 여는 중에 문제가 발견되었습니다(가장 최근 체크포인트를 사용하지 못할 수 있습니다).</value>
+    <value>디스크를 여는 중에 문제가 발견되었습니다(마지막으로 저장된 상태를 사용하지 못할 수 있습니다).</value>
   </data>
   <data name="Gate.Sealed" xml:space="preserve">
     <value>"{0}"은(는) 봉인된 시스템 볼륨입니다.</value>
@@ -103,7 +103,7 @@
     <value>"{0}" 볼륨이 이 버전에서 인식하지 못하는 APFS 기능을 사용합니다.</value>
   </data>
   <data name="Gate.Unresolvable" xml:space="preserve">
-    <value>디스크에 이 버전이 해석할 수 없는 구조가 있습니다. 모든 블록의 소유자를 확인할 수 없어 쓰기를 사용하도록 설정하지 않았습니다.</value>
+    <value>디스크에 이 버전이 해석할 수 없는 구조가 있습니다. 디스크 각 부분의 용도를 확인할 수 없어 쓰기를 사용하도록 설정하지 않았습니다.</value>
   </data>
   <data name="Gate.UnsupportedEncryption" xml:space="preserve">
     <value>"{0}" 볼륨은 이 버전에서 쓸 수 없는 방식으로 암호화되어 있습니다(하드웨어 암호화 또는 파일별 키).</value>

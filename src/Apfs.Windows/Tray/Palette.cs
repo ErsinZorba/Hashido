@@ -13,7 +13,7 @@ namespace Apfs.Windows.Tray;
 /// <see cref="Focus"/> odak halkası, <see cref="Accent"/>/<see cref="OnAccent"/> birincil düğme ve işaretli kutu dolgusu
 /// ve üstündeki işaret/metin, <see cref="Link"/> bağlantı metni. <see cref="Light"/>/<see cref="Dark"/> markadır.
 /// </summary>
-public sealed record Palette(Color Paper, Color Washi, Color Ink, Color InkSoft, Color Hair, Color Track, Color Bar, Color Shu,
+public sealed record Palette(Color Paper, Color Washi, Color Ink, Color InkSoft, Color Hair, Color Bar, Color Shu,
     Color Alert, Color WritableMark, Color Caution, Color Focus, Color Accent, Color OnAccent, Color Link, bool IsDark, AppDesign Design)
 {
     public static readonly Palette Light = Brand(false);
@@ -24,12 +24,12 @@ public sealed record Palette(Color Paper, Color Washi, Color Ink, Color InkSoft,
         if (!dark)
         {
             Color paper = Hex(0xFBFAF7), ink = Hex(0x1E1C19), shu = Hex(0xC2412A);
-            return new(paper, Hex(0xF5F2EC), ink, Hex(0x6B665E), Hex(0xDCD6CB), Hex(0xE6E1D7), Hex(0x4A4640), shu,
+            return new(paper, Hex(0xF5F2EC), ink, Hex(0x6B665E), Hex(0xDCD6CB), Hex(0x4A4640), shu,
                 Alert: shu, WritableMark: shu, Caution: Hex(0x9A6200), Focus: shu, Accent: ink, OnAccent: paper, Link: ink,
                 IsDark: false, Design: AppDesign.Brand);
         }
         Color dPaper = Hex(0x1B1A18), dInk = Hex(0xECE7DF), dShu = Hex(0xE4664C);
-        return new(dPaper, Hex(0x141312), dInk, Hex(0x9D978D), Hex(0x34312C), Hex(0x2E2B27), Hex(0xBDB6AA), dShu,
+        return new(dPaper, Hex(0x141312), dInk, Hex(0x9D978D), Hex(0x34312C), Hex(0xBDB6AA), dShu,
             Alert: dShu, WritableMark: dShu, Caution: Hex(0xD9A44A), Focus: dShu, Accent: dInk, OnAccent: dPaper, Link: dInk,
             IsDark: true, Design: AppDesign.Brand);
     }
@@ -40,12 +40,12 @@ public sealed record Palette(Color Paper, Color Washi, Color Ink, Color InkSoft,
         if (!dark)
         {
             Color caution = Hex(0x9D5D00);
-            return new(Hex(0xF3F3F3), Hex(0xFBFBFB), Hex(0x1A1A1A), Hex(0x5D5D5D), Hex(0xE5E5E5), Hex(0xEAEAEA), accent.Dark1,
+            return new(Hex(0xF3F3F3), Hex(0xFBFBFB), Hex(0x1A1A1A), Hex(0x5D5D5D), Hex(0xE5E5E5), accent.Dark1,
                 Hex(0xC2412A), Alert: Hex(0xC42B1C), WritableMark: caution, Caution: caution, Focus: Hex(0x1A1A1A),
                 Accent: accent.Dark1, OnAccent: Hex(0xFFFFFF), Link: accent.Dark2, IsDark: false, Design: AppDesign.Windows);
         }
         Color dCaution = Hex(0xFCE100);
-        return new(Hex(0x202020), Hex(0x2B2B2B), Hex(0xFFFFFF), Hex(0xC5C5C5), Hex(0x333333), Hex(0x2D2D2D), accent.Light2,
+        return new(Hex(0x202020), Hex(0x2B2B2B), Hex(0xFFFFFF), Hex(0xC5C5C5), Hex(0x333333), accent.Light2,
             Hex(0xE4664C), Alert: Hex(0xFF99A4), WritableMark: dCaution, Caution: dCaution, Focus: Hex(0xFFFFFF),
             Accent: accent.Light2, OnAccent: Hex(0x000000), Link: accent.Light3, IsDark: true, Design: AppDesign.Windows);
     }

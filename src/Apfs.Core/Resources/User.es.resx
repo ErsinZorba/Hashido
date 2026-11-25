@@ -58,19 +58,19 @@
     <value>Contraseña incorrecta.</value>
   </data>
   <data name="Gate.BlockSize" xml:space="preserve">
-    <value>El tamaño de bloque es {0}; solo se admiten bloques de 4096 bytes.</value>
+    <value>Este disco se formateó con bloques de {0} bytes; la escritura solo se admite en discos con bloques de 4096 bytes.</value>
   </data>
   <data name="Gate.CheckpointArea" xml:space="preserve">
-    <value>El área de puntos de control del disco está fragmentada; esta disposición no es compatible.</value>
+    <value>Este disco guarda su información de guardado en un área dividida; no se admite escribir en un disco así.</value>
   </data>
   <data name="Gate.EncRolled" xml:space="preserve">
-    <value>El cifrado del volumen "{0}" se modificó posteriormente (ENC_ROLLED); no se escribe en un disco así.</value>
+    <value>El cifrado del volumen "{0}" se modificó en el Mac después de crearse; no se escribe en un disco así.</value>
   </data>
   <data name="Gate.EncryptionInProgress" xml:space="preserve">
     <value>Una operación de cifrado iniciada por macOS no ha terminado en el volumen "{0}"; no se escribe en un disco así.</value>
   </data>
   <data name="Gate.Fusion" xml:space="preserve">
-    <value>No se admite la escritura en un contenedor Fusion Drive.</value>
+    <value>No se admite escribir en un Fusion Drive.</value>
   </data>
   <data name="Gate.Inconsistent" xml:space="preserve">
     <value>Se encontró una incoherencia en la estructura interna del disco; por seguridad, no se habilitó la escritura. Compruebe el disco en un Mac con Utilidad de Discos → Primera ayuda.</value>
@@ -79,10 +79,10 @@
     <value>El volumen "{0}" está cifrado; desbloquéelo antes de permitir la escritura.</value>
   </data>
   <data name="Gate.OmapUnreadable" xml:space="preserve">
-    <value>No se pudo leer el mapa de objetos del volumen "{0}".</value>
+    <value>No se pudo leer la tabla que localiza el contenido del volumen "{0}".</value>
   </data>
   <data name="Gate.OpenWarnings" xml:space="preserve">
-    <value>Se detectaron problemas al abrir el disco (es posible que el punto de control más reciente no se pueda usar).</value>
+    <value>Se detectaron problemas al abrir el disco (es posible que su último estado guardado no se pueda usar).</value>
   </data>
   <data name="Gate.Sealed" xml:space="preserve">
     <value>"{0}" es un volumen del sistema sellado.</value>
@@ -103,7 +103,7 @@
     <value>El volumen "{0}" usa una función de APFS que esta versión no reconoce.</value>
   </data>
   <data name="Gate.Unresolvable" xml:space="preserve">
-    <value>El disco tiene una estructura que esta versión no puede interpretar; no se habilitó la escritura porque no se pudo verificar el propietario de cada bloque.</value>
+    <value>El disco tiene una estructura que esta versión no puede interpretar; no se habilitó la escritura porque no se pudo confirmar para qué se usa cada parte del disco.</value>
   </data>
   <data name="Gate.UnsupportedEncryption" xml:space="preserve">
     <value>El volumen "{0}" usa un tipo de cifrado en el que esta versión no puede escribir (cifrado por hardware o claves por archivo).</value>

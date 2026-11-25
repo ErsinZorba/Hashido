@@ -69,6 +69,15 @@ public static class UserSettings
         set => Write(UpdateDeclinedVersionValue, value);
     }
 
+    private const string UpdateReadyValue = "UpdateReady"; // metin, "hazır, Kur'a basabilirsiniz" balonu gösterilen sürüm (1.9.0)
+
+    /// <summary>Kendiliğinden kurulumu takılı disk beklettiği için "hazır" balonu gösterilen son sürüm (sürüm başına bir balon).</summary>
+    public static string? UpdateReadyAnnounced
+    {
+        get => ReadString(UpdateReadyValue);
+        set => Write(UpdateReadyValue, value);
+    }
+
     /// <summary><see cref="UpdateDeclinedVersion"/>'ın kaydedildiği an (24 saat o sürüm kendiliğinden önerilmez).</summary>
     public static DateTime? UpdateDeclinedUtc
     {
@@ -150,14 +159,18 @@ public static class UserSettings
     /// 1.6.2 geçişi (kullanıcı kararı 2026-11-15), kullanıcı başına BİR KEZ: 1.6.0/1.6.1 Ayarlar'da tasarım ya da tema
     /// değişince ikisini birlikte yazıyordu, kayıtlı "brand" bilinçli seçimden ayırt edilemiyor → bir kez Windows 11 yapılır ve
     /// işaretlenir. Sonra Hashido'yu seçen markada kalır. Kayıt okunamazsa hiçbir şey yapılmaz (sonraki açılışta yeniden denenir).
+    /// İşaret ÖNCE yazılır; yazılamazsa tasarıma dokunulmaz (1.9.0: yoksa geçiş her açılışta yeniden koşup arada seçilen
+    /// Hashido'yu yine Windows 11 yapardı).
     /// Tepsi paleti ilk kez okumadan önce çağrılmalı.
     /// </summary>
-    public static void MigrateDesignDefault()
+    public static void MigrateDesignDefault() => MigrateDesignDefault(Write);
+
+    internal static void MigrateDesignDefault(Func<string, object?, bool> write)
     {
         if (!TryRead(DesignDefaultValue, out var done) || done is int) return;
         if (!TryRead(DesignValue, out var design)) return;
-        if (design is string s && string.Equals(s.Trim(), "brand", StringComparison.OrdinalIgnoreCase)) Write(DesignValue, "windows");
-        Write(DesignDefaultValue, 2);
+        if (!write(DesignDefaultValue, 2)) return;
+        if (design is string s && string.Equals(s.Trim(), "brand", StringComparison.OrdinalIgnoreCase)) write(DesignValue, "windows");
     }
     private const string ThemeValue = "Theme";   // metin: "system" | "light" | "dark"
 
@@ -193,15 +206,17 @@ public static class UserSettings
 
     private static string? ReadString(string name) => Read(name) as string;
 
-    private static void Write(string name, object? value)
+    /// <returns>Yazıldı (yetki/G/Ç hatası sessizce yutulur: false).</returns>
+    private static bool Write(string name, object? value)
     {
         try
         {
             using var key = Registry.CurrentUser.CreateSubKey(LanguageSetting.KeyPath);
             if (value is null) key.DeleteValue(name, throwOnMissingValue: false);
             else key.SetValue(name, value, value is int ? RegistryValueKind.DWord : RegistryValueKind.String);
+            return true;
         }
-        catch (Exception e) when (e is System.Security.SecurityException or UnauthorizedAccessException or IOException) { }
+        catch (Exception e) when (e is System.Security.SecurityException or UnauthorizedAccessException or IOException) { return false; }
     }
 }
 

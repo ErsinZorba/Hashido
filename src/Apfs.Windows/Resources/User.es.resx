@@ -12,6 +12,9 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
+  <data name="A11y.ForItem" xml:space="preserve">
+    <value>{0}: {1}</value>
+  </data>
   <data name="About.Text" xml:space="preserve">
     <value>Abre en Windows discos APFS formateados en un Mac: de solo lectura de forma predeterminada, con escritura opcional (experimental). Código abierto, licencia GPLv3.</value>
   </data>
@@ -158,6 +161,9 @@
   <data name="Disk.PhysicalName" xml:space="preserve">
     <value>Disco {0} ({1})</value>
   </data>
+  <data name="Drive.Shadowed" xml:space="preserve">
+    <value>En su sesión de Windows, {0} apunta a otra unidad (una unidad de red asignada o una unidad subst), así que el Explorador de archivos abriría esa unidad en lugar de "{1}". Desconecte esa asignación y "{1}" aparecerá como {0}.</value>
+  </data>
   <data name="Eject.Busy" xml:space="preserve">
     <value>Hay un archivo de {0} abierto o copiándose en este momento ({1}). Si lo expulsa ahora, la copia se interrumpirá; su disco de Mac no sufrirá daños.</value>
   </data>
@@ -259,6 +265,9 @@
   </data>
   <data name="Password.Locked" xml:space="preserve">
     <value>"{0}" está bloqueado</value>
+  </data>
+  <data name="Password.NotRemembered" xml:space="preserve">
+    <value>No se pudo recordar la contraseña en este equipo; se le volverá a pedir la próxima vez.</value>
   </data>
   <data name="Password.Prompt" xml:space="preserve">
     <value>Este volumen está cifrado. Para abrirlo, escriba la contraseña que usa en el Mac.</value>
@@ -451,6 +460,9 @@
   </data>
   <data name="Update.Link" xml:space="preserve">
     <value>Versión {0} disponible</value>
+  </data>
+  <data name="Update.Ready" xml:space="preserve">
+    <value>{0} {1} está listo. Haga clic aquí y elija "Instalar".</value>
   </data>
   <data name="Update.Updated" xml:space="preserve">
     <value>{0} se actualizó a la versión {1}.</value>
