@@ -18,6 +18,11 @@ public sealed record TrayMenuItem(TrayMenuKind Kind, string Text = "", bool Enab
 public sealed record SettingsChoices(bool Reports, bool ReportsAtOpen, bool UpdateNotify, bool UpdateAutoInstall, AppDesign Design,
     ThemeMode ThemeMode, CultureInfo? Language, NotificationMode Notifications);
 
+/// <summary>Ayarlar › Tamam'ın sonucu (1.9.1).</summary>
+/// <param name="Restart">Program yeniden başlamalı (tasarım ya da dil değişti ve kaydedildi).</param>
+/// <param name="SaveFailed">Bir seçim kayıt defterine yazılamadı: kullanıcıya bir kez söylenir.</param>
+public sealed record SettingsResult(bool Restart, bool SaveFailed);
+
 /// <summary>
 /// Tepsi simgesinin ve ayarların arayüzden bağımsız kararları (winuiPlan P1; önceden <c>TrayApp</c> ve <c>MainForm</c>'un içindeydi).
 /// </summary>
@@ -81,29 +86,49 @@ public static class TrayModel
     /// tema ya da dil değiştiyse kaydedilir. Tema (açık/koyu) yeniden başlatmaz:
     /// çağıran hemen uygular (winuiPlan P2.2, Ek A R2 ⟳; WinForms'ta tema da yeniden başlatıyordu).
     /// </summary>
-    /// <returns>Program yeniden başlamalı: tasarım ya da dil değişti (ikisi birlikte de bir kez; HEMEN, boşta beklemeden).</returns>
-    public static bool ApplySettings(SettingsChoices c, Action consentChanged)
+    /// <returns>Program yeniden başlamalı: tasarım ya da dil değişti (ikisi birlikte de bir kez; süren iş yoksa hemen, varsa bitince: <see cref="DeferredRestart"/>).</returns>
+    public static bool ApplySettings(SettingsChoices c, Action consentChanged) => ApplySettingsChecked(c, consentChanged).Restart;
+
+    /// <summary>
+    /// <see cref="ApplySettings"/>, kaydedilemeyen seçimi de söyler (1.9.1): kayıt defteri yazılamazsa Ayarlar bir kez
+    /// <c>Settings.SaveFailed</c> gösterir (önceden seçim uygulanmış gibi görünüyordu). Rapor onayı yazılamasa da bu çalışmada
+    /// seçilen değerle uygulanır (<see cref="UserSettings.ReportsConsent"/>); tasarım ya da dil kaydedilemediyse yeniden başlanmaz
+    /// (yeni süreç eskisini açardı).
+    /// </summary>
+    public static SettingsResult ApplySettingsChecked(SettingsChoices c, Action consentChanged)
     {
+        bool saved = true;
         if (c.Reports != c.ReportsAtOpen)
         {
-            UserSettings.ReportsConsent = c.Reports;
+            saved &= UserSettings.SetReportsConsent(c.Reports);
             consentChanged();
         }
-        UserSettings.UpdateNotify = c.UpdateNotify;
-        UserSettings.UpdateAutoInstall = c.UpdateAutoInstall;
-        UserSettings.Notifications = c.Notifications;
+        saved &= UserSettings.SetUpdateNotify(c.UpdateNotify);
+        saved &= UserSettings.SetUpdateAutoInstall(c.UpdateAutoInstall);
+        saved &= UserSettings.SetNotifications(c.Notifications);
         bool restart = false;
-        if (c.ThemeMode != UserSettings.ThemeMode) UserSettings.ThemeMode = c.ThemeMode;
+        if (c.ThemeMode != UserSettings.ThemeMode) saved &= UserSettings.SetThemeMode(c.ThemeMode);
         if (c.Design != UserSettings.Design)
         {
-            UserSettings.Design = c.Design;
-            restart = true;
+            if (UserSettings.SetDesign(c.Design)) restart = true;
+            else saved = false;
         }
-        if (LanguageSetting.Load()?.Name != c.Language?.Name && LanguageSetting.Save(c.Language)) restart = true;
-        return restart;
+        if (LanguageSetting.Load()?.Name != c.Language?.Name)
+        {
+            if (LanguageSetting.Save(c.Language)) restart = true;
+            else saved = false;
+        }
+        return new SettingsResult(restart, !saved);
     }
 
-    /// <summary>Alt çubuktaki dil menüsünden seçim: farklıysa kaydedilir ve true (program HEMEN yeniden başlar); aynıysa hiçbir şey.</summary>
+    /// <summary>
+    /// Dil/tasarım yeniden başlaması şimdi süren bir işi keser mi (1.9.1; <see cref="DeferredRestart"/>): güncelleme "Kur" akışı
+    /// (<see cref="TrayFeatures.Updating"/>), bu tepsinin başlattığı setup (<see cref="TrayFeatures.SetupRunning"/>) ya da tepsi
+    /// boşta değil (<see cref="AppController.Idle"/>: açık kutu, çıkarma, yazma geçişi, kilit açma, tarama).
+    /// </summary>
+    public static bool RestartMustWait(bool updating, bool setupRunning, bool idle) => updating || setupRunning || !idle;
+
+    /// <summary>Alt çubuktaki dil menüsünden seçim: farklıysa kaydedilir ve true (program yeniden başlar; süren iş varsa bitince, <see cref="DeferredRestart"/>); aynıysa hiçbir şey.</summary>
     public static bool ChooseLanguage(CultureInfo? language)
     {
         // Kaydedilemediyse yeniden başlamak eski dili açardı

@@ -6,7 +6,9 @@ using Apfs.Util;
 namespace Apfs.Partitions;
 
 /// <summary>Bir aygıtta bulunan APFS kapsayıcısının konumu.</summary>
-public sealed record ApfsPartition(long Offset, long Length, int Index, string Description);
+/// <param name="OverlapsOther">GPT'de APFS DIŞI bir girdiyle örtüşüyor (1.9.1): bozuk tablo. Bölüm gizlenmez (kullanıcı
+/// verisinden ayrılmasın), salt okunur açılır; yazmaya açılmaz (yazıcı öbür bölümün verisine yazabilirdi).</param>
+public sealed record ApfsPartition(long Offset, long Length, int Index, string Description, bool OverlapsOther = false);
 
 /// <summary>GPT bölüm tablosunu okuyup APFS bölümlerini bulur. Bölüm tablosu yoksa aygıtın tamamını kapsayıcı kabul eder.</summary>
 public static class PartitionLocator
@@ -191,6 +193,16 @@ public static class PartitionLocator
         ulong sectors = (ulong)(device.Length / sector);
         var result = new List<ApfsPartition>();
         var taken = new List<(ulong First, ulong Last)>();
+        // APFS dışı girdilerin aralıkları (boş tür ve ters aralık hariç; kullanılabilir alanın dışındakiler de: bozuk tablo)
+        var others = new List<(ulong First, ulong Last)>();
+        for (int i = 0; i < count; i++)
+        {
+            var entry = table.AsSpan((int)(i * entrySize), (int)entrySize);
+            var type = new Guid(entry[..16]);
+            if (type == Guid.Empty || type == ApfsPartitionType) continue;
+            ulong f = Bin.U64(entry, 32), l = Bin.U64(entry, 40);
+            if (f <= l) others.Add((f, l));
+        }
         // En çok 1024 APFS bölümü (önceki tablo sınırının izin verdiği kadar): çok girdili tablo örtüşme denetimini (n²)
         // ve hizmetin bölüm başına işini büyütmesin; gerçek disklerde birkaç APFS bölümü olur
         for (int i = 0; i < count && result.Count < MaxApfsPartitions; i++)
@@ -210,7 +222,8 @@ public static class PartitionLocator
             long offset = (long)first * sector;
             long length = (long)(last - first + 1) * sector;
             string name = System.Text.Encoding.Unicode.GetString(entry.Slice(56, 72)).TrimEnd('\0');
-            result.Add(new ApfsPartition(offset, length, i + 1, string.IsNullOrEmpty(name) ? CoreText.U("Partition.Numbered", i + 1) : name));
+            bool overlaps = others.Exists(o => first <= o.Last && o.First <= last);
+            result.Add(new ApfsPartition(offset, length, i + 1, string.IsNullOrEmpty(name) ? CoreText.U("Partition.Numbered", i + 1) : name, overlaps));
         }
         return result;
     }

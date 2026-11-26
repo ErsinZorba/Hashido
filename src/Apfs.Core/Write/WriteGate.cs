@@ -37,9 +37,9 @@ public sealed record LockedVolume(int Index, string Name);
 /// varsa reddettirmez: <see cref="GateResult.LockedVolumes"/>'a girer ve dokunulmadan kalır (1.7.0); hepsi kilitliyse ret;</item>
 /// <item>kota hiçbir birimde, ayrılmış alan (rezerv) çok birimli kapsayıcıda hiçbir birimde tanımlı olmamalı (yazıcı kotaya
 /// bakmaz; rezervi yalnız kendi birimi için gözetir);</item>
-/// <item>Fusion yok, checkpoint halkaları bitişik, blok boyutu 4096, tanınmayan özellik biti yok;</item>
+/// <item>Fusion yok, checkpoint halkaları bitişik, blok boyutu 4096, tanınmayan özellik biti yok, CIB adres bloğu (CAB) yok;</item>
 /// <item>en yeni checkpoint kullanılıyor (daha eskisine düşülmemiş), reaper boşta;</item>
-/// <item>tam denetleyici (<see cref="FullCheck"/>) 0 hata veriyor.</item>
+/// <item>tam denetimin bellek tahmini bütçenin içinde (<see cref="FullCheck.MemoryEstimate"/>) ve tam denetleyici (<see cref="FullCheck"/>) 0 hata veriyor.</item>
 /// </list>
 /// </summary>
 public static class WriteGate
@@ -68,6 +68,17 @@ public static class WriteGate
         if ((sb.XpDescBlocks & ApfsConstants.XpDescBlocksNonContiguous) != 0 || (sb.XpDataBlocks & ApfsConstants.XpDescBlocksNonContiguous) != 0)
             Add("Gate.CheckpointArea", CoreText.U("Gate.CheckpointArea"));
         if (c.Warnings.Count > 0) Add("Gate.OpenWarnings", CoreText.U("Gate.OpenWarnings"));
+        // GPT'de APFS dışı bölümle örtüşen bölüm (1.9.1): yazıcı öbür bölümün verisine yazabilirdi; tam denetimden önce ret
+        if (c.PartitionOverlapsOther) Add("Gate.Inconsistent", CoreText.U("Gate.Inconsistent"));
+        // CIB adres bloklu (~7 TB üstü) kapsayıcıyı yazıcı açmaz: büyük diskte saatler sürebilecek tam denetimden ÖNCE ret (1.9.1;
+        // önce tam denetim bitince oturum açılırken "desteklenmiyor"). Alan yöneticisi okunamıyorsa tam denetim bildirir.
+        try
+        {
+            var cp = Checkpoint.Read(c);
+            if (cp.IsValid && Spaceman.Read(c, cp).Main.CabCount != 0)
+                Add("Gate.WriteBlocker", CoreText.U("Gate.WriteBlocker", CoreText.T("Check.LabelCab")));
+        }
+        catch (ApfsException e) when (e.Code is not ApfsErrorCode.IoError) { }
 
         var locked = new List<LockedVolume>();
         int writable = 0;
@@ -123,6 +134,10 @@ public static class WriteGate
             foreach (var l in locked) Add("Gate.Locked", CoreText.U("Gate.Locked", l.Name));
 
         if (reasons.Count > 0) return Refused(reasons, null);
+
+        // Tam denetimin belleği diskteki nesne sayısıyla büyür: bütçeyi aşacaksa hiç başlatma (1.9.1)
+        var (needed, budget) = FullCheck.MemoryEstimate(c);
+        if (needed > budget) return Refused([("Gate.TooManyFiles", CoreText.U("Gate.TooManyFiles"))], null);
 
         // Yapısal denetim en sonda: pahalıdır ve yukarıdaki kurallar geçmeden anlamsızdır
         var report = FullCheck.Run(c, keys: keyList);

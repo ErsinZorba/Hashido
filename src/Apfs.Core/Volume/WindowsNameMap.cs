@@ -16,6 +16,12 @@ namespace Apfs.Volume;
 /// Böylece her girdi görünür (kopyada sessiz eksik dosya yok) ve gösterilen ad doğru girdiye gider. Haritadan bulunan girdiye
 /// yazılabilir sürücüde dokunulmaz (adla yapılan işlemler eşlemeden geri çevrilmiş adı hedefler).
 /// </para>
+/// <para>
+/// 1.9.1: geçersiz UTF-8 baytlarının kaçış aralığı (U+F680–U+F6FF, <see cref="Bin.Utf8NameZ"/>) da tuhaf: aynı aralıktan
+/// karakter taşıyan geçerli bir Mac adı geçersiz baytlı bir adla AYNI dizgeye düşebilir (ikiz). Bu aralık eşlemeden değişmediği için
+/// adın kendisi bugünkü aramayla da bulunur; tuhaf girdiyi bulan arama yine haritaya bakar (kilitli), ikizlerden biri kendi adıyla,
+/// öbürü <c>~2</c> ile görünür. Gösterilen ad girdinin kendisine bağlıdır (ada değil).
+/// </para>
 /// Harita klasör dizini başına ilk gerekince bir kez kurulur (yalnız tuhaf adlar için; çoğu klasörde boş), yazma oturumu dizini
 /// değiştirince yeniden.
 /// </summary>
@@ -24,12 +30,12 @@ public sealed class WindowsNameMap
     /// <summary>Windows'ta bir ad bileşeninin en çok uzunluğu (sürücülerin MaxComponentLength'i).</summary>
     private const int MaxComponentLength = 255;
 
-    private static readonly WindowsNameMap Empty = new(new Dictionary<string, DirEntry>(), new Dictionary<string, string>(), 0, null);
+    private static readonly WindowsNameMap Empty = new(new Dictionary<string, DirEntry>(), new Dictionary<DirEntry, string>(), 0, null);
 
     private readonly Dictionary<string, DirEntry> _byWindows; // gösterilen ad (birimin harf kuralıyla) → tuhaf girdi
-    private readonly Dictionary<string, string> _display;     // tuhaf girdinin Mac adı → gösterilen ad
+    private readonly Dictionary<DirEntry, string> _display;   // tuhaf girdi → gösterilen ad (ikizler aynı ada sahip olabilir)
 
-    private WindowsNameMap(Dictionary<string, DirEntry> byWindows, Dictionary<string, string> display, int suffixed, string? firstSuffixed)
+    private WindowsNameMap(Dictionary<string, DirEntry> byWindows, Dictionary<DirEntry, string> display, int suffixed, string? firstSuffixed)
     {
         _byWindows = byWindows;
         _display = display;
@@ -46,11 +52,14 @@ public sealed class WindowsNameMap
     /// <summary>Ek alarak gösterilen ilk girdinin gösterilen adı (günlük için).</summary>
     public string? FirstSuffixed { get; }
 
-    /// <summary>Adında SFM aralığından (U+F001–U+F029) karakter var mı: yalnız böyle bir ad eşlemeden geri dönmez.</summary>
+    /// <summary>
+    /// Adında SFM aralığından (U+F001–U+F029; böyle bir ad eşlemeden geri dönmez) ya da geçersiz UTF-8 kaçış aralığından
+    /// (U+F680–U+F6FF; ikiz olabilir) karakter var mı.
+    /// </summary>
     public static bool IsOdd(string apfsName)
     {
         foreach (char c in apfsName)
-            if (c is >= '' and <= '') return true;
+            if (c is >= (char)0xF001 and <= (char)0xF029 or >= Bin.NameEscapeFirst and <= Bin.NameEscapeLast) return true;
         return false;
     }
 
@@ -63,7 +72,7 @@ public sealed class WindowsNameMap
     /// </summary>
     public static DirEntry? Find(DirectoryIndex dir, string windowsName, out bool canonical)
     {
-        if (dir.Find(WindowsNames.FromWindows(windowsName)) is { } e)
+        if (dir.Find(WindowsNames.FromWindows(windowsName)) is { } e && !IsOdd(e.Name))
         {
             canonical = true;
             return e;
@@ -74,7 +83,7 @@ public sealed class WindowsNameMap
 
     /// <summary>Girdinin Windows'ta gösterilen adı.</summary>
     public static string Display(DirectoryIndex dir, DirEntry e) =>
-        IsOdd(e.Name) && Of(dir)._display.TryGetValue(e.Name, out var shown) ? shown : WindowsNames.ToWindows(e.Name);
+        IsOdd(e.Name) && Of(dir)._display.TryGetValue(e, out var shown) ? shown : WindowsNames.ToWindows(e.Name);
 
     private static WindowsNameMap Build(DirectoryIndex dir)
     {
@@ -83,14 +92,16 @@ public sealed class WindowsNameMap
             if (IsOdd(e.Name)) (odd ??= []).Add(e);
         if (odd is null) return Empty;
         odd.Sort((a, b) => string.CompareOrdinal(a.Name, b.Name));
-        var cmp = dir.CaseInsensitive ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
+        IEqualityComparer<string> cmp = dir.CaseInsensitive ? FoldComparer.Instance : StringComparer.Ordinal;
         var byWindows = new Dictionary<string, DirEntry>(cmp);
-        var display = new Dictionary<string, string>(StringComparer.Ordinal);
+        var display = new Dictionary<DirEntry, string>();
         var shadowed = new List<(DirEntry Entry, string Windows)>();
         foreach (var e in odd)
         {
             string w = WindowsNames.ToWindows(e.Name);
-            if (dir.Find(WindowsNames.FromWindows(w)) is null && byWindows.TryAdd(w, e)) display[e.Name] = w;
+            // Adın bugünkü araması başka bir girdi bulmuyorsa (kaçış aralıklı ad kendini bulur; ikizinden yalnız dizindeki ilki)
+            var same = dir.Find(WindowsNames.FromWindows(w));
+            if ((same is null || ReferenceEquals(same, e)) && byWindows.TryAdd(w, e)) display[e] = w;
             else shadowed.Add((e, w));
         }
         var next = new Dictionary<string, int>(cmp);
@@ -102,9 +113,24 @@ public sealed class WindowsNameMap
             while (byWindows.ContainsKey(candidate) || dir.Find(WindowsNames.FromWindows(candidate)) is not null);
             next[w] = k;
             byWindows[candidate] = e;
-            display[e.Name] = candidate;
+            display[e] = candidate;
         }
-        return new WindowsNameMap(byWindows, display, shadowed.Count, shadowed.Count > 0 ? display[shadowed[0].Entry.Name] : null);
+        return new WindowsNameMap(byWindows, display, shadowed.Count, shadowed.Count > 0 ? display[shadowed[0].Entry] : null);
+    }
+
+    /// <summary>
+    /// Harf duyarsız birimde Windows adlarının karşılaştırması birimin kuralıyla: katlanmış anahtar (<see cref="ApfsNames.FoldKey"/>;
+    /// NFD + tam Unicode katlaması). OrdinalIgnoreCase değil (mimari kuralı): uzunluk değiştiren katlamaları ("İ" → "i̇", "ß" → "ss")
+    /// ve Kelvin işaretini birimin aynı saydığı biçimle eşleştirmiyordu (1.9.1).
+    /// </summary>
+    private sealed class FoldComparer : IEqualityComparer<string>
+    {
+        public static readonly FoldComparer Instance = new();
+
+        public bool Equals(string? a, string? b) =>
+            a is null ? b is null : b is not null && string.Equals(ApfsNames.FoldKey(a), ApfsNames.FoldKey(b), StringComparison.Ordinal);
+
+        public int GetHashCode(string s) => string.GetHashCode(ApfsNames.FoldKey(s), StringComparison.Ordinal);
     }
 
     /// <summary>

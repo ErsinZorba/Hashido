@@ -85,6 +85,45 @@ public static class Lzfse
         }
     }
 
+    /// <summary>
+    /// Blok başlıklarının bildirdiği açılmış boyların toplamı (çözmeden; yalnız üst sınır için). Biçimsiz akışta o ana dek
+    /// okunanı döndürür — çözme zaten reddeder.
+    /// </summary>
+    internal static ulong DeclaredSize(ReadOnlySpan<byte> src)
+    {
+        ulong total = 0;
+        long s = 0;
+        while (s + 4 <= src.Length)
+        {
+            int at = (int)s;
+            uint magic = BinaryPrimitives.ReadUInt32LittleEndian(src.Slice(at, 4));
+            long header, payload;
+            switch (magic)
+            {
+                case MagicRaw when at + 8 <= src.Length:
+                    header = 8; payload = U32(src, at + 4);
+                    break;
+                case MagicLzvn when at + 12 <= src.Length:
+                    header = 12; payload = U32(src, at + 8);
+                    break;
+                case MagicV1 when at + 772 <= src.Length:
+                    header = 772; payload = (long)U32(src, at + 20) + U32(src, at + 24);
+                    break;
+                case MagicV2 when at + 32 <= src.Length:
+                    header = (long)Field(U64(src, at + 24), 0, 32);
+                    if (header < 32) return total; // ilerlemeyen akış
+
+                    payload = (long)Field(U64(src, at + 8), 20, 20) + (long)Field(U64(src, at + 16), 40, 20);
+                    break;
+                default:
+                    return total; // bvx$ ya da biçimsiz
+            }
+            total += U32(src, at + 4);
+            s += header + payload;
+        }
+        return total;
+    }
+
     private sealed class Header
     {
         public int RawBytes, Literals, Matches, LiteralPayload, LmdPayload, LiteralBits, LmdBits;

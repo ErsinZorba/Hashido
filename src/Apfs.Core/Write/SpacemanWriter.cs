@@ -36,7 +36,9 @@ internal sealed class SpacemanWriter
     // Bu işlemde ayrılanlar (bırakılırsa hemen boşa çıkar; değer = verisini yazacak birim, metadata için null) ve bırakılanlar
     // (commit'te boş kuyruğa girer)
     private readonly Dictionary<ulong, object?> _allocatedThisTx = [];
-    private readonly HashSet<ulong> _quarantineMain = [];   // bu işlemde bırakılan kalıcı bloklar (commit'te boşa çıkar)
+    // Bu işlemde bırakılan kalıcı bloklar (commit'te boşa çıkar): örtüşmeyen, bitişikleri birleşmiş [Start, End) aralıkları, başa
+    // göre sıralı. 1.9.0'a dek blok başına HashSet'ti: 1 TB'lık dosyanın silinmesi ~13 GB bellek isterdi (1.9.1).
+    private readonly SortedSet<(ulong Start, ulong End)> _quarantineMain = new(Comparer<(ulong Start, ulong End)>.Create((a, b) => a.Start.CompareTo(b.Start)));
     private readonly HashSet<ulong> _quarantineIp = [];
     private readonly HashSet<ulong> _allocatedIpThisTx = [];
 
@@ -235,15 +237,119 @@ internal sealed class SpacemanWriter
     public ulong AllocateBlock() => Allocate(1).Start;
 
     /// <summary>
-    /// Blokları bırakır. Bu işlemde ayrılmışsa hemen boşa çıkar; değilse boş kuyruğa girer (bitmap'te dolu kalır).
+    /// [<paramref name="start"/>, +<paramref name="count"/>) bloklarından bu işlemde ayrılmış olanların sayısı (hiçbir şey değişmez):
+    /// aralıkla bu işlemin ayırmalarından küçük olan taranır.
+    /// </summary>
+    public ulong CountAllocatedThisTx(ulong start, ulong count)
+    {
+        if (count == 0 || _allocatedThisTx.Count == 0) return 0;
+        ulong n = 0, end = start + count;
+        if (count <= (ulong)_allocatedThisTx.Count)
+        {
+            for (ulong b = start; b < end; b++) if (_allocatedThisTx.ContainsKey(b)) n++;
+        }
+        else foreach (ulong b in _allocatedThisTx.Keys) if (b >= start && b < end) n++;
+        return n;
+    }
+
+    /// <summary>
+    /// Blokları bırakır. Bu işlemde ayrılmış olanlar hemen boşa çıkar; öbürleri karantinaya girer (bitmap'te dolu kalır, commit'te
+    /// boşa çıkar). Karantina aralık olarak tutulur (blok başına nesne yok); dolu olmayan bloğu bırakmak ya da karantinadakini
+    /// yeniden bırakmak (aralık çakışması) bozukluktur.
     /// </summary>
     public void Free(ulong paddr, ulong count = 1)
     {
-        for (ulong b = paddr; b < paddr + count; b++)
+        if (count == 0) return;
+        ulong end = paddr + count;
+        if (end < paddr || end > _blockCount) throw ApfsException.Corrupt(CoreText.T("SmWriter.BlockOutsideContainer", end < paddr ? paddr : end - 1));
+        RequireAllocated(paddr, end);
+        List<ulong>? mine = null;
+        if (_allocatedThisTx.Count > 0)
         {
-            if (!IsAllocated(b)) throw ApfsException.Corrupt(CoreText.T("SmWriter.FreeingFreeBlock", b));
-            if (_allocatedThisTx.Remove(b)) SetMain(b, used: false);
-            else if (!_quarantineMain.Add(b)) throw ApfsException.Corrupt(CoreText.T("SmWriter.BlockFreedTwice", b));
+            if (count <= (ulong)_allocatedThisTx.Count)
+            {
+                for (ulong b = paddr; b < end; b++) if (_allocatedThisTx.ContainsKey(b)) (mine ??= []).Add(b);
+            }
+            else foreach (ulong b in _allocatedThisTx.Keys) if (b >= paddr && b < end) (mine ??= []).Add(b);
+        }
+        if (mine is null) { Quarantine(paddr, end); return; }
+        mine.Sort();
+        ulong pos = paddr;
+        foreach (ulong b in mine)
+        {
+            if (b > pos) Quarantine(pos, b);
+            _allocatedThisTx.Remove(b);
+            SetMain(b, used: false);
+            pos = b + 1;
+        }
+        if (pos < end) Quarantine(pos, end);
+    }
+
+    /// <summary>[start, end) bloklarının hepsi bitmap'te dolu olmalı; değilse ilk boş blokla bozukluk.</summary>
+    private void RequireAllocated(ulong start, ulong end)
+    {
+        for (ulong p = start; p < end;)
+        {
+            int c = (int)(p / _blocksPerChunk);
+            var ch = _chunks[c];
+            ulong chunkEnd = Math.Min(end, ch.Addr + ch.BlockCount);
+            var bm = Bitmap(c);
+            uint i = (uint)(p - ch.Addr), last = (uint)(chunkEnd - ch.Addr);
+            while (i < last)
+            {
+                if ((i & 7) == 0 && i + 8 <= last && bm[i >> 3] == 0xFF) { i += 8; continue; }
+                if ((bm[i >> 3] & (1 << (int)(i & 7))) == 0) throw ApfsException.Corrupt(CoreText.T("SmWriter.FreeingFreeBlock", ch.Addr + i));
+                i++;
+            }
+            p = chunkEnd;
+        }
+    }
+
+    /// <summary>[start, end) aralığını karantinaya ekler (bitişik aralıklarla birleşir); karantinadakiyle çakışırsa bozukluk.</summary>
+    private void Quarantine(ulong start, ulong end)
+    {
+        // Karantinada dolu blok sayılır: aralıklar boş olmadığından End > 0; boş görünümün Max/Min'i varsayılan (0, 0)
+        var below = _quarantineMain.GetViewBetween((0, 0), (start, 0)).Max; // başı start'tan büyük olmayan son aralık
+        if (below.End > start) throw ApfsException.Corrupt(CoreText.T("SmWriter.BlockFreedTwice", start));
+        var above = start == ulong.MaxValue ? default : _quarantineMain.GetViewBetween((start + 1, 0), (ulong.MaxValue, 0)).Min;
+        if (above.End != 0 && above.Start < end) throw ApfsException.Corrupt(CoreText.T("SmWriter.BlockFreedTwice", above.Start));
+        if (below.End != 0 && below.End == start) { _quarantineMain.Remove(below); start = below.Start; }
+        if (above.End != 0 && above.Start == end) { _quarantineMain.Remove(above); end = above.End; }
+        _quarantineMain.Add((start, end));
+    }
+
+    /// <summary>Karantinadaki aralık sayısı (testler).</summary>
+    internal int QuarantinedRanges => _quarantineMain.Count;
+
+    /// <summary>[start, end) bloklarını ana bitmap'te topluca boşa çıkarır (hepsi dolu olmalı); parça ve aygıt sayaçları birlikte.</summary>
+    private void FreeRange(ulong start, ulong end)
+    {
+        for (ulong p = start; p < end;)
+        {
+            int c = (int)(p / _blocksPerChunk);
+            var ch = _chunks[c];
+            ulong chunkEnd = Math.Min(end, ch.Addr + ch.BlockCount);
+            var bm = Bitmap(c);
+            uint i = (uint)(p - ch.Addr), last = (uint)(chunkEnd - ch.Addr);
+            while (i < last)
+            {
+                if ((i & 7) == 0 && i + 8 <= last)
+                {
+                    if (bm[i >> 3] != 0xFF) throw ApfsException.Corrupt(CoreText.T("SmWriter.BlockAlreadyState", ch.Addr + i, CoreText.T("SmWriter.StateFree")));
+                    bm[i >> 3] = 0;
+                    i += 8;
+                    continue;
+                }
+                byte mask = (byte)(1 << (int)(i & 7));
+                if ((bm[i >> 3] & mask) == 0) throw ApfsException.Corrupt(CoreText.T("SmWriter.BlockAlreadyState", ch.Addr + i, CoreText.T("SmWriter.StateFree")));
+                bm[i >> 3] = (byte)(bm[i >> 3] & ~mask);
+                i++;
+            }
+            ulong n = chunkEnd - p;
+            _chunks[c] = ch with { FreeCount = ch.FreeCount + (uint)n };
+            _dirtyChunks.Add(c);
+            BinaryPrimitives.WriteUInt64LittleEndian(_raw.AsSpan(72), Bin.U64(_raw, 72) + n);
+            p = chunkEnd;
         }
     }
 
@@ -293,7 +399,7 @@ internal sealed class SpacemanWriter
         var dirtyCibs = new SortedSet<int>();
 
         // 0) Karantinadaki ana aygıt blokları boşa çıkar (bu checkpoint'te boş; ancak sonraki işlemde kullanılabilir)
-        foreach (ulong b in _quarantineMain) SetMain(b, used: false);
+        foreach (var (start, end) in _quarantineMain) FreeRange(start, end);
         _quarantineMain.Clear();
 
         // 1) Parça bitmap'leri: yeni iç havuz bloğuna

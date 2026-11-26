@@ -261,7 +261,7 @@ public sealed class AppController : IDisposable
     internal static string NoticeText(IEnumerable<Notice> notices)
     {
         string text = string.Join("\n", notices.TakeLast(3).Select(n => n.Text));
-        return text.Length > 250 ? text[..250] + "…" : text;
+        return text.Length > 250 ? Apfs.Util.TextClamp.Prefix(text, 250) + "…" : text; // vekil çifti bölünmez
     }
 
     // ---------------- Parola ----------------
@@ -274,8 +274,6 @@ public sealed class AppController : IDisposable
         // ya da Salt okunura dönünce) kilitli birimin parola penceresi yeniden açılırdı (1.7.0).
         var waiting = s.Disks.SelectMany(d => d.Volumes.Where(v => v.State == VolumeStatus.NeedsPassword).Select(v => AskKey(d, v))).ToHashSet();
         _asked.RemoveWhere(k => !waiting.Contains(k) && !_switching.Contains(k[..k.LastIndexOf('#')]) && !switchingAtStart.Contains(k[..k.LastIndexOf('#')]));
-        // Kayıtlı parolası tutmamış birim yeniden takılınca kayıtlı parola yine bir kez denenir
-        _savedRefused.IntersectWith(_asked);
         // Aynı anda en çok bir kendiliğinden akış (H18): sürerken yeni kilitli birimler "soruldu" sayılmaz, akış bitince sonraki
         // yoklama onları alır (yoklamanın kendisi artık durmaz)
         if (_autoUnlocking) return;
@@ -300,10 +298,12 @@ public sealed class AppController : IDisposable
     private bool _autoUnlocking;
 
     /// <summary>
-    /// Kayıtlı parolası hizmetçe "yanlış" denen birimler (<see cref="AskKey"/>; 1.9.0): kayıt silinmez ama disk takılı kaldıkça o
-    /// birime bir daha kendiliğinden gönderilmez (elle "Kilidi aç" doğrudan parola penceresi açar). Birim beklemekten çıkınca unutulur.
+    /// Kayıtlı parolası hizmetçe "yanlış" denen birimlerin UUID'leri (1.9.0'da disk takılı kaldıkça; 1.9.1'den beri tepsi ömrü
+    /// boyunca): kayıt silinmez ama o UUID'ye bir daha kendiliğinden gönderilmez (elle "Kilidi aç" doğrudan parola penceresi açar).
+    /// Önceden disk çıkarılınca unutuluyordu: bayat kayıt her takışta hizmetin yanlış parola sayacını bir artırıyor, birkaç takıştan
+    /// sonra elle girilen doğru parola da bekliyordu. O UUID'nin kilidi açılınca ya da kaydı yeniden yazılınca/silinince unutulur.
     /// </summary>
-    private readonly HashSet<string> _savedRefused = [];
+    private readonly HashSet<string> _savedRefused = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>Birimin parola penceresi anahtarı: disk + APFS bölüm sırası + birim sırası.</summary>
     internal static string AskKey(DiskStatus d, VolumeStatus v) => $"{d.Id}#{v.Container}#{v.Index}";
@@ -331,7 +331,8 @@ public sealed class AppController : IDisposable
     /// doğrudan (yalnız etkin oturumda); Hello bilinmiyorsa (uzak oturum, hata), onay verilmezse ya da kayıt yoksa parola
     /// penceresi. Kayıtlı parola tutmazsa (hizmet <c>WrongPassword</c> derse) kayıt KALIR (aynı UUID'li başka bir disk gerçek
     /// diskin kaydını silmesin; 1.9.0), pencere "Kayıtlı parola artık geçerli değil" ile kutu işaretli açılır ve kayıtlı parola
-    /// o birime disk takılı kaldıkça bir daha gönderilmez. Birimler sırayla açılır.
+    /// o UUID'ye tepsi açık kaldıkça (kilidi açılana ya da kaydı değişene dek; çıkar-tak dahil) bir daha gönderilmez (1.9.1).
+    /// Birimler sırayla açılır.
     /// </summary>
     private async Task UnlockVolumesAsync(List<(DiskStatus D, VolumeStatus V)> items)
     {
@@ -342,11 +343,12 @@ public sealed class AppController : IDisposable
             var saved = new Dictionary<string, string>(); // AskKey → kayıtlı parola (yalnız bu yöntemin ömrü boyunca bellekte)
             var recorded = new HashSet<string>();         // kaydı olan birimler (kutu işaretli açılır)
             foreach (var (d, v) in mine)
-                if (ReadSaved(v) is { } p)
-                {
-                    recorded.Add(AskKey(d, v));
-                    if (!_savedRefused.Contains(AskKey(d, v))) saved[AskKey(d, v)] = p;
-                }
+            {
+                var state = ReadSaved(v, out var p);
+                // Okuma hatası (1.9.1): kayıt var sayılır (kutu işaretli; elle açış onu silmesin), ama kayıtlı parola denenmez
+                if (state != CredentialRead.Missing) recorded.Add(AskKey(d, v));
+                if (state == CredentialRead.Found && !_savedRefused.Contains(v.Uuid!)) saved[AskKey(d, v)] = p!; // kayıt yalnız UUID'li birimde
+            }
             HelloAvailability? hello = null;
             bool useSaved = false, approved = false; // approved: kullanıcı Hello'da onayladı (yoksa kendiliğinden açılış)
             if (saved.Count > 0)
@@ -379,7 +381,7 @@ public sealed class AppController : IDisposable
                             continue;
                         case SavedAttemptOutcome.WrongAndAsk:
                             // Mac'te parola değişmiş ya da aynı UUID'li başka disk: kayıt kalır, bir kez sorulur (döngü yok)
-                            _savedRefused.Add(AskKey(d, v));
+                            _savedRefused.Add(v.Uuid!);
                             _services.Log(WinText.T("Password.SavedRefused", v.Name));
                             error = WinText.U("Password.SavedInvalid");
                             break;
@@ -412,6 +414,7 @@ public sealed class AppController : IDisposable
             var r = await SendUnlockAsync(d, v, answer.Password);
             if (r is { Ok: true })
             {
+                if (v.Uuid is { } opened) _savedRefused.Remove(opened); // kilit açıldı: kayıtlı parola sonraki takışta yine bir kez denenir
                 // Yalnız tutan parola kaydedilir; kutu boş bırakıldıysa varsa eski kayıt silinir
                 bool remembered = true;
                 switch (RememberPolicy.AfterManualUnlock(remember))
@@ -431,6 +434,13 @@ public sealed class AppController : IDisposable
             if (!RememberPolicy.StillLocked(await FreshStatusAsync(), d.Id, v.Container, v.Index, v.Uuid)) return;
         }
     }
+
+    /// <summary>
+    /// Hizmete taze sorulan disk sayısı (1.9.1; kendiliğinden ve elle güncellemenin "takılı Mac diski yok" koşulu): yoklamanın yan
+    /// etkisi yok (bildirim gösterilmez, parola penceresi açılmaz ve BEKLENMEZ, durum değişmez). Hizmet yanıt vermezse null.
+    /// Önceden <see cref="PollAsync"/> kullanılıyordu: açık bir parola penceresi kurulum kararını kullanıcı cevaplayana dek bekletiyordu.
+    /// </summary>
+    public async Task<int?> FreshDiskCountAsync() => (await FreshStatusAsync())?.Disks.Count;
 
     /// <summary>Kilit açma akışının arasında taze durum (bildirim imleci ilerletilmez; alınamazsa null).</summary>
     private async Task<StatusResponse?> FreshStatusAsync()
@@ -458,16 +468,23 @@ public sealed class AppController : IDisposable
 
     // Kasa erişimi kilit açmayı hiçbir zaman bozmaz: geçersiz UUID (ArgumentException) ve kasa hatası yutulur; kaydetme hatası
     // günlüğe parolasız tek satır.
-    private string? ReadSaved(VolumeStatus v)
+    private CredentialRead ReadSaved(VolumeStatus v, out string? password)
     {
-        if (v.Uuid is not { } uuid) return null;
-        try { return _services.Credentials.TryRead(uuid); }
-        catch (ArgumentException) { return null; }
+        password = null;
+        if (v.Uuid is not { } uuid) return CredentialRead.Missing;
+        try
+        {
+            var state = _services.Credentials.Read(uuid, out password, out int error);
+            if (state == CredentialRead.Failed) _services.Log(WinText.T("Password.ReadFailed", v.Name, error));
+            return state;
+        }
+        catch (ArgumentException) { return CredentialRead.Missing; }
     }
 
     private void ForgetSaved(VolumeStatus v)
     {
         if (v.Uuid is not { } uuid) return;
+        _savedRefused.Remove(uuid);
         try { _services.Credentials.Delete(uuid); }
         catch (ArgumentException) { }
     }
@@ -488,6 +505,7 @@ public sealed class AppController : IDisposable
         try
         {
             _services.Credentials.Save(uuid, v.Name, password);
+            _savedRefused.Remove(uuid);
             return true;
         }
         catch (Exception e) when (e is System.ComponentModel.Win32Exception or ArgumentException)

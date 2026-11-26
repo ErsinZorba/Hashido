@@ -262,7 +262,7 @@ internal static class ShotRig
         // 1.9.0: Mac'te yazılmış çok uzun ipucu: kutu ekrana sığar, üst alan kaydırılır, düğmeler görünür
         "unlock-long-hint" => host.AskPasswordAsync(new PasswordRequest("Archive", string.Join(" ", Enumerable.Repeat("first holiday by the sea, the blue house", 120)), null, true, true)),
         "unlock-wrong" => host.AskPasswordAsync(new PasswordRequest("Archive", "first holiday", WinText.U("Unlock.Failed"), true, true)),
-        "unlock-saved-invalid" => host.AskPasswordAsync(new PasswordRequest("Archive", null, WinText.U("Password.SavedInvalid"), false, false)),
+        "unlock-saved-invalid" => host.AskPasswordAsync(new PasswordRequest("Archive", null, WinText.U("Password.SavedInvalid"), true, false)), // gerçek akışta kayıt var: kutu işaretli
         "consent" => ConsentWindow.AskAsync(null),
         "sent" => SentWindow.ShowAsync(null, new Apfs.Windows.Reporting.SentLog(Path.Combine(Path.GetTempPath(), "hashido-shot-sent.jsonl"))),
         _ => throw new ArgumentException("unknown view: " + view),

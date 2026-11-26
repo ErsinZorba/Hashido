@@ -19,7 +19,7 @@ namespace Apfs.Tray;
 /// seçenek), otomatik raporlar (+ "Ne
 /// gönderiliyor?", "Gönderilenleri göster"), hatırlanan parolalar (kayıt varsa), güncellemeler (bildirim, kendiliğinden indir ve
 /// kur, "Şimdi denetle"), Hakkında (sürüm → Hakkında kutusu, günlüğü aç, sahip). Ana pencerenin içeriği olarak açılır (anında).
-/// Seçimler "Tamam"la uygulanır (<see cref="TrayModel.ApplySettings"/>); "İptal", geri ve Esc hiçbir şeyi uygulamaz ("Unut" ve
+/// Seçimler "Tamam"la uygulanır (<see cref="TrayModel.ApplySettingsChecked"/>); "İptal", geri ve Esc hiçbir şeyi uygulamaz ("Unut" ve
 /// "Şimdi denetle"nin yan etkileri hariç). Açıkken tepsi yeniden başlamaz (kalıcı pencere sayılır; S4).
 /// </summary>
 internal sealed class SettingsView
@@ -358,15 +358,18 @@ internal sealed class SettingsView
         (NotificationMode)Math.Max(0, Array.FindIndex(_notify, r => r.IsChecked == true)));
 
     /// <summary>
-    /// Tamam: seçimler kaydedilir; tema hemen uygulanır (R2 ⟳); tasarım ya da dil değiştiyse program TEK kez ve HEMEN yeniden
-    /// açılır (A18).
+    /// Tamam: seçimler kaydedilir; tema hemen uygulanır (R2 ⟳); tasarım ya da dil değiştiyse program TEK kez yeniden açılır (A18;
+    /// 1.9.1'den beri süren iş varsa bitince). Kaydedilemeyen seçim varsa bir kez söylenir.
     /// </summary>
-    private void Apply()
+    private async void Apply()
     {
-        bool restart = TrayModel.ApplySettings(Choices, () => _main.Features?.ConsentChanged());
+        var result = TrayModel.ApplySettingsChecked(Choices, () => _main.Features?.ConsentChanged());
         Look.Refresh();
         _main.Back();
-        if (restart) _main.RequestRestart();
+        // Kayıt defteri yazılamadı (1.9.1): seçim uygulanmış gibi görünmesin, bir kez söylenir
+        if (result.SaveFailed)
+            await AppController.ModalAsync(() => MessageWindow.InformAsync(_main, null, WinText.U("Settings.SaveFailed"), InformIcon.Warning));
+        if (result.Restart) _main.RequestRestart();
     }
 
     private void Cancel() => _main.Back();

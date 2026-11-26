@@ -27,18 +27,12 @@ public sealed class RawDiskDevice : IBlockDevice
     /// <summary>Bir okumanın en uzun süresi (uyuyan diskin kalkması birkaç saniye sürer; bu süre onun çok üstünde).</summary>
     public static readonly TimeSpan DefaultReadTimeout = TimeSpan.FromSeconds(30);
 
-    /// <summary>İptal isteğinden sonra okumanın gerçekten bitmesi için beklenen süre.</summary>
-    private const uint CancelGraceMs = 5000;
-
     private const uint GenericRead = 0x80000000;
     private const uint FileShareRead = 0x1, FileShareWrite = 0x2;
     private const uint OpenExisting = 3;
     private const uint FileFlagOverlapped = 0x40000000;
     private const uint IoctlDiskGetLengthInfo = 0x0007405C;
-    private const uint IoctlDiskGetDriveGeometryEx = 0x000700A0;
     private const uint IoctlStorageQueryProperty = 0x002D1400;
-    private const int ErrorIoPending = 997, ErrorOperationAborted = 995, ErrorHandleEof = 38;
-    private const uint WaitObject0 = 0;
 
     private readonly SafeFileHandle _handle;
     private readonly int? _busType;
@@ -54,6 +48,33 @@ public sealed class RawDiskDevice : IBlockDevice
 
     /// <summary>Okuması bırakılan aygıtın yeniden açılmadığı süre.</summary>
     public static readonly TimeSpan StalledFor = TimeSpan.FromMinutes(10);
+
+    /// <summary>
+    /// İsteği (okuma ya da yazıcının yazması) iptali de tutmadığı için bırakılan aygıt yolu: <see cref="StalledFor"/> boyunca
+    /// açılmaz (<see cref="OverlappedIo"/>).
+    /// </summary>
+    internal static void MarkStalled(string path, bool write = false)
+    {
+        lock (s_stalled)
+        {
+            s_stalled[path] = (Environment.TickCount64, false);
+            if (write) s_writeStalled[path] = Environment.TickCount64;
+        }
+    }
+
+    /// <summary>
+    /// Yazması (ya da diske boşaltması) iptali de tutmadan bırakılan aygıt yolları → an (1.9.1, inceleme). <see cref="ForgetStalled"/>
+    /// bunları SİLMEZ (aygıt olayı, "Yeniden tara"): çekirdekte bekleyen eski yazma yeni oturumun bloklarına inebilir; yalnız
+    /// <see cref="StalledFor"/> dolunca düşer.
+    /// </summary>
+    private static readonly Dictionary<string, long> s_writeStalled = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Yazma aygıtı bu yola açılabilir mi: yazması bırakılmış yol <see cref="StalledFor"/> boyunca hayır.</summary>
+    internal static bool IsWriteStalled(string path)
+    {
+        lock (s_stalled)
+            return s_writeStalled.TryGetValue(path, out long since) && Environment.TickCount64 - since < (long)StalledFor.TotalMilliseconds;
+    }
 
     /// <summary>Bırakılan okumalı aygıtlar yeniden denensin (aygıt takıldı/çıkarıldı, kullanıcı "Yeniden tara" dedi).</summary>
     public static void ForgetStalled()
@@ -115,7 +136,7 @@ public sealed class RawDiskDevice : IBlockDevice
         using (var info = OpenChecked(devicePath, overlapped: false))
         {
             length = QueryLength(info);
-            sectorSize = QuerySectorSize(info);
+            sectorSize = SectorSizeQuery.Query(info);
             busType = QueryBusType(info);
         }
         return new Opened(length, sectorSize, busType, OpenChecked(devicePath, overlapped: true));
@@ -260,61 +281,11 @@ public sealed class RawDiskDevice : IBlockDevice
     }
 
     /// <summary>
-    /// Tek bindirmeli okuma, süre sınırıyla. <paramref name="abandoned"/>: okuma iptal edildiği hâlde bitmedi; çağıran belleği
-    /// bırakmamalı. Okunan bayt sayısını döner.
+    /// Tek bindirmeli okuma, süre sınırıyla (<see cref="OverlappedIo.Transfer"/>). <paramref name="abandoned"/>: okuma iptal edildiği
+    /// hâlde bitmedi; çağıran belleği bırakmamalı. Okunan bayt sayısını döner.
     /// </summary>
-    private unsafe int ReadOnce(byte* buffer, int length, long offset, ref bool abandoned)
-    {
-        bool added = false;
-        try { _handle.DangerousAddRef(ref added); } // okuma sürerken tanıtıcı kapanmasın (Dispose onu sonraya bırakır)
-        catch (ObjectDisposedException e) { throw new ApfsException(ApfsErrorCode.IoError, WinText.T("Raw.DiskClosed"), e); }
-        IntPtr handle = _handle.DangerousGetHandle();
-        IntPtr ev = CreateEventW(IntPtr.Zero, true, false, IntPtr.Zero);
-        var ov = (NativeOverlapped*)NativeMemory.AllocZeroed((nuint)sizeof(NativeOverlapped));
-        bool keep = false;
-        try
-        {
-            if (ev == IntPtr.Zero) throw new ApfsException(ApfsErrorCode.IoError, new Win32Exception(Marshal.GetLastPInvokeError()).Message);
-            ov->OffsetLow = unchecked((int)offset);
-            ov->OffsetHigh = (int)(offset >> 32);
-            ov->EventHandle = ev;
-            if (!ReadFile(handle, buffer, length, IntPtr.Zero, ov))
-            {
-                int err = Marshal.GetLastPInvokeError();
-                if (err == ErrorHandleEof) return 0;
-                if (err != ErrorIoPending) throw new ApfsException(ApfsErrorCode.IoError, $"{Path}: {new Win32Exception(err).Message}");
-            }
-            uint timeoutMs = (uint)Math.Clamp(ReadTimeout.TotalMilliseconds, 1, int.MaxValue);
-            bool timedOut = WaitForSingleObject(ev, timeoutMs) != WaitObject0;
-            if (timedOut)
-            {
-                CancelIoEx(handle, ov);
-                if (WaitForSingleObject(ev, CancelGraceMs) != WaitObject0)
-                {
-                    keep = abandoned = true; // çekirdek hâlâ bu belleğe ve olaya yazabilir: bırakılmaz
-                    lock (s_stalled) s_stalled[Path] = (Environment.TickCount64, false);
-                    throw TimedOut();
-                }
-            }
-            if (!GetOverlappedResult(handle, ov, out uint read, false))
-            {
-                int err = Marshal.GetLastPInvokeError();
-                if (err == ErrorHandleEof) return 0;
-                if (err == ErrorOperationAborted && timedOut) throw TimedOut();
-                throw new ApfsException(ApfsErrorCode.IoError, $"{Path}: {new Win32Exception(err).Message}");
-            }
-            return (int)read; // süre dolduğu anda biten okuma da geçerli
-        }
-        finally
-        {
-            if (!keep)
-            {
-                NativeMemory.Free(ov);
-                if (ev != IntPtr.Zero) CloseHandle(ev);
-            }
-            if (added) _handle.DangerousRelease();
-        }
-    }
+    private unsafe int ReadOnce(byte* buffer, int length, long offset, ref bool abandoned) =>
+        OverlappedIo.Transfer(_handle, Path, buffer, length, offset, write: false, ReadTimeout, ref abandoned, TimedOut);
 
     private ApfsException TimedOut() =>
         new(ApfsErrorCode.IoError, WinText.T("Raw.ReadTimedOut", Path, (int)Math.Round(ReadTimeout.TotalSeconds)));
@@ -325,16 +296,6 @@ public sealed class RawDiskDevice : IBlockDevice
         if (!DeviceIoControl(handle, IoctlDiskGetLengthInfo, IntPtr.Zero, 0, ref MemoryMarshal.GetReference(outBuf), 8, out _, IntPtr.Zero))
             throw new ApfsException(ApfsErrorCode.IoError, WinText.T("Raw.LengthQueryFailedDetail", new Win32Exception(Marshal.GetLastPInvokeError()).Message));
         return BitConverter.ToInt64(outBuf);
-    }
-
-    private static int QuerySectorSize(SafeFileHandle handle)
-    {
-        Span<byte> outBuf = stackalloc byte[256];
-        if (!DeviceIoControl(handle, IoctlDiskGetDriveGeometryEx, IntPtr.Zero, 0, ref MemoryMarshal.GetReference(outBuf), 256, out _, IntPtr.Zero))
-            return 512;
-        // DISK_GEOMETRY_EX.Geometry.BytesPerSector: Cylinders(8) + MediaType(4) + TracksPerCylinder(4) + SectorsPerTrack(4)
-        int bps = BitConverter.ToInt32(outBuf[20..]);
-        return bps is 512 or 1024 or 2048 or 4096 ? bps : 512;
     }
 
     /// <summary>
@@ -357,20 +318,10 @@ public sealed class RawDiskDevice : IBlockDevice
         return BitConverter.ToInt32(outBuf[28..]); // STORAGE_DEVICE_DESCRIPTOR.BusType
     }
 
-    public unsafe void Dispose()
+    public void Dispose()
     {
         // Süren okumalar iptal edilir (bkz. sınıf açıklaması); tanıtıcı son okuma bitince kapanır
-        bool added = false;
-        try
-        {
-            _handle.DangerousAddRef(ref added);
-            CancelIoEx(_handle.DangerousGetHandle(), null);
-        }
-        catch (ObjectDisposedException) { } // zaten kapatılmış
-        finally
-        {
-            if (added) _handle.DangerousRelease();
-        }
+        OverlappedIo.CancelAll(_handle);
         _handle.Dispose();
     }
 
@@ -381,22 +332,4 @@ public sealed class RawDiskDevice : IBlockDevice
     [DllImport("kernel32.dll", SetLastError = true)]
     private static extern bool DeviceIoControl(SafeFileHandle hDevice, uint dwIoControlCode, IntPtr lpInBuffer, uint nInBufferSize,
         ref byte lpOutBuffer, uint nOutBufferSize, out uint lpBytesReturned, IntPtr lpOverlapped);
-
-    [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern unsafe bool ReadFile(IntPtr hFile, byte* lpBuffer, int nNumberOfBytesToRead, IntPtr lpNumberOfBytesRead, NativeOverlapped* lpOverlapped);
-
-    [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern unsafe bool GetOverlappedResult(IntPtr hFile, NativeOverlapped* lpOverlapped, out uint lpNumberOfBytesTransferred, bool bWait);
-
-    [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern unsafe bool CancelIoEx(IntPtr hFile, NativeOverlapped* lpOverlapped);
-
-    [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern IntPtr CreateEventW(IntPtr lpEventAttributes, bool bManualReset, bool bInitialState, IntPtr lpName);
-
-    [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern uint WaitForSingleObject(IntPtr hHandle, uint dwMilliseconds);
-
-    [DllImport("kernel32.dll", SetLastError = true)]
-    private static extern bool CloseHandle(IntPtr hObject);
 }

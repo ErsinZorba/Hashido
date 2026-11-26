@@ -79,6 +79,7 @@ static int Info(CliOptions o)
     Console.WriteLine();
     foreach (var r in c.OpenVolumes())
     {
+        using var opened = r.Volume;
         if (r.Volume is { } v)
         {
             Console.WriteLine(WinText.T("Cli.VolumeHeader", r.Index, v.Name, (v.RoleName.Length > 0 ? $"  [{v.RoleName}]" : "")));
@@ -102,7 +103,7 @@ static int Dump(CliOptions o)
     if (o.Positional.Count > 1)
     {
         // apfs dump <kaynak> <yol>: o yolun ham kayıtları (geliştirme)
-        var v = OpenVolume(c, o.Volume, Passwords.FromOptions(o));
+        using var v = OpenVolume(c, o.Volume, Passwords.FromOptions(o));
         foreach (var line in Apfs.Diagnostics.RecordDump.Lines(v, o.Positional[1])) Console.WriteLine(line);
         return 0;
     }
@@ -119,7 +120,7 @@ static int Dump(CliOptions o)
 static int List(CliOptions o)
 {
     using var c = SourceOpener.OpenContainer(o.Require(0, WinText.T("Cli.ArgSource")), o.Partition);
-    var v = OpenVolume(c, o.Volume, Passwords.FromOptions(o));
+    using var v = OpenVolume(c, o.Volume, Passwords.FromOptions(o));
     string path = o.Positional.Count > 1 ? o.Positional[1] : "/";
     var start = v.Lookup(path);
     if (!start.IsDirectory)
@@ -189,7 +190,7 @@ static string HashFile(ApfsVolume v, Inode ino)
 static int Extract(CliOptions o)
 {
     using var c = SourceOpener.OpenContainer(o.Require(0, WinText.T("Cli.ArgSource")), o.Partition);
-    var v = OpenVolume(c, o.Volume, Passwords.FromOptions(o));
+    using var v = OpenVolume(c, o.Volume, Passwords.FromOptions(o));
     string source = o.Require(1, WinText.T("Cli.ArgPath"));
     var ino = v.Lookup(source);
     string target = o.Require(2, WinText.T("Cli.ArgTarget"));
@@ -227,8 +228,9 @@ static int Extract(CliOptions o)
 static ApfsVolume OpenVolume(ApfsContainer c, int index, Func<VolumeLockInfo, string?>? passwords)
 {
     var all = c.OpenVolumes(passwords);
-    var r = all.FirstOrDefault(x => x.Index == index)
-        ?? throw new ApfsException(ApfsErrorCode.InvalidArgument, WinText.T("Cli.NoSuchVolumeCount", index, all.Count));
+    var r = all.FirstOrDefault(x => x.Index == index);
+    foreach (var other in all) if (other != r) other.Volume?.Dispose(); // seçilmeyenlerin şifreleyicisi bellekte kalmasın
+    if (r is null) throw new ApfsException(ApfsErrorCode.InvalidArgument, WinText.T("Cli.NoSuchVolumeCount", index, all.Count));
     return r.Volume ?? throw r.Error!;
 }
 

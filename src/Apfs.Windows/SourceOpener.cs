@@ -46,6 +46,6 @@ public static partial class SourceOpener
             throw new ApfsException(ApfsErrorCode.InvalidArgument, WinText.T("Source.PartitionIndex", partitionIndex, parts.Count));
         var p = parts[partitionIndex];
         var window = p.Offset == 0 && p.Length == device.Length ? device : new OffsetDevice(device, p.Offset, p.Length, ownsInner: ownsDevice);
-        return ApfsContainer.Open(window, ownsDevice: ownsDevice || !ReferenceEquals(window, device));
+        return ApfsContainer.Open(window, ownsDevice: ownsDevice || !ReferenceEquals(window, device), partitionOverlapsOther: p.OverlapsOther);
     }
 }

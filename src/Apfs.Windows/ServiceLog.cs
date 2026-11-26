@@ -19,21 +19,42 @@ public static class ServiceLog
     /// <summary>Geliştirme (konsol) modunda satırlar ayrıca standart hataya yazılır.</summary>
     public static bool EchoToConsole { get; set; }
 
+    private static volatile bool _fallbackOnly;
+
+    /// <summary>
+    /// Bu süreçte günlük yalnız <see cref="FallbackPathName"/>'e yazılır (1.9.1): hizmet veri klasörünün günlük alanını güvenceye
+    /// alamadıysa (<see cref="DataDirSecurity.Result.LogTrusted"/>) o çalışmada ProgramData'daki günlüğe hiç yazmaz.
+    /// </summary>
+    public static void UseFallbackOnly() => _fallbackOnly = true;
+
+    /// <summary>Bu süreçte satırların yazıldığı ilk yol.</summary>
+    public static string CurrentPathName => _fallbackOnly ? FallbackPathName : PathName;
+
     public static void Write(string message)
     {
-        string line = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss}  {message}";
+        string line = FormatLine(DateTime.Now, message);
         if (EchoToConsole) Console.Error.WriteLine(line);
         lock (Gate)
         {
-            if (!TryAppend(PathName, line)) TryAppend(FallbackPathName, line);
+            if (_fallbackOnly || !TryAppend(PathName, line, createDirectory: false)) TryAppend(FallbackPathName, line, createDirectory: true);
         }
     }
 
-    private static bool TryAppend(string path, string line)
+    /// <summary>
+    /// Günlük satırı (1.9.1): tarih her zaman Gregoryen takvimle (InvariantCulture; önceden süreç kültürünün takvimiyle: th-TH'de
+    /// 2569, ar-SA'da Hicri yıl), ileti <see cref="Apfs.Util.TextSafety.ForLog"/>'dan geçer (diskten gelen ad sahte satır ekleyemez).
+    /// </summary>
+    internal static string FormatLine(DateTime when, string message) =>
+        when.ToString("yyyy-MM-dd HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture) + "  " + Apfs.Util.TextSafety.ForLog(message);
+
+    /// <param name="createDirectory">Klasör yoksa açılsın mı. ProgramData'daki klasörü YALNIZ hizmet, son izinleriyle açar (1.9.1):
+    /// önceden SYSTEM olarak koşan başka bir süreç (Launcher) onu ProgramData'nın mirasıyla, kullanıcıların yazabileceği biçimde açabiliyordu.</param>
+    internal static bool TryAppend(string path, string line, bool createDirectory)
     {
         try
         {
-            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            if (createDirectory) Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            else if (!Directory.Exists(Path.GetDirectoryName(path)!)) return false;
             var info = new FileInfo(path);
             if (info.Exists && info.Length > MaxBytes)
                 File.Move(path, path + ".1", overwrite: true);

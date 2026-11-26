@@ -32,16 +32,29 @@ internal static class ServiceLanguage
     /// </summary>
     public static uint? ConsoleSessionOverride { get; set; }
 
+    private static readonly Lock s_applyGate = new();
+
+    /// <summary>Dil değişikliği satırının gittiği yer (test kancası: testler günlüğe yazmaz).</summary>
+    internal static Action<string> Log { get; set; } = ServiceLog.Write;
+
     /// <summary>Varsayılan arayüz dilini değiştirir (açılışta `--lang`, sonra konsol oturumunun istekleri); değişince günlüğe bir satır.</summary>
     public static void Apply(string? name) => Apply(Languages.Resolve(name));
 
+    /// <summary>
+    /// Karşılaştır-yaz tek kilit altında (1.9.1): iki istek aynı anda farklı dil verince <c>_current</c> birinin, varsayılan UI
+    /// kültürü öbürünün dilinde kalabiliyordu; sonra o dili isteyen istek "zaten bu dil" sanıp düzeltmiyordu.
+    /// </summary>
     private static void Apply(CultureInfo? culture)
     {
-        if (culture is null || culture.Name == Volatile.Read(ref _current)) return;
-        Volatile.Write(ref _current, culture.Name);
-        // İş parçacıkları kendi dilini hiç ayarlamadığı için bu, hizmetin bütün iş parçacıklarına (WinFsp dahil) geçer.
-        CultureInfo.DefaultThreadCurrentUICulture = culture;
-        ServiceLog.Write(WinText.T("Service.LanguageSet", culture.Name));
+        if (culture is null) return;
+        lock (s_applyGate)
+        {
+            if (culture.Name == _current) return;
+            _current = culture.Name;
+            // İş parçacıkları kendi dilini hiç ayarlamadığı için bu, hizmetin bütün iş parçacıklarına (WinFsp dahil) geçer.
+            CultureInfo.DefaultThreadCurrentUICulture = culture;
+            Log(WinText.T("Service.LanguageSet", culture.Name));
+        }
     }
 
     /// <summary>Metinlerdeki sayıların biçimi: istek sürerken isteyeninki, yoksa varsayılan, o da yoksa hizmetin kendi kültürü.</summary>

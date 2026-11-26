@@ -4,16 +4,21 @@ using Fsp;
 
 namespace Apfs.Mount;
 
-/// <summary>Bir APFS birimini sürücü harfine bağlar ve ayırır.</summary>
+/// <summary>
+/// Bir APFS birimini sürücü harfine bağlar ve ayırır. Bağlama başarılı olunca birim sürücünündür: ayrılınca atılır (şifreli birimin
+/// şifreleyicisi bellekte kalmasın; 1.9.1); bağlama düşerse birim çağıranda kalır.
+/// </summary>
 public sealed class ApfsMount : IDisposable
 {
     private readonly FileSystemHost _host;
+    private readonly ApfsVolume _volume;
 
-    private ApfsMount(FileSystemHost host, ApfsFileSystem fs, string mountPoint)
+    private ApfsMount(FileSystemHost host, ApfsFileSystem fs, string mountPoint, ApfsVolume volume)
     {
         _host = host;
         FileSystem = fs;
         MountPoint = mountPoint;
+        _volume = volume;
     }
 
     public ApfsFileSystem FileSystem { get; }
@@ -44,12 +49,13 @@ public sealed class ApfsMount : IDisposable
             throw new ApfsException(ApfsErrorCode.Unsupported,
                 CoreText.U("Mount.WinFspNotLoaded", e.InnerException?.Message ?? e.Message), e);
         }
-        return new ApfsMount(host, fs, host.MountPoint());
+        return new ApfsMount(host, fs, host.MountPoint(), volume);
     }
 
     public void Dispose()
     {
         _host.Unmount();
         _host.Dispose();
+        _volume.Dispose(); // sürücü ayrıldı, okuma bitti (ayırma düşerse birim atılmaz: sürücü hâlâ okuyor olabilir)
     }
 }

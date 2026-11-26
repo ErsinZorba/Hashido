@@ -374,6 +374,9 @@
   <data name="Settings.ReportsHeading" xml:space="preserve">
     <value>Automatische Berichte</value>
   </data>
+  <data name="Settings.SaveFailed" xml:space="preserve">
+    <value>Einige Einstellungen konnten nicht gespeichert werden und bleiben möglicherweise nicht erhalten. Versuchen Sie es später erneut.</value>
+  </data>
   <data name="Settings.ShowSent" xml:space="preserve">
     <value>Gesendete Berichte anzeigen</value>
   </data>
@@ -462,7 +465,7 @@
     <value>Version {0} ist verfügbar</value>
   </data>
   <data name="Update.Ready" xml:space="preserve">
-    <value>{0} {1} ist bereit. Klicken Sie hier und wählen Sie dann "Installieren".</value>
+    <value>{0} {1} ist bereit. Klicken Sie hier und installieren Sie es dann über den Link unten.</value>
   </data>
   <data name="Update.Updated" xml:space="preserve">
     <value>{0} wurde auf Version {1} aktualisiert.</value>

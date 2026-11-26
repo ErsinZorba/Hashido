@@ -315,13 +315,22 @@ public sealed class VolumeCrypto : IDisposable
 {
     private readonly AesXts _xts;
     private readonly uint _unitsPerBlock;
+    private int _disposed;
+    private static int s_live;
 
     public VolumeCrypto(byte[] vek, uint blockSize)
     {
         _xts = new AesXts(vek.AsSpan(0, 16), vek.AsSpan(16, 16));
         _unitsPerBlock = blockSize / AesXts.UnitSize;
         CryptographicOperations.ZeroMemory(vek);
+        Interlocked.Increment(ref s_live);
     }
+
+    /// <summary>
+    /// Teşhis: bu süreçte oluşturulup henüz atılmamış şifreleyici sayısı (VEK'ten türetilmiş AES anahtarları; <see cref="VolumeKey.LiveCount"/>
+    /// gibi hizmetin geliştirme kipi günlüğe yazar — 1.9.1).
+    /// </summary>
+    public static int LiveCount => Volatile.Read(ref s_live);
 
     /// <summary>Metadata bloğu (fs-tree düğümü): tweak = fiziksel blok × (blok / 512) + birim.</summary>
     public void DecryptBlock(Span<byte> block, ulong paddr) => _xts.DecryptUnits(block, paddr * _unitsPerBlock);
@@ -338,5 +347,10 @@ public sealed class VolumeCrypto : IDisposable
     /// <summary>Dosya verisini şifreler: tweak = crypto_id × (blok / 512) + extent başından itibaren 512 baytlık birim sırası.</summary>
     public void EncryptData(Span<byte> data, ulong cryptoId, ulong unitIndex) => _xts.EncryptUnits(data, cryptoId * _unitsPerBlock + unitIndex);
 
-    public void Dispose() => _xts.Dispose();
+    public void Dispose()
+    {
+        if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
+        _xts.Dispose();
+        Interlocked.Decrement(ref s_live);
+    }
 }

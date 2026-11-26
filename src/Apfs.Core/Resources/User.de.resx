@@ -61,7 +61,7 @@
     <value>Dieser Datenträger wurde mit {0}-Byte-Blöcken formatiert; Schreiben wird nur auf Datenträgern mit 4096-Byte-Blöcken unterstützt.</value>
   </data>
   <data name="Gate.CheckpointArea" xml:space="preserve">
-    <value>Dieser Datenträger speichert seine Sicherungsdaten in einem geteilten Bereich; das Schreiben auf einen solchen Datenträger wird nicht unterstützt.</value>
+    <value>Dieser Datenträger speichert seine Statusdaten in einem geteilten Bereich; das Schreiben auf einen solchen Datenträger wird nicht unterstützt.</value>
   </data>
   <data name="Gate.EncRolled" xml:space="preserve">
     <value>Die Verschlüsselung des Volumes "{0}" wurde auf dem Mac nachträglich geändert; auf einen solchen Datenträger wird nicht geschrieben.</value>
@@ -95,6 +95,9 @@
   </data>
   <data name="Gate.SystemVolume" xml:space="preserve">
     <value>"{0}" ist ein macOS-System-, Sicherungs- oder internes Volume; auf diesen Datenträger wird nicht geschrieben.</value>
+  </data>
+  <data name="Gate.TooManyFiles" xml:space="preserve">
+    <value>Der Datenträger enthält mehr Dateien und Ordner, als dieser Computer mit seinem Arbeitsspeicher sicher prüfen kann; das Schreiben wurde nicht aktiviert.</value>
   </data>
   <data name="Gate.UnknownContainerFeature" xml:space="preserve">
     <value>Der Datenträger verwendet eine APFS-Funktion, die diese Version nicht kennt.</value>

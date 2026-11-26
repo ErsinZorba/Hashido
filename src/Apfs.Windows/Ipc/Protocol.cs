@@ -71,7 +71,9 @@ public sealed record Request(string Op, long Since = 0, string? Disk = null, int
 /// <summary>
 /// Adlandırılmış kanal: her bağlantıda tek satır JSON istek, tek satır JSON yanıt. Erişim listesi yalnızca SYSTEM, Yöneticiler ve
 /// etkileşimli (oturum açmış) kullanıcılara izin verir; ağdan bağlantı reddedilir. İstekler 64 KiB, yanıtlar (istemci tarafı) 1 MiB ile
-/// sınırlıdır; hizmet "status" yanıtını yine de eski istemcinin 64 KiB'ına sığacak biçimde kırpar (1.8.1).
+/// sınırlıdır. Hizmetin "status" yanıtı bunun altında kalır: disk listesi (birimler dahil) en çok <see cref="MaxDiskListBytes"/>
+/// (1.9.1), bildirimler en çok <see cref="MaxNoticeBytes"/> (1.8.1). Olağan durumda (birkaç disk) yanıt eski 1.8.0 istemcisinin
+/// 64 KiB'ına da sığar (1.9.1'e dek disk listesi sınırsızdı, yalnız bildirimler kırpılıyordu).
 /// </summary>
 public static class PipeProtocol
 {
@@ -95,16 +97,70 @@ public static class PipeProtocol
     public const int MaxNoticeChars = 2048;
 
     /// <summary>Bildirim metnini <see cref="MaxNoticeChars"/>'a kısaltır (sonuna "…"; vekil çifti bölünmez).</summary>
-    public static string ClampNoticeText(string text)
-    {
-        if (text.Length <= MaxNoticeChars) return text;
-        int n = MaxNoticeChars - 1;
-        if (char.IsHighSurrogate(text[n - 1])) n--;
-        return text[..n] + "…";
-    }
+    public static string ClampNoticeText(string text) => Apfs.Util.TextClamp.WithEllipsis(text, MaxNoticeChars);
 
     /// <summary>"status" yanıtındaki parola ipucunun en çok uzunluğu (karakter; 1.8.1).</summary>
     public const int MaxHintChars = 256;
+
+    /// <summary>
+    /// "status" yanıtındaki disk listesinin (birimler dahil) JSON bütçesi (1.9.1). Düşmanca diskte (çok bölüm × birim, uzun adlar)
+    /// liste sınırsızdı: 7 diskte yanıt 1 MiB'ı aşıp tepsiyi hizmetten koparıyordu. Bildirimlerin <see cref="MaxNoticeBytes"/>'ıyla
+    /// yanıt istemcinin <see cref="MaxResponseBytes"/>'ının altında kalır.
+    /// </summary>
+    public const int MaxDiskListBytes = 512 * 1024;
+
+    /// <summary>"status" yanıtındaki metinlerin en çok uzunluğu (karakter; 1.9.1): birim adı, birim iletisi, disk başlığı.</summary>
+    public const int MaxVolumeNameChars = 255, MaxVolumeMessageChars = 1024, MaxDiskDescriptionChars = 256;
+
+    /// <summary>Birim adı yanıtta: denetim/yön karakterleri gösterilmez (<see cref="Apfs.Util.TextSafety.ForDisplay"/>), en çok
+    /// <see cref="MaxVolumeNameChars"/> karakter (vekil çifti bölünmez).</summary>
+    public static string ClampVolumeName(string name) =>
+        Apfs.Util.TextClamp.Prefix(Apfs.Util.TextSafety.ForDisplay(name), MaxVolumeNameChars);
+
+    /// <summary>Birim iletisi (ör. açılamama nedeni) yanıtta: gösterilmeyen karakterler ayıklanır, en çok
+    /// <see cref="MaxVolumeMessageChars"/> karakter ("…" ile).</summary>
+    public static string? ClampVolumeMessage(string? message) =>
+        message is null ? null : Apfs.Util.TextClamp.WithEllipsis(Apfs.Util.TextSafety.ForDisplay(message), MaxVolumeMessageChars);
+
+    /// <summary>Disk başlığı yanıtta: en çok <see cref="MaxDiskDescriptionChars"/> karakter ("…" ile).</summary>
+    public static string ClampDiskDescription(string description) =>
+        Apfs.Util.TextClamp.WithEllipsis(description, MaxDiskDescriptionChars);
+
+    /// <summary>
+    /// Disk listesini JSON bütçesine (<see cref="Json"/> ile, ayırıcı virgüller dahil) sığdırır (1.9.1): diskler HEP listelenir
+    /// (birimsiz hâlleri önce sayılır), birimler sırayla bütçe dolana dek eklenir; ilk sığmayandan sonrakiler (bütün disklerde)
+    /// yanıtta yok, sayıları <paramref name="omitted"/>'da. Sıra korunur.
+    /// </summary>
+    public static List<DiskStatus> DisksWithinBudget(IReadOnlyList<DiskStatus> disks, out int omitted, int budget = MaxDiskListBytes)
+    {
+        omitted = 0;
+        int used = 2; // [ ]
+        for (int i = 0; i < disks.Count; i++)
+            used += JsonSerializer.SerializeToUtf8Bytes(disks[i] with { Volumes = [] }, Json).Length + (i > 0 ? 1 : 0);
+        var result = new List<DiskStatus>(disks.Count);
+        bool full = false;
+        foreach (var d in disks)
+        {
+            var kept = new List<VolumeStatus>(d.Volumes.Count);
+            foreach (var v in d.Volumes)
+            {
+                if (!full)
+                {
+                    int size = JsonSerializer.SerializeToUtf8Bytes(v, Json).Length + (kept.Count > 0 ? 1 : 0);
+                    if (used + size <= budget)
+                    {
+                        used += size;
+                        kept.Add(v);
+                        continue;
+                    }
+                    full = true;
+                }
+                omitted++;
+            }
+            result.Add(kept.Count == d.Volumes.Count ? d : d with { Volumes = kept });
+        }
+        return result;
+    }
 
     /// <summary>
     /// Bildirimlerden JSON boyu (<see cref="Json"/> ile, ayırıcı virgüller dahil) bütçeye sığan EN YENİLERİ, sıralarını koruyarak
@@ -130,13 +186,7 @@ public static class PipeProtocol
     /// İpucunu <see cref="MaxHintChars"/>'a kısaltır (düşmanca diskte keybag ipucu ~11 bin karakter olabiliyor). Vekil çifti
     /// bölünmez.
     /// </summary>
-    public static string? ClampHint(string? hint)
-    {
-        if (hint is null || hint.Length <= MaxHintChars) return hint;
-        int n = MaxHintChars;
-        if (char.IsHighSurrogate(hint[n - 1])) n--;
-        return hint[..n];
-    }
+    public static string? ClampHint(string? hint) => hint is null ? null : Apfs.Util.TextClamp.Prefix(hint, MaxHintChars);
 
     /// <summary>Test kancası: bu ad da varsayılan kanal gibi oturum denetiminden geçer (ortam değişkeni bilerek YOK).</summary>
     internal static string? SessionCheckedPipe { get; set; }
@@ -221,27 +271,140 @@ public static class PipeProtocol
     public static bool IsChannelFailure(Exception e) =>
         e is TimeoutException or IOException or OperationCanceledException or UnauthorizedAccessException or InvalidDataException or JsonException;
 
-    /// <summary>İstemci tarafı: tek istek gönderir, yanıtı döndürür. Hizmet çalışmıyorsa TimeoutException/IOException.</summary>
+    /// <summary>Kurulu hizmetin SCM adı (kanal adıyla aynı; teknik kimlik, ürün adıyla değişmez).</summary>
+    public const string ServiceName = "APFSforWindows";
+
+    /// <summary>Test kancası: oturum denetimli adda beklenen sunucu oturumu (verilmezse 0). Ortam değişkeni bilerek YOK.</summary>
+    internal static uint? TestServiceSession { get; set; }
+
+    /// <summary>Test kancası: oturum denetimli adda beklenen sunucu PID'i (verilmezse SCM'ye sorulur; null = sorgu sonuçsuz).</summary>
+    internal static Func<uint?>? TestServiceProcessId { get; set; }
+
+    /// <summary>
+    /// İstemci tarafı: tek istek gönderir, yanıtı döndürür. Hizmet çalışmıyorsa TimeoutException/IOException.
+    /// Kanala yalnız kimlik bildirme düzeyiyle (Identification) bağlanır (1.9.1): sunucu istemcinin hesabını öğrenir (parola sayacı
+    /// hesap başına) ama onun adına iş yapamaz; önceden düzey verilmiyordu, sunucu istemciye tam bürünebiliyordu.
+    /// </summary>
     public static async Task<T?> SendAsync<T>(Request request, TimeSpan timeout, CancellationToken ct = default)
     {
-        using var client = new NamedPipeClientStream(".", PipeName, PipeDirection.InOut, PipeOptions.Asynchronous);
+        using var client = new NamedPipeClientStream(".", PipeName, PipeDirection.InOut, PipeOptions.Asynchronous,
+            TokenImpersonationLevel.Identification);
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         cts.CancelAfter(timeout);
         await client.ConnectAsync(cts.Token);
-        // Kurulu hizmetin kanalında sunucu oturum 0'da olmalı: hizmet dururken adı kapan kullanıcı süreci oturum 0'da
-        // çalışamaz. Denetlenemezse de güvenilmez sayılır; isteğin tek baytı gitmez.
-        if (RequiresServiceSession(PipeName) && !(GetNamedPipeServerSessionId(client.SafePipeHandle, out uint session) && session == 0))
+        // Kurulu hizmetin kanalında sunucu oturum 0'da olmalı VE (1.9.1) sunucu süreci SCM'nin APFSforWindows hizmetinin süreci
+        // olmalı: hizmet dururken adı kapan süreç oturum 0'da çalışan başka bir hizmet olabilir. Denetlenemezse de güvenilmez
+        // sayılır; isteğin tek baytı gitmez.
+        if (RequiresServiceSession(PipeName) && !IsServiceProcess(client.SafePipeHandle))
             throw new UntrustedServerException(WinText.T("Ipc.UntrustedServer", PipeName));
         if (request.Lang is null && ClientLanguage is not null) request = request with { Lang = ClientLanguage };
         if (request.Culture is null && ClientCulture is not null) request = request with { Culture = ClientCulture };
         await WriteLineAsync(client, request, cts.Token);
         var line = await ReadLineAsync(client, cts.Token, MaxResponseBytes);
-        return line is null ? default : JsonSerializer.Deserialize<T>(line, Json);
+        if (line is null) return default;
+        var value = JsonSerializer.Deserialize<T>(line, Json);
+        return value is StatusResponse status ? (T)(object)Checked(status) : value;
     }
+
+    /// <summary>
+    /// "status" yanıtının biçimi (1.9.1): disk listesi yoksa yanıt biçimsizdir → <see cref="InvalidDataException"/> (kanal hatası,
+    /// tepsi "hizmet çalışmıyor" der); iç içe eksik listeler (birimler, bildirimler) boş sayılır, boş öğeler atlanır. Önceden null
+    /// liste tepsinin yoklamasında NullReferenceException'a dönüşüp tepsiyi düşürebiliyordu.
+    /// </summary>
+    internal static StatusResponse Checked(StatusResponse s)
+    {
+        if (s.Disks is null) throw new InvalidDataException(WinText.T("Ipc.MalformedResponse"));
+        return s with
+        {
+            Disks = s.Disks.OfType<DiskStatus>().Select(d => d.Volumes is null || d.Volumes.Contains(null!)
+                ? d with { Volumes = d.Volumes?.OfType<VolumeStatus>().ToList() ?? [] } : d).ToList(),
+            Notices = s.Notices?.OfType<Notice>().ToList() ?? [],
+        };
+    }
+
+    /// <summary>Test kancası: oturum denetimli adda kabul edilen kanal sahibi (verilmezse yalnız SYSTEM ya da Yöneticiler).</summary>
+    internal static SecurityIdentifier? TestServiceOwner { get; set; }
+
+    /// <summary>
+    /// Kanalın sunucusu hizmet oturumunda (0), SCM'nin hizmet süreci ve kanal nesnesinin sahibi SYSTEM ya da Yöneticiler mi (hizmetin
+    /// açtığı kanalın sahibi Yöneticiler'dir, ölçüldü; yönetici olmayan bir hesap bu sahibi veremez — PID yeniden kullanılsa da).
+    /// Herhangi bir sorgu düşerse false.
+    /// </summary>
+    private static bool IsServiceProcess(SafePipeHandle pipe)
+    {
+        if (!GetNamedPipeServerSessionId(pipe, out uint session) || session != (TestServiceSession ?? 0)) return false;
+        if (!GetNamedPipeServerProcessId(pipe, out uint serverPid)) return false;
+        uint? servicePid = TestServiceProcessId is { } test ? test() : QueryServiceProcessId(ServiceName);
+        if (servicePid is not uint pid || pid == 0 || pid != serverPid) return false;
+        return PipeOwner(pipe) is { } owner && (TestServiceOwner is { } expected ? owner == expected
+            : owner.IsWellKnown(WellKnownSidType.LocalSystemSid) || owner.IsWellKnown(WellKnownSidType.BuiltinAdministratorsSid));
+    }
+
+    private static SecurityIdentifier? PipeOwner(SafePipeHandle pipe)
+    {
+        if (GetSecurityInfo(pipe, SeKernelObject, OwnerSecurityInformation, out IntPtr owner, out _, out _, out _, out IntPtr sd) != 0) return null;
+        try { return owner == IntPtr.Zero ? null : new SecurityIdentifier(owner); }
+        finally { LocalFree(sd); }
+    }
+
+    /// <summary>
+    /// Çalışan hizmetin süreç kimliği SCM'den (yükseltilmemiş kullanıcı da sorgulayabilir: hizmetin izinleri Etkileşimli
+    /// kullanıcılara sorgu verir). Hizmet yoksa, çalışmıyorsa ya da sorgu düşerse null.
+    /// </summary>
+    internal static uint? QueryServiceProcessId(string serviceName)
+    {
+        IntPtr scm = OpenSCManagerW(null, null, ScManagerConnect);
+        if (scm == IntPtr.Zero) return null;
+        try
+        {
+            IntPtr svc = OpenServiceW(scm, serviceName, ServiceQueryStatus);
+            if (svc == IntPtr.Zero) return null;
+            try
+            {
+                var buffer = new byte[36]; // SERVICE_STATUS_PROCESS
+                if (!QueryServiceStatusEx(svc, ScStatusProcessInfo, buffer, buffer.Length, out _)) return null;
+                uint state = BitConverter.ToUInt32(buffer, 4), pid = BitConverter.ToUInt32(buffer, 28);
+                // Başlarken de (OnStart kanalı SCM "çalışıyor" demeden açar; tepsinin o aradaki isteği boşa düşmesin)
+                return state is ServiceRunning or ServiceStartPending && pid != 0 ? pid : null;
+            }
+            finally { CloseServiceHandle(svc); }
+        }
+        finally { CloseServiceHandle(scm); }
+    }
+
+    private const uint ScManagerConnect = 0x1, ServiceQueryStatus = 0x4, ServiceRunning = 4, ServiceStartPending = 2;
+    private const int SeKernelObject = 6;
+    private const uint OwnerSecurityInformation = 0x1;
+
+    [DllImport("advapi32.dll")]
+    private static extern int GetSecurityInfo(SafePipeHandle handle, int objectType, uint securityInfo, out IntPtr owner, out IntPtr group,
+        out IntPtr dacl, out IntPtr sacl, out IntPtr securityDescriptor);
+
+    [DllImport("kernel32.dll")]
+    private static extern IntPtr LocalFree(IntPtr memory);
+    private const int ScStatusProcessInfo = 0;
 
     [DllImport("kernel32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool GetNamedPipeServerSessionId(SafePipeHandle pipe, out uint serverSessionId);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetNamedPipeServerProcessId(SafePipeHandle pipe, out uint serverProcessId);
+
+    [DllImport("advapi32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern IntPtr OpenSCManagerW(string? machine, string? database, uint access);
+
+    [DllImport("advapi32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern IntPtr OpenServiceW(IntPtr scm, string name, uint access);
+
+    [DllImport("advapi32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool QueryServiceStatusEx(IntPtr service, int infoLevel, byte[] buffer, int size, out int needed);
+
+    [DllImport("advapi32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool CloseServiceHandle(IntPtr handle);
 }
 
 /// <summary>

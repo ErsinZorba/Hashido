@@ -27,7 +27,7 @@ Diski takarsınız, birkaç saniye içinde Dosya Gezgini'nde sürücü harfi ola
 | 10 arayüz dili | Türkçe, English, Deutsch, Français, Español, Português (Brasil), Italiano, 日本語, 简体中文, 한국어 |
 
 ## Kurulum
-`Hashido-Setup-1.9.0.exe` dosyasını çalıştırın ve sihirbazı izleyin (İleri › Kur › Son). Windows 10/11 (64 bit) yeter;
+`Hashido-Setup-1.9.1.exe` dosyasını çalıştırın ve sihirbazı izleyin (İleri › Kur › Son). Windows 10/11 (64 bit) yeter;
 başka bir şey kurmanız gerekmez: .NET programla birlikte gelir, [WinFsp](https://winfsp.dev) sürücüsü yoksa sihirbaz onu da kurar.
 Kurulumdan sonra Başlat menüsünde **Hashido** bulunur ve tepsi simgesi her oturumda kendiliğinden açılır.
 
@@ -179,11 +179,13 @@ Kilitli şifreli birime yazma; şifreli birimin parolasını değiştirme, şifr
 Fusion Drive; mühürlü macOS sistem birimi; DMG/sparsebundle dosyaları; HFS+; Apple Silicon/T2 dahili disk donanım şifrelemesi.
 
 ## Gizlilik
-Son güncelleme: 2026-11-17. Bağlayıcı olan [İngilizce metindir](README.md#privacy); bu çeviri bilgi amaçlıdır. Aynı metin [worker/PRIVACY.md](worker/PRIVACY.md) dosyasında da var.
+Son güncelleme: 2026-11-25. Bağlayıcı olan [İngilizce metindir](README.md#privacy); bu çeviri bilgi amaçlıdır. Aynı metin [worker/PRIVACY.md](worker/PRIVACY.md) dosyasında da var.
 
 **Otomatik raporlar siz "evet" diyene kadar kapalıdır.** Program ilk açılışta bir kez anonim rapor gönderip gönderemeyeceğini
 sorar. "Evet, gönder" demediğiniz sürece hiçbir şey toplanmaz ve gönderilmez. Seçiminizi istediğiniz zaman **Ayarlar**'dan
-değiştirebilirsiniz; raporları kapatmak bilgisayarınızda henüz gönderilmemiş raporları da siler.
+değiştirebilirsiniz; raporları kapatmak bilgisayarınızda henüz gönderilmemiş raporları da siler. Birden çok Windows hesabı olan
+bilgisayarda her hesabın seçimi sayılır: raporlar yalnız son 30 günde programı kullanan hesaplardan hiçbiri "Hayır" demediyse
+toplanır — bir hesabın "Hayır"ı bütün hesaplar için durdurur.
 
 **Ne gönderilir, neden.** Raporlar hataları, çökmeleri ve başarılı işlemleri (disk bağlama, kilit açma, yazmaya açma, yazma
 oturumu, güvenle çıkarma) anlatır. Hataları bulmaya ve özellikle deneysel yazma özelliğinde hangi disklerin ve durumların sorun
@@ -207,7 +209,9 @@ satılmaz, reklam için kullanılmaz ve kimseyle paylaşılmaz.
 **Ne kadar süre.** Raporlar alındıktan 18 ay sonra kendiliğinden silinir.
 
 **Bilgisayarınızda.** Gönderilmeyi bekleyen raporlar `%ProgramData%\APFS for Windows\reports\` klasöründe (en çok 200), tepsi
-programının kendi çökme raporları ise `%LOCALAPPDATA%\APFS for Windows\reports\` klasöründe durur. Gönderilen son 20 rapor, gönderildiği biçimiyle **Ayarlar › Gönderilenleri göster**'de görünür.
+programının kendi çökme raporları ise `%LOCALAPPDATA%\APFS for Windows\reports\` klasöründe durur. Gönderilen son 20 rapor, gönderildiği biçimiyle **Ayarlar › Gönderilenleri göster**'de görünür. Programın günlüğü
+(`%ProgramData%\APFS for Windows\log.txt`, "Günlüğü aç"ın gösterdiği) hiç gönderilmez ama bu bilgisayardaki her hesap onu
+okuyabilir; günlükte bağlanan disklerin ve birimlerin adları ve bir dosyada sorun çıkınca o dosyanın adı bulunur.
 
 **Haklarınız.** Raporlar hiçbir kimlik taşımadığı için hiç kimse (geliştirici dahil) hangi raporun sizden geldiğini bilemez; bu
 yüzden tek tek raporlar istek üzerine bulunamaz ya da silinemez. Raporları kapatmak bundan sonraki bütün raporları durdurur.

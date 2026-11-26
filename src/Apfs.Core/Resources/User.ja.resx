@@ -96,6 +96,9 @@
   <data name="Gate.SystemVolume" xml:space="preserve">
     <value>"{0}" は macOS のシステム、バックアップ、または内部ボリュームです。このディスクには書き込みません。</value>
   </data>
+  <data name="Gate.TooManyFiles" xml:space="preserve">
+    <value>このディスクのファイルとフォルダーの数が、このコンピューターのメモリで安全に検査できる量を超えています。書き込みは有効にしませんでした。</value>
+  </data>
   <data name="Gate.UnknownContainerFeature" xml:space="preserve">
     <value>このディスクは、このバージョンでは認識できない APFS の機能を使用しています。</value>
   </data>

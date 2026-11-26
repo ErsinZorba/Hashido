@@ -17,6 +17,9 @@ public sealed class ReportQueue(string path)
     public const int MaxEvents = 200;
     public const int MaxBytes = 256 * 1024;
 
+    /// <summary>En büyük sıra numarası (2^53: JSON sayısı olarak kayıpsız; dışındaki dosya değeri yok sayılır).</summary>
+    public const long MaxId = 1L << 53;
+
     private readonly Lock _gate = new();
 
     public string PathName { get; } = path;
@@ -64,6 +67,8 @@ public sealed class ReportQueue(string path)
         lock (_gate)
         {
             var lines = Load();
+            // Onay kuyruğun bildiği en büyük numarayı aşamaz (1.9.1): sahte uç değer ".id"'yi taşırıp numaraları sıfırlatıyordu
+            uptoId = Math.Min(uptoId, Math.Max(lines.Count > 0 ? lines[^1].Id : 0, ReadIdFloor()));
             int before = lines.Count;
             lines.RemoveAll(l => l.Id <= uptoId);
             if (lines.Count != before) Save(lines, Math.Max(uptoId, lines.Count > 0 ? lines[^1].Id : 0));
@@ -98,7 +103,9 @@ public sealed class ReportQueue(string path)
             try
             {
                 using var doc = JsonDocument.Parse(line);
-                if (doc.RootElement.TryGetProperty("id", out var id) && id.TryGetInt64(out long n)
+                // Sıra numarası aralıkta olmalı (1.9.1): önceden yazılabilir olmuş bir klasörde kullanıcının koyduğu uç değer
+                // sonraki olayın numarasını taşırıyordu. Olayın şeması gönderilmeden önce yükleyicide denetlenir (uymayan düşer).
+                if (doc.RootElement.TryGetProperty("id", out var id) && id.TryGetInt64(out long n) && n is > 0 and <= MaxId
                     && doc.RootElement.TryGetProperty("e", out var e) && e.ValueKind == JsonValueKind.Object)
                     list.Add((n, line));
             }
@@ -124,7 +131,7 @@ public sealed class ReportQueue(string path)
 
     private long ReadIdFloor()
     {
-        try { return long.TryParse(File.ReadAllText(PathName + ".id"), out long n) ? n : 0; }
+        try { return long.TryParse(File.ReadAllText(PathName + ".id"), out long n) && n is >= 0 and <= MaxId ? n : 0; }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException) { return 0; }
     }
 

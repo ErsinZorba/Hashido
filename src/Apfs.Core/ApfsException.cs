@@ -17,6 +17,12 @@ public enum ApfsErrorCode
     DiskFull,
     AlreadyExists,
     DirectoryNotEmpty,
+    /// <summary>Ad UTF-8'de 255 baytı aşıyor (APFS sınırı; Windows'un 255 karakteri ja/zh/ko adlarda bunu aşabilir). Sıradan hata:
+    /// sürücü "dosya adı çok uzun" der, bildirim yok.</summary>
+    NameTooLong,
+    /// <summary>Ad bu sürücüde yazılamaz (1.9.1: geçersiz Mac adlarının kaçış aralığından karakter). Sıradan hata: sürücü
+    /// "dosya adı geçersiz" der (STATUS_OBJECT_NAME_INVALID), bildirim yok.</summary>
+    InvalidName,
 }
 
 public sealed class ApfsException : Exception
@@ -50,6 +56,8 @@ public sealed class ApfsException : Exception
         ApfsErrorCode.DiskFull => CoreText.U("Error.DiskFull") + Suffix(detail),
         ApfsErrorCode.AlreadyExists => CoreText.U("Error.AlreadyExists") + Suffix(detail),
         ApfsErrorCode.DirectoryNotEmpty => CoreText.U("Error.DirectoryNotEmpty") + Suffix(detail),
+        ApfsErrorCode.NameTooLong => CoreText.U("Error.InvalidArgument") + Suffix(detail),
+        ApfsErrorCode.InvalidName => CoreText.U("Error.InvalidArgument") + Suffix(detail),
         _ => CoreText.U("Error.Unknown") + Suffix(detail),
     };
 

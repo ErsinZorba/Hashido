@@ -285,6 +285,9 @@ Encrypted volumes: --password-prompt (asks for the password) or --password-stdin
   <data name="Ejector.Refused" xml:space="preserve">
     <value>Windows could not eject the disk right now (code {0:X}/{1}{2}). Try again in a moment.</value>
   </data>
+  <data name="Ipc.MalformedResponse" xml:space="preserve">
+    <value>malformed service response (no disk list)</value>
+  </data>
   <data name="Ipc.MessageTooLong" xml:space="preserve">
     <value>message too long</value>
   </data>
@@ -305,6 +308,9 @@ Encrypted volumes: --password-prompt (asks for the password) or --password-stdin
   </data>
   <data name="Password.SavedRefused" xml:space="preserve">
     <value>{0}: the saved password did not work; the record is kept and the password is asked for.</value>
+  </data>
+  <data name="Password.ReadFailed" xml:space="preserve">
+    <value>could not read the remembered password of {0} (Windows error {1}); the password window opens with the box checked</value>
   </data>
   <data name="Password.SaveFailed" xml:space="preserve">
     <value>{0}: the password could not be saved ({1}).</value>
@@ -329,6 +335,9 @@ Encrypted volumes: --password-prompt (asks for the password) or --password-stdin
   </data>
   <data name="Raw.ShortRead" xml:space="preserve">
     <value>less data than expected was read from the disk</value>
+  </data>
+  <data name="Raw.ShortWrite" xml:space="preserve">
+    <value>the disk wrote less than requested</value>
   </data>
   <data name="Raw.Unaligned" xml:space="preserve">
     <value>raw disk I/O not aligned to sectors: {0}+{1}</value>
@@ -356,6 +365,15 @@ Encrypted volumes: --password-prompt (asks for the password) or --password-stdin
   </data>
   <data name="Svc.DiskCheckFailed" xml:space="preserve">
     <value>{0}: could not check the disk: {1}</value>
+  </data>
+  <data name="Svc.ContainerWarning" xml:space="preserve">
+    <value>{0}: APFS partition {1}: {2}</value>
+  </data>
+  <data name="Svc.DuplicateVolumeOid" xml:space="preserve">
+    <value>{0}: APFS partition {1} lists the same volume {2} more time(s); it was mounted once.</value>
+  </data>
+  <data name="Svc.AttachStopped" xml:space="preserve">
+    <value>{0}: the service is stopping; the volumes mounted during the scan were unmounted.</value>
   </data>
   <data name="Svc.DiskNotReady" xml:space="preserve">
     <value>{0} is not ready yet; retrying without a warning for up to {1} seconds: {2}</value>
@@ -390,6 +408,12 @@ Encrypted volumes: --password-prompt (asks for the password) or --password-stdin
   <data name="Svc.DataDirSecureFailed" xml:space="preserve">
     <value>data folder could not be fully secured: {0}</value>
   </data>
+  <data name="Svc.DataDirMovedAside" xml:space="preserve">
+    <value>data folder: a folder whose permissions let other accounts change it was moved aside to {0} and replaced by a new one (its reports were not kept).</value>
+  </data>
+  <data name="Svc.DataDirUntrusted" xml:space="preserve">
+    <value>data folder: {0} could not be secured; until the next start the service writes there nothing and uses {1} instead.</value>
+  </data>
   <data name="Svc.PipeNameTaken" xml:space="preserve">
     <value>pipe name {0} is held by another process; the tray cannot connect until it is released. Retrying every 5 seconds.</value>
   </data>
@@ -410,6 +434,9 @@ Encrypted volumes: --password-prompt (asks for the password) or --password-stdin
   </data>
   <data name="Svc.ScanError" xml:space="preserve">
     <value>scan error: {0}</value>
+  </data>
+  <data name="Svc.StatusTrimmed" xml:space="preserve">
+    <value>{0} volume(s) were left out of the status reply (size limit; logged once).</value>
   </data>
   <data name="Svc.Started" xml:space="preserve">
     <value>Service started.</value>
@@ -447,8 +474,38 @@ Encrypted volumes: --password-prompt (asks for the password) or --password-stdin
   <data name="Raw.ReadTimedOut" xml:space="preserve">
     <value>{0}: the disk did not answer a read within {1} s; it is treated as unreadable.</value>
   </data>
+  <data name="Raw.WriteTimedOut" xml:space="preserve">
+    <value>{0}: the disk did not complete a write within {1} s; treated as unwritable.</value>
+  </data>
   <data name="Svc.UnmountError" xml:space="preserve">
     <value>{0}: unmount error: {1}</value>
+  </data>
+  <data name="Svc.PowerEventFailed" xml:space="preserve">
+    <value>sleep/wake handling error: {0}</value>
+  </data>
+  <data name="Svc.PowerRegisterFailed" xml:space="preserve">
+    <value>Sleep notifications could not be registered (error {0}); writable drives are not protected during sleep.</value>
+  </data>
+  <data name="Svc.PowerResume" xml:space="preserve">
+    <value>Wake: {0} write session(s) released without writing; mounted read-only.</value>
+  </data>
+  <data name="Svc.PowerSuspend" xml:space="preserve">
+    <value>Sleep: {0} write session(s) put on hold, {1} saved ({2} ms); {3} gate(s) frozen, {4} with a write still running.</value>
+  </data>
+  <data name="Svc.WritesResumedVerified" xml:space="preserve">
+    <value>{0}: the disk identity was verified; writing continues.</value>
+  </data>
+  <data name="Svc.WritesHeldUnreadable" xml:space="preserve">
+    <value>{0}: the disk identity could not be read once; writing is on hold until the next check.</value>
+  </data>
+  <data name="Svc.SleepNotSaved" xml:space="preserve">
+    <value>could not be saved before sleep</value>
+  </data>
+  <data name="Svc.SleptDuringEnable" xml:space="preserve">
+    <value>the computer went to sleep meanwhile</value>
+  </data>
+  <data name="Svc.WritesFrozenForSleep" xml:space="preserve">
+    <value>writes are stopped for sleep</value>
   </data>
   <data name="Svc.WaitingForPassword" xml:space="preserve">
     <value>{0}: "{1}" is waiting for a password.</value>
@@ -482,6 +539,9 @@ Encrypted volumes: --password-prompt (asks for the password) or --password-stdin
   </data>
   <data name="Update.BadVersion" xml:space="preserve">
     <value>Update rejected: the file's version is {0}, expected {1}.</value>
+  </data>
+  <data name="Update.CleanUpFailed" xml:space="preserve">
+    <value>could not clean up the updates folder: {0}: {1}</value>
   </data>
   <data name="Update.Declined" xml:space="preserve">
     <value>Update {0}: setup ended with code {1}; it is not offered automatically for 24 hours.</value>

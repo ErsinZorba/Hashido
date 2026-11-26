@@ -56,17 +56,49 @@ public static class Decmpfs
             ?? throw new ApfsException(ApfsErrorCode.Corrupt, CoreText.T("Decmpfs.NoCompressionInfo"));
         var h = ParseHeader(attr);
         if (!IsSupported(h.Type)) throw Unsupported(h.Type);
-        if (IsInline(h.Type))
-        {
-            if (h.UncompressedSize > MaxInlineSize)
-                throw new ApfsException(ApfsErrorCode.Unsupported, CoreText.T("Decmpfs.InlineTooLarge", h.UncompressedSize));
-            var data = new byte[h.UncompressedSize];
-            DecodeChunk(h.Type, attr.AsSpan(HeaderSize), data);
-            return new MemoryDataReader(data);
-        }
+        // Tek boy kaynağı: görünen boy (GetFileSize) inode'dakini alır; okuyucu başlıktakiyle çalışır. İkisi ayrıysa kopya sessizce
+        // kısa ya da sıfırla uzun kalırdı → çelişki bozukluktur.
+        if (inode.HasUncompressedSize && inode.UncompressedSize != h.UncompressedSize)
+            throw new ApfsException(ApfsErrorCode.Corrupt, CoreText.T("Decmpfs.SizeMismatch", inode.UncompressedSize, h.UncompressedSize));
+        if (IsInline(h.Type)) return new MemoryDataReader(DecodeInline(h, attr));
         var fork = volume.OpenXattrStream(inode.Id, ResourceForkName)
             ?? throw new ApfsException(ApfsErrorCode.Corrupt, CoreText.T("Decmpfs.ResourceForkMissing"));
         return new ResourceForkReader(h, fork);
+    }
+
+    /// <summary>
+    /// Öznitelik içi veriyi açar. Başlıktaki boy ayırmadan ÖNCE veriyle sınanır: verinin açılabileceği en çok bayttan büyükse
+    /// bozuktur (birkaç yüz baytlık öznitelik 64 MiB ayırtmasın).
+    /// </summary>
+    internal static byte[] DecodeInline(Header h, ReadOnlySpan<byte> attr)
+    {
+        var src = attr[HeaderSize..];
+        if (h.UncompressedSize > InlineCapacity(h.Type, src, h.UncompressedSize))
+            throw new ApfsException(ApfsErrorCode.Corrupt, CoreText.T("Decmpfs.InlineSizeExceedsData", h.UncompressedSize, src.Length));
+        if (h.UncompressedSize > MaxInlineSize)
+            throw new ApfsException(ApfsErrorCode.Unsupported, CoreText.T("Decmpfs.InlineTooLarge", h.UncompressedSize));
+        var data = new byte[h.UncompressedSize];
+        DecodeChunk(h.Type, src, data);
+        return data;
+    }
+
+    /// <summary>
+    /// <paramref name="src"/>'nin <see cref="DecodeChunk"/> ile açılabileceği en çok bayt (yalnız üst sınır; gerçek çözme yine
+    /// tam boyu ister). Sıkıştırılmamış işaretli veri kendi boyu; deflate en çok 1032:1 (2 bitte 258 bayt); LZVN en çok 271 bayt / 2
+    /// baytlık işlem; LZFSE bloklarının başlıkları açılmış boylarını söyler (toplamları, çözmeden).
+    /// </summary>
+    internal static ulong InlineCapacity(uint type, ReadOnlySpan<byte> src, ulong size)
+    {
+        ulong n = (ulong)src.Length;
+        if (n == 0) return 0;
+        return type switch
+        {
+            1 or 9 => n,
+            3 => (src[0] & 0x0F) == 0x0F ? n - 1 : n * 1032,
+            7 => src[0] == 0x06 ? n - 1 : n * 136,
+            11 => n - 1 == size && src[0] != (byte)'b' ? n - 1 : Lzfse.DeclaredSize(src),
+            _ => 0,
+        };
     }
 
     /// <summary>
@@ -167,7 +199,8 @@ public static class Decmpfs
             _type = h.Type;
             _fork = fork;
             Length = h.UncompressedSize;
-            long numBlocks = (long)((h.UncompressedSize + BlockSize - 1) / BlockSize);
+            // Yukarı yuvarlama taşmasız (boy + 65535, 2^64 − 65535 üstünde sarıp blok sayısını 0 yapıyordu)
+            ulong numBlocks = h.UncompressedSize / BlockSize + (h.UncompressedSize % BlockSize == 0 ? 0UL : 1UL);
             if (numBlocks > 1 << 26) throw new ApfsException(ApfsErrorCode.Corrupt, CoreText.T("Decmpfs.InvalidFileSize"));
             // Çatalın gerçekten ayrılmış kısmı: tablo ve bloklar onun içinde olmalı (diskteki boy yüzünden büyük ayırma yok)
             ulong available = fork is FileDataReader f ? Math.Min(fork.Length, f.CoveredLength) : fork.Length;

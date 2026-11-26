@@ -285,6 +285,9 @@ Seçenekler: --volume N (birim sırası, varsayılan 0), --partition N (APFS bö
   <data name="Ejector.Refused" xml:space="preserve">
     <value>Windows diski şu anda çıkaramadı (kod {0:X}/{1}{2}). Biraz sonra tekrar deneyin.</value>
   </data>
+  <data name="Ipc.MalformedResponse" xml:space="preserve">
+    <value>hizmetin yanıtı biçimsiz (disk listesi yok)</value>
+  </data>
   <data name="Ipc.MessageTooLong" xml:space="preserve">
     <value>ileti çok uzun</value>
   </data>
@@ -305,6 +308,9 @@ Seçenekler: --volume N (birim sırası, varsayılan 0), --partition N (APFS bö
   </data>
   <data name="Password.SavedRefused" xml:space="preserve">
     <value>{0}: kayıtlı parola tutmadı; kayıt korunuyor, parola soruluyor.</value>
+  </data>
+  <data name="Password.ReadFailed" xml:space="preserve">
+    <value>{0} biriminin hatırlanan parolası okunamadı (Windows hatası {1}); parola penceresi kutu işaretli açılır</value>
   </data>
   <data name="Password.SaveFailed" xml:space="preserve">
     <value>{0}: parola kaydedilemedi ({1}).</value>
@@ -329,6 +335,9 @@ Seçenekler: --volume N (birim sırası, varsayılan 0), --partition N (APFS bö
   </data>
   <data name="Raw.ShortRead" xml:space="preserve">
     <value>diskten beklenenden az veri okundu</value>
+  </data>
+  <data name="Raw.ShortWrite" xml:space="preserve">
+    <value>disk istenenden az yazdı</value>
   </data>
   <data name="Raw.Unaligned" xml:space="preserve">
     <value>sektör hizasız ham disk G/Ç'si: {0}+{1}</value>
@@ -356,6 +365,15 @@ Seçenekler: --volume N (birim sırası, varsayılan 0), --partition N (APFS bö
   </data>
   <data name="Svc.DiskCheckFailed" xml:space="preserve">
     <value>{0}: disk denetlenemedi: {1}</value>
+  </data>
+  <data name="Svc.ContainerWarning" xml:space="preserve">
+    <value>{0}: {1}. APFS bölümü: {2}</value>
+  </data>
+  <data name="Svc.DuplicateVolumeOid" xml:space="preserve">
+    <value>{0}: {1}. APFS bölümü aynı birimi {2} kez daha listeliyor; birim bir kez bağlandı.</value>
+  </data>
+  <data name="Svc.AttachStopped" xml:space="preserve">
+    <value>{0}: hizmet durduruluyor; taramada bağlanan birimler ayrıldı.</value>
   </data>
   <data name="Svc.DiskNotReady" xml:space="preserve">
     <value>{0} henüz hazır değil; {1} saniyeye kadar uyarı vermeden yeniden denenecek: {2}</value>
@@ -390,6 +408,12 @@ Seçenekler: --volume N (birim sırası, varsayılan 0), --partition N (APFS bö
   <data name="Svc.DataDirSecureFailed" xml:space="preserve">
     <value>veri klasörü tam güvenceye alınamadı: {0}</value>
   </data>
+  <data name="Svc.DataDirMovedAside" xml:space="preserve">
+    <value>veri klasörü: izinleri başka hesapların değiştirmesine açık bir klasör {0} adıyla kenara taşındı, yerine yenisi açıldı (içindeki raporlar alınmadı).</value>
+  </data>
+  <data name="Svc.DataDirUntrusted" xml:space="preserve">
+    <value>veri klasörü: {0} güvenceye alınamadı; hizmet bir sonraki açılışa dek oraya hiçbir şey yazmaz, yerine {1} kullanılır.</value>
+  </data>
   <data name="Svc.PipeNameTaken" xml:space="preserve">
     <value>{0} kanal adı başka bir sürecin elinde; o bırakana dek tepsi bağlanamaz. 5 saniyede bir yeniden deneniyor.</value>
   </data>
@@ -410,6 +434,9 @@ Seçenekler: --volume N (birim sırası, varsayılan 0), --partition N (APFS bö
   </data>
   <data name="Svc.ScanError" xml:space="preserve">
     <value>tarama hatası: {0}</value>
+  </data>
+  <data name="Svc.StatusTrimmed" xml:space="preserve">
+    <value>{0} birim durum yanıtına sığmadı, yanıtta yok (boyut sınırı; günlüğe bir kez).</value>
   </data>
   <data name="Svc.Started" xml:space="preserve">
     <value>Hizmet başladı.</value>
@@ -447,8 +474,38 @@ Seçenekler: --volume N (birim sırası, varsayılan 0), --partition N (APFS bö
   <data name="Raw.ReadTimedOut" xml:space="preserve">
     <value>{0}: disk bir okumayı {1} sn içinde yanıtlamadı; okunamıyor sayıldı.</value>
   </data>
+  <data name="Raw.WriteTimedOut" xml:space="preserve">
+    <value>{0}: disk bir yazmayı {1} sn içinde tamamlamadı; yazılamıyor sayıldı.</value>
+  </data>
   <data name="Svc.UnmountError" xml:space="preserve">
     <value>{0}: ayırma hatası: {1}</value>
+  </data>
+  <data name="Svc.PowerEventFailed" xml:space="preserve">
+    <value>uyku/uyanış işlenirken hata: {0}</value>
+  </data>
+  <data name="Svc.PowerRegisterFailed" xml:space="preserve">
+    <value>Uyku bildirimlerine kaydolunamadı (hata {0}); yazılabilir sürücüler uykuda korunmuyor.</value>
+  </data>
+  <data name="Svc.PowerResume" xml:space="preserve">
+    <value>Uyanış: {0} yazma oturumu diske yazılmadan bırakıldı; salt okunur bağlandı.</value>
+  </data>
+  <data name="Svc.PowerSuspend" xml:space="preserve">
+    <value>Uyku: {0} yazma oturumu bekletildi, {1} tanesi kaydedildi ({2} ms); {3} kapı donduruldu, {4} tanesinde süren yazma vardı.</value>
+  </data>
+  <data name="Svc.WritesResumedVerified" xml:space="preserve">
+    <value>{0}: disk kimliği doğrulandı; yazma sürüyor.</value>
+  </data>
+  <data name="Svc.WritesHeldUnreadable" xml:space="preserve">
+    <value>{0}: disk kimliği bir kez okunamadı; yazma sonraki denetime dek bekletildi.</value>
+  </data>
+  <data name="Svc.SleepNotSaved" xml:space="preserve">
+    <value>uykudan önce kaydedilemedi</value>
+  </data>
+  <data name="Svc.SleptDuringEnable" xml:space="preserve">
+    <value>bilgisayar bu sırada uykuya geçti</value>
+  </data>
+  <data name="Svc.WritesFrozenForSleep" xml:space="preserve">
+    <value>uyku için yazma durduruldu</value>
   </data>
   <data name="Svc.WaitingForPassword" xml:space="preserve">
     <value>{0}: "{1}" parola bekliyor.</value>
@@ -482,6 +539,9 @@ Seçenekler: --volume N (birim sırası, varsayılan 0), --partition N (APFS bö
   </data>
   <data name="Update.BadVersion" xml:space="preserve">
     <value>Güncelleme reddedildi: dosyanın sürümü {0}, beklenen {1}.</value>
+  </data>
+  <data name="Update.CleanUpFailed" xml:space="preserve">
+    <value>güncelleme klasörü temizlenemedi: {0}: {1}</value>
   </data>
   <data name="Update.Declined" xml:space="preserve">
     <value>Güncelleme {0}: setup {1} koduyla bitti; 24 saat kendiliğinden önerilmez.</value>

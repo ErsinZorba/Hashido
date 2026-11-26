@@ -71,7 +71,9 @@ internal sealed class MutableBTree
     /// <list type="bullet">
     /// <item>Bir kayıt işlemi kökten yaprağa tek yolun düğümlerini değiştirir → yaprak başına en çok seviye sayısı kadar temiz düğüm.</item>
     /// <item>Yaprak yalnız eklenen/büyüyen kayıtla taşar: kayıt alan her yaprak zaten dolu olabilir (bir bölünme), sonraki her bölünme
-    /// en az çeyrek düğüm yeni bayt ister.</item>
+    /// en az çeyrek düğüm yeni bayt ister — büyük kaydı (macOS'un 3–4 KB'lık xattr'ı) taşıyan parça hariç: o doluya yakın kalabilir;
+    /// orada her küçük kayıt en çok bir bölünme doğurur ve eklenen kayıt sayısı yaprak payında sayılır (1.9.1 bağımsız inceleme;
+    /// <c>BTreeSplitTests.SeveralRecordsNextToABigRecordStayWithinGrowth</c>).</item>
     /// <item>Üst seviyedeki düğüm, alttaki bölünmenin yeni ayracıyla ya da ilk anahtarı değişen çocuğun uzayan ayracıyla taşar. Bir
     /// aralıkta ilk anahtarı değişen en çok iki düğüm vardır (ilki ve sonuncusu; aradakiler ya tümüyle silinir ya ilk kaydını korur;
     /// ekleme ilk anahtarın önüne girmez): seviye l'deki bölünme ≤ l-1'dekiler + 2 × aralık. Kök bir kez büyüyebilir.</item>
@@ -318,15 +320,51 @@ internal sealed class MutableBTree
 
             var (parent, idx) = path[^1];
             path.RemoveAt(path.Count - 1);
-            int half = SplitPoint(node);
-            var right = NewNode(node.Level);
-            Move(node, right, half, node.Count - half);
-            parent.Keys.Insert(idx + 1, right.Keys[0]);
-            parent.Vals.Insert(idx + 1, new byte[8]);
-            parent.Children.Insert(idx + 1, right);
+            var cuts = SplitCuts(node);
+            // Sondan başa: her parça düğümün hemen sağına girer, sıra korunur; sol parça düğümde kalır (ayracı değişmez)
+            for (int c = cuts.Count - 1; c >= 0; c--)
+            {
+                var right = NewNode(node.Level);
+                Move(node, right, cuts[c], node.Count - cuts[c]);
+                parent.Keys.Insert(idx + 1, right.Keys[0]);
+                parent.Vals.Insert(idx + 1, new byte[8]);
+                parent.Children.Insert(idx + 1, right);
+            }
             MarkDirty(parent);
             node = parent;
         }
+    }
+
+    /// <summary>
+    /// Sığmayan (kök olmayan) düğümün yeni düğümlerin başlayacağı kayıt indeksleri. İki yarı da sığıyorsa yaklaşık ortadan tek
+    /// kesim (<see cref="SplitPoint"/>). Sığmıyorsa — büyük bir kaydın (ör. macOS'un 3–4 KB'lık satır içi xattr'ı) yanında yarılar
+    /// dengesiz düşer; 1.9.0'a dek taşık yarı kalıyor, commit "düğüm bloğa sığmıyor" ile düşüyordu — kayıtlar soldan sağa
+    /// açgözlü: her parça sığabildiği kadar kayıt alır (sıralı kayıtlar için en az parça). Sığan bir düğüme tek kayıt eklenince
+    /// (ya da kayıt büyüyünce) en çok üç parça çıkar — kaydın solu, kendisi, sağı — ve üç parça ancak kayıt düğümün yaklaşık
+    /// yarısından büyükse gerekir: <see cref="Growth"/>'ın sınırı değişmez (eklenen baytın her çeyrek düğümü bir bölünme sayar).
+    /// </summary>
+    private List<int> SplitCuts(MNode n)
+    {
+        int half = SplitPoint(n);
+        if (FitsRange(n, 0, half) && FitsRange(n, half, n.Count - half)) return [half];
+        var cuts = new List<int>();
+        for (int start = 0; start < n.Count;)
+        {
+            int end = start, bytes = 0;
+            while (end < n.Count && NodeCodec.Fits(end - start + 1, bytes + NodeCodec.RecordBytes(n, end), n.IsLeaf, _shape, isRoot: false))
+                bytes += NodeCodec.RecordBytes(n, end++);
+            if (end == start) throw new InvalidOperationException(CoreText.T("MBTree.SingleRecordTooBig"));
+            if (start > 0) cuts.Add(start);
+            start = end;
+        }
+        return cuts;
+    }
+
+    private bool FitsRange(MNode n, int start, int count)
+    {
+        int bytes = 0;
+        for (int i = start; i < start + count; i++) bytes += NodeCodec.RecordBytes(n, i);
+        return NodeCodec.Fits(count, bytes, n.IsLeaf, _shape, isRoot: false);
     }
 
     /// <summary>Bayt olarak yaklaşık ortadan böler (iki yarı da en az bir kayıt).</summary>

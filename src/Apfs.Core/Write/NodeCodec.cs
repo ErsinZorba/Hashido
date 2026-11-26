@@ -99,24 +99,32 @@ internal static class NodeCodec
         return node;
     }
 
-    private static int TocLength(MNode node, TreeShape shape) =>
+    private static int TocLength(MNode node, TreeShape shape) => TocLength(node.Count, node.IsLeaf, shape);
+
+    private static int TocLength(int count, bool leaf, TreeShape shape) =>
         shape.IsFixed
-            ? shape.FixedCapacity(node.IsLeaf) * 4
-            : (Math.Max(node.Count, 1) + TreeShape.TocIncrement - 1) / TreeShape.TocIncrement * TreeShape.TocIncrement * 8;
+            ? shape.FixedCapacity(leaf) * 4
+            : (Math.Max(count, 1) + TreeShape.TocIncrement - 1) / TreeShape.TocIncrement * TreeShape.TocIncrement * 8;
+
+    /// <summary>Kaydın düğümde kapladığı anahtar + değer baytı (içindekiler tablosu girdisi hariç).</summary>
+    public static int RecordBytes(MNode node, int i) => node.Keys[i].Length + (node.Vals[i]?.Length ?? 0);
 
     private static int DataLength(MNode node)
     {
         int sum = 0;
-        for (int i = 0; i < node.Count; i++) sum += node.Keys[i].Length + (node.Vals[i]?.Length ?? 0);
+        for (int i = 0; i < node.Count; i++) sum += RecordBytes(node, i);
         return sum;
     }
 
     /// <summary>Düğüm bir bloğa sığıyor mu (kökte 40 baytlık özet de hesaba katılır).</summary>
-    public static bool Fits(MNode node, TreeShape shape, bool isRoot)
+    public static bool Fits(MNode node, TreeShape shape, bool isRoot) => Fits(node.Count, DataLength(node), node.IsLeaf, shape, isRoot);
+
+    /// <summary><paramref name="count"/> kayıt, toplam <paramref name="dataBytes"/> anahtar + değer baytı bir düğüme sığıyor mu.</summary>
+    public static bool Fits(int count, int dataBytes, bool leaf, TreeShape shape, bool isRoot)
     {
-        if (shape.IsFixed && node.Count > shape.FixedCapacity(node.IsLeaf)) return false;
+        if (shape.IsFixed && count > shape.FixedCapacity(leaf)) return false;
         int avail = shape.BlockSize - TreeShape.HeaderSize - (isRoot ? TreeShape.FooterSize : 0);
-        return TocLength(node, shape) + DataLength(node) <= avail;
+        return TocLength(count, leaf, shape) + dataBytes <= avail;
     }
 
     /// <summary>Düğümü diskteki biçime yazar ve sağlama toplamını hesaplar.</summary>

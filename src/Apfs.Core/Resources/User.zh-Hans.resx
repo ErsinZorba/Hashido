@@ -96,6 +96,9 @@
   <data name="Gate.SystemVolume" xml:space="preserve">
     <value>"{0}" 是 macOS 系统卷、备份卷或内部卷；不会写入此磁盘。</value>
   </data>
+  <data name="Gate.TooManyFiles" xml:space="preserve">
+    <value>该磁盘中的文件和文件夹数量超出了这台电脑的内存能够安全检查的范围；未启用写入。</value>
+  </data>
   <data name="Gate.UnknownContainerFeature" xml:space="preserve">
     <value>该磁盘使用了此版本无法识别的 APFS 功能。</value>
   </data>

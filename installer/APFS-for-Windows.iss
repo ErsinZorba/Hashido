@@ -3,7 +3,7 @@
 ; WinFsp yoksa (veya 2.1'den eskiyse) içindeki resmi WinFsp kurulum paketini sessizce kurar.
 
 #ifndef AppVersion
-  #define AppVersion "1.9.0"
+  #define AppVersion "1.9.1"
 #endif
 ; Görünen ad: src/Apfs.Windows/Branding.cs ProductName ile aynı olmalı (BrandingTests). Metinler adı {#AppName} ile alır.
 #define AppName "Hashido"
@@ -286,21 +286,23 @@ end;
   (Apfs.Windows/TrayRestart.cs; değer "1,3", yazıldığı an anahtarın UTC son yazma zamanı). Setup'ın kendi oturumu yazılmaz: onun
   tepsisini sihirbazın son sayfası ya da güncellemede DeinitializeSetup açar (güncellemede hizmet önce açarsa "--updated" örneği
   tek örnek kilidine takılır, "güncellendi" balonu kaybolurdu). Güncelleme olmayan SESSİZ kurulumda ([Run] skipifsilent,
-  DeinitializeSetup açmaz) kendi oturumu da yazılır. Tepsisini kendi kapatanın oturumu listede olmaz. }
+  DeinitializeSetup açmaz) kendi oturumu da yazılır. Tepsisini kendi kapatanın oturumu listede olmaz.
+  1.9.1: tasklist'in çıktısı doğrudan alınır (ExecAndCaptureOutput); önceden cmd ile geçici klasördeki bir dosyaya
+  yönlendiriliyordu, kullanıcı adında yüzde işareti olan hesapta cmd o yolu ortam değişkeni sanıp bozabiliyordu. }
 procedure RememberTraySessions;
 var
-  Csv, List, Field: String;
+  List, Field: String;
   Lines: TArrayOfString;
+  Output: TExecOutput;
   I, Code, Session, OwnSession: Integer;
   Own: DWORD;
 begin
   RegDeleteValue(HKLM, 'SOFTWARE\{#DataDirName}', 'RestartTraySessions');
   if ProcessIdToSessionId(GetCurrentProcessId, Own) then OwnSession := Own else OwnSession := -1;
-  Csv := ExpandConstant('{tmp}\trays.csv');
   { Oturum numarası CSV'nin dördüncü alanı: "apfs-tray.exe","PID","Oturum adı","Oturum#","Bellek" }
-  if not Exec(ExpandConstant('{cmd}'), '/C ""' + ExpandConstant('{sys}\tasklist.exe') + '" /FI "IMAGENAME eq apfs-tray.exe" /FO CSV /NH > "' +
-    Csv + '""', '', SW_HIDE, ewWaitUntilTerminated, Code) then Exit;
-  if not LoadStringsFromFile(Csv, Lines) then Exit;
+  if not ExecAndCaptureOutput(ExpandConstant('{sys}\tasklist.exe'), '/FI "IMAGENAME eq apfs-tray.exe" /FO CSV /NH', '', SW_HIDE,
+    ewWaitUntilTerminated, Code, Output) then Exit;
+  Lines := Output.StdOut;
   List := '';
   for I := 0 to GetArrayLength(Lines) - 1 do
   begin

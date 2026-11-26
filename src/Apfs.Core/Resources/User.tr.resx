@@ -96,6 +96,9 @@
   <data name="Gate.SystemVolume" xml:space="preserve">
     <value>"{0}" bir macOS sistem, yedek veya iç birimi; bu diske yazılmaz.</value>
   </data>
+  <data name="Gate.TooManyFiles" xml:space="preserve">
+    <value>Diskteki dosya ve klasör sayısı, bu bilgisayarın belleğinin güvenle denetleyebileceğinden fazla; yazmaya açılmadı.</value>
+  </data>
   <data name="Gate.UnknownContainerFeature" xml:space="preserve">
     <value>Disk, bu sürümün tanımadığı bir APFS özelliği kullanıyor.</value>
   </data>

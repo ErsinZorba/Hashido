@@ -27,7 +27,7 @@ Plug the disk in and within a few seconds it shows up in File Explorer with a dr
 | 10 interface languages | English, Türkçe, Deutsch, Français, Español, Português (Brasil), Italiano, 日本語, 简体中文, 한국어 |
 
 ## Installation
-Run `Hashido-Setup-1.9.0.exe` and follow the wizard (Next › Install › Finish). Windows 10/11 (64-bit) is all you need;
+Run `Hashido-Setup-1.9.1.exe` and follow the wizard (Next › Install › Finish). Windows 10/11 (64-bit) is all you need;
 nothing else has to be installed: .NET comes with the program, and if the [WinFsp](https://winfsp.dev) driver is missing the wizard
 installs it too. After installation, **Hashido** is in the Start menu and the tray icon starts automatically at every sign-in.
 
@@ -184,11 +184,13 @@ repair, formatting; snapshots and the Time Machine structure; Fusion Drive; the 
 HFS+; hardware encryption of Apple Silicon/T2 internal disks.
 
 ## Privacy
-Last updated: 2026-11-17. This statement is binding in English; translations are for information only. The same text is in [worker/PRIVACY.md](worker/PRIVACY.md).
+Last updated: 2026-11-25. This statement is binding in English; translations are for information only. The same text is in [worker/PRIVACY.md](worker/PRIVACY.md).
 
 **Automatic reports are off until you say yes.** The first time the program starts it asks once whether it may send anonymous
 reports. Until you answer "Yes, send", nothing is collected or sent. You can change your choice at any time in **Settings**;
-turning reports off also deletes the reports on your computer that have not been sent yet.
+turning reports off also deletes the reports on your computer that have not been sent yet. On a computer with several Windows
+accounts each account's choice counts: reports are collected only while no account that used the program in the last 30 days
+has answered "No" — one account's "No" stops them for every account.
 
 **What is sent and why.** Reports describe errors, crashes and successful operations (connecting a disk, unlocking, enabling
 writing, a writing session, safely ejecting). They help find bugs and show which disks and situations cause problems, especially
@@ -213,7 +215,9 @@ not sold, not used for advertising and not shared with anyone else.
 
 **On your computer.** Reports waiting to be sent are kept in `%ProgramData%\APFS for Windows\reports\` (at most 200) and, for
 the tray program's own crash reports, in `%LOCALAPPDATA%\APFS for Windows\reports\`. The last 20 reports sent are shown, exactly
-as sent, under **Settings › Show what was sent**.
+as sent, under **Settings › Show what was sent**. The program's log (`%ProgramData%\APFS for Windows\log.txt`, shown by
+"Open log") is never sent, but every account on this computer can read it; it contains the names of the disks and volumes that
+were connected and, when something goes wrong with a file, that file's name.
 
 **Your rights.** Because reports contain no identifier, nobody (including the developer) can tell which reports came from you,
 so individual reports cannot be found or deleted on request. Turning reports off stops all future reports.

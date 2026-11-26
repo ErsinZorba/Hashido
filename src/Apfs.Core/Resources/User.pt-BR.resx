@@ -96,6 +96,9 @@
   <data name="Gate.SystemVolume" xml:space="preserve">
     <value>"{0}" é um volume do sistema, de backup ou interno do macOS; não é feita gravação neste disco.</value>
   </data>
+  <data name="Gate.TooManyFiles" xml:space="preserve">
+    <value>O disco contém mais arquivos e pastas do que a memória deste computador permite verificar com segurança; a gravação não foi ativada.</value>
+  </data>
   <data name="Gate.UnknownContainerFeature" xml:space="preserve">
     <value>O disco usa um recurso do APFS que esta versão não reconhece.</value>
   </data>

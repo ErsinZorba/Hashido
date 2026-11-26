@@ -504,19 +504,27 @@ public sealed class WriteSession : IDisposable
         _cp = written;
     }
 
-    /// <summary>Aygıta ulaşılamadı (okuma/yazma G/Ç hatası, aygıt kapatıldı) — verinin kendisiyle ilgili bir sorun değil.</summary>
+    /// <summary>
+    /// Aygıta ulaşılamadı (okuma/yazma G/Ç hatası, aygıt kapatıldı, Windows ham yazmayı engelledi — <c>RawDiskWriter</c>'ın AccessDenied'i;
+    /// 1.9.1) — verinin kendisiyle ilgili bir sorun değil.
+    /// </summary>
     private static bool IsDeviceFailure(Exception e) =>
-        e is IOException or ObjectDisposedException or UnauthorizedAccessException || e is ApfsException { Code: ApfsErrorCode.IoError };
+        e is IOException or ObjectDisposedException or UnauthorizedAccessException
+        || e is ApfsException { Code: ApfsErrorCode.IoError or ApfsErrorCode.AccessDenied };
 
-    /// <summary>Oturumu kapatır: açık işlem kalıcı yapılır, blok 0'a süper blok kopyası yazılır (diskin "düzgün kapatıldı" işareti).</summary>
+    /// <summary>
+    /// Oturumu kapatır: kaydedilmemiş değişiklik varsa açık işlem kalıcı yapılır, blok 0'a süper blok kopyası yazılır (diskin
+    /// "düzgün kapatıldı" işareti).
+    /// </summary>
     public void Close()
     {
         if (_closed) return;
         ThrowIfFaulted();
-        // Doğrulanamamış son commit'ten beri değişiklik yoksa kaydedilecek bir şey yok: yeniden commit (blok ayırır, doğrulama
-        // ister) yapılmaz, son commit diskteki son hâldir. Son commit hâlâ doğrulanamıyorsa blok 0'a "düzgün kapatıldı"
-        // işareti yazılmaz (uyarı commit'te günlüğe gitti; macOS sonraki bağlamada checkpoint'leri kendisi tarar).
-        if (_unverifiedXid == 0 || HasUncommittedChanges) Commit();
+        // Son commit'ten beri değişiklik yoksa kaydedilecek bir şey yok (1.9.1): commit yapılmaz (önceden boş bir commit daha
+        // yazılıyordu), aygıta yalnız blok 0 gider. Doğrulanamamış son commit varsa yalnız yeniden okunur; hâlâ doğrulanamıyorsa
+        // blok 0'a "düzgün kapatıldı" işareti yazılmaz (uyarı commit'te günlüğe gitti; macOS sonraki bağlamada checkpoint'leri
+        // kendisi tarar).
+        if (HasUncommittedChanges) Commit();
         if (!TryVerifyLastCommit(out _))
         {
             _closed = true;

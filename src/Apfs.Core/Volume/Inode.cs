@@ -63,7 +63,7 @@ public sealed class Inode
                 switch (type)
                 {
                     case InodeXField.Name:
-                        name = Bin.Utf8Z(data);
+                        name = Bin.Utf8NameZ(data);
                         break;
                     case InodeXField.Dstream when data.Length >= 16:
                         size = Bin.U64(data, 0);

@@ -10,19 +10,23 @@ namespace Apfs.Mount;
 /// </summary>
 public sealed class ApfsWritableMount : IDisposable
 {
-    private readonly FileSystemHost _host;
+    private readonly Action _unmount;
     private readonly WriteSession _session;
     private readonly bool _closeSession;
     private bool _disposed;
 
-    private ApfsWritableMount(FileSystemHost host, ApfsWritableFileSystem fs, WriteSession session, string mountPoint, bool closeSession)
+    private ApfsWritableMount(Action unmount, ApfsWritableFileSystem fs, WriteSession session, string mountPoint, bool closeSession)
     {
-        _host = host;
+        _unmount = unmount;
         _session = session;
         _closeSession = closeSession;
         FileSystem = fs;
         MountPoint = mountPoint;
     }
+
+    /// <summary>Testler: WinFsp'siz; ayırma <paramref name="unmount"/> (ör. atan) ile.</summary>
+    internal static ApfsWritableMount ForTest(ApfsWritableFileSystem fs, WriteSession session, Action unmount, bool closeSession = true) =>
+        new(unmount, fs, session, "T:", closeSession);
 
     public ApfsWritableFileSystem FileSystem { get; }
     public string MountPoint { get; }
@@ -57,17 +61,23 @@ public sealed class ApfsWritableMount : IDisposable
             fs.Dispose();
             throw;
         }
-        return new ApfsWritableMount(host, fs, session, host.MountPoint(), closeSession);
+        return new ApfsWritableMount(() => { host.Unmount(); host.Dispose(); }, fs, session, host.MountPoint(), closeSession);
     }
 
-    /// <summary>Ayırır ve oturumu kapatır (son değişiklikler kalıcı olur, disk "düzgün kapatıldı" işaretlenir).</summary>
+    /// <summary>
+    /// Ayırır ve oturumu kapatır (son değişiklikler kalıcı olur, disk "düzgün kapatıldı" işaretlenir). Ayırma atsa da sürücünün
+    /// zamanlayıcısı durur ve oturum kapanır (1.9.1; önceden ikisi de atlanıyor, oturum açık kalıyordu); ayırmanın istisnası
+    /// yine çağırana gider. Sürücü sonradan çağrı alırsa durdurulmuş sürücü olarak reddeder (bkz. <see cref="ApfsWritableFileSystem"/>).
+    /// </summary>
     public void Dispose()
     {
         if (_disposed) return;
         _disposed = true;
-        _host.Unmount();
-        _host.Dispose();
-        FileSystem.Dispose();
-        if (_closeSession) _session.Close();
+        try { _unmount(); }
+        finally
+        {
+            try { FileSystem.Dispose(); }
+            finally { if (_closeSession) _session.Close(); }
+        }
     }
 }

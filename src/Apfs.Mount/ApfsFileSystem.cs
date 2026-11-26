@@ -166,7 +166,7 @@ public sealed class ApfsFileSystem : FileSystemBase
         volumeInfo = default;
         volumeInfo.TotalSize = (ulong)_totalBytes;
         volumeInfo.FreeSize = (ulong)_freeBytes;
-        volumeInfo.SetVolumeLabel(_volume.Name.Length > 32 ? _volume.Name[..32] : _volume.Name);
+        volumeInfo.SetVolumeLabel(Apfs.Util.TextClamp.Prefix(_volume.Name, 32)); // Windows etiket sınırı; vekil çifti bölünmez
         return StatusSuccess;
     }
 
@@ -335,7 +335,7 @@ public sealed class ApfsFileSystem : FileSystemBase
             return StatusObjectNameNotFound;
         }
         var child = MakeNode(_volume.GetInode(entry.FileId), entry.Name);
-        normalizedName = SameLengthOrNull(WindowsNameMap.Display(dir, entry), fileName);
+        normalizedName = SameLengthOrNull(WindowsPath.Shown(dir, entry, fileName), fileName);
         fileInfo = child.Info;
         return StatusSuccess;
     }

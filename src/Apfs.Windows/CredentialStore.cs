@@ -4,6 +4,9 @@ using System.Text;
 
 namespace Apfs.Windows;
 
+/// <summary>Kasadan okumanın sonucu (1.9.1): kayıt var, kayıt yok (Windows: 1168 ERROR_NOT_FOUND) ya da okunamadı (başka hata).</summary>
+public enum CredentialRead { Found, Missing, Failed }
+
 /// <summary>Hatırlanan bir birim (parolasız: liste yalnız ad ve UUID taşır).</summary>
 public sealed record RememberedVolume(string Uuid, string Name);
 
@@ -61,16 +64,48 @@ public sealed class CredentialStore(string prefix)
         }
     }
 
-    /// <summary>Kayıtlı parola; kayıt yoksa (ya da okunamıyorsa) null.</summary>
-    public string? TryRead(string uuid)
+    /// <summary>Kayıtlı parola; kayıt yoksa (ya da okunamıyorsa) null. Ayrım gerekiyorsa <see cref="Read"/>.</summary>
+    public string? TryRead(string uuid) => Read(uuid, out var password) == CredentialRead.Found ? password : null;
+
+    /// <summary>
+    /// Kayıtlı parolayı okur ve "kayıt yok"u okuma hatasından ayırır (1.9.1): tepsi hata hâlinde kaydı var sayar (kutu işaretli),
+    /// yoksa elle açışta işaretsiz kutu var olan kaydı siliyordu. Hata kodu <paramref name="error"/>'da (günlük için).
+    /// </summary>
+    public CredentialRead Read(string uuid, out string? password) => Read(uuid, out password, out _);
+
+    /// <inheritdoc cref="Read(string, out string?)"/>
+    public CredentialRead Read(string uuid, out string? password, out int error)
     {
         string target = Target(uuid);
-        lock (Gate) return ReadLocked(target);
+        password = null;
+        if (TestReadError is { } fault)
+        {
+            error = fault;
+            return fault == ErrorNotFound ? CredentialRead.Missing : CredentialRead.Failed;
+        }
+        lock (Gate) return ReadLocked(target, out password, out error);
     }
 
-    private static string? ReadLocked(string target)
+    /// <summary>Test kancası: verilirse okuma bu Windows hata koduyla düşer (1168 = kayıt yok). Yalnız bu örnekte.</summary>
+    internal int? TestReadError { get; set; }
+
+    private const int ErrorNotFound = 1168;
+
+    private static CredentialRead ReadLocked(string target, out string? password, out int error)
     {
-        if (!CredRead(target, CredTypeGeneric, 0, out IntPtr p)) return null;
+        password = null;
+        error = 0;
+        if (!CredRead(target, CredTypeGeneric, 0, out IntPtr p))
+        {
+            error = Marshal.GetLastWin32Error();
+            return error == ErrorNotFound ? CredentialRead.Missing : CredentialRead.Failed;
+        }
+        password = ReadBlob(p);
+        return password is null ? CredentialRead.Missing : CredentialRead.Found;
+    }
+
+    private static string? ReadBlob(IntPtr p)
+    {
         try
         {
             var c = Marshal.PtrToStructure<Credential>(p);

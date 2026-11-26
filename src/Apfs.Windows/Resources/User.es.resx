@@ -374,6 +374,9 @@
   <data name="Settings.ReportsHeading" xml:space="preserve">
     <value>Informes automáticos</value>
   </data>
+  <data name="Settings.SaveFailed" xml:space="preserve">
+    <value>No se pudo guardar parte de la configuración y es posible que no se conserve. Inténtelo de nuevo más tarde.</value>
+  </data>
   <data name="Settings.ShowSent" xml:space="preserve">
     <value>Mostrar lo enviado</value>
   </data>
@@ -462,7 +465,7 @@
     <value>Versión {0} disponible</value>
   </data>
   <data name="Update.Ready" xml:space="preserve">
-    <value>{0} {1} está listo. Haga clic aquí y elija "Instalar".</value>
+    <value>{0} {1} está listo. Haga clic aquí y luego instálelo desde el enlace de la parte inferior.</value>
   </data>
   <data name="Update.Updated" xml:space="preserve">
     <value>{0} se actualizó a la versión {1}.</value>

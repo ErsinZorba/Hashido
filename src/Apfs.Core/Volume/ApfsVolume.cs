@@ -5,7 +5,7 @@ using Apfs.Util;
 namespace Apfs.Volume;
 
 /// <summary>APFS birimi (apfs_superblock_t) ve dosya sistemi ağacı üzerinde salt okunur işlemler.</summary>
-public sealed class ApfsVolume
+public sealed class ApfsVolume : IDisposable
 {
     private readonly ApfsContainer _container;
     private readonly ObjectMap _omap;
@@ -69,10 +69,26 @@ public sealed class ApfsVolume
             Crypto = new Apfs.Crypto.VolumeCrypto(Apfs.Crypto.VolumeKeys.Unlock(container, Uuid, password), container.BlockSize);
         }
 
-        _omap = new ObjectMap(container.Reader, OmapOid);
-        var (rootPaddr, rootEncrypted) = ResolveVirtual(RootTreeOid);
-        _fsTree = new BTree.BTree(container.Reader, rootPaddr, ApfsConstants.TypeFsTree, ResolveVirtual, rootEncrypted, Crypto);
+        try
+        {
+            _omap = new ObjectMap(container.Reader, OmapOid);
+            var (rootPaddr, rootEncrypted) = ResolveVirtual(RootTreeOid);
+            _fsTree = new BTree.BTree(container.Reader, rootPaddr, ApfsConstants.TypeFsTree, ResolveVirtual, rootEncrypted, Crypto);
+        }
+        catch
+        {
+            Crypto?.Dispose(); // açılamayan birimin şifreleyicisi bellekte kalmasın
+            throw;
+        }
     }
+
+    /// <summary>
+    /// Şifreli birimin şifreleyicisini (VEK'ten türetilmiş AES anahtarları) atar — 1.9.1; önceden GC'ye dek bellekte kalıyordu
+    /// ("anahtar bellekte kalmasın" amacına ters). Birimi açan atar: salt okunur sürücü ayrılınca (<c>ApfsMount</c>), yazma oturumu
+    /// biterken oturumun görüntüsü (<c>VolumeWriter.ReleaseKey</c>), tam denetim ve komut satırı işi bitince. Atıldıktan sonra şifreli
+    /// düğüm ve veri okunamaz. Şifresiz birimde etkisiz; birden çok çağrı zararsız.
+    /// </summary>
+    public void Dispose() => Crypto?.Dispose();
 
     /// <summary>Süren şifreleme dönüşümü (macOS birimi şifrelerken yarıda kaldıysa); yoksa null.</summary>
     public EncryptionRolling? Rolling { get; }
@@ -213,8 +229,8 @@ public sealed class ApfsVolume
     internal static string DrecKeyName(byte[] key)
     {
         int hashedLen = (int)(Bin.U32(key, 8) & 0x3FF);
-        if (12 + hashedLen == key.Length) return Bin.Utf8Z(Bin.Slice(key, 12, hashedLen));
-        return Bin.Utf8Z(Bin.Slice(key, 10, Bin.U16(key, 8)));
+        if (12 + hashedLen == key.Length) return Bin.Utf8NameZ(Bin.Slice(key, 12, hashedLen));
+        return Bin.Utf8NameZ(Bin.Slice(key, 10, Bin.U16(key, 8)));
     }
 
     /// <summary>Yazıcı bir kaydı değiştirdiğinde: ilgili önbellek girdisini düşürür.</summary>
@@ -274,7 +290,7 @@ public sealed class ApfsVolume
         {
             int hashedLen = (int)(Bin.U32(e.Key, 8) & 0x3FF);
             if (12 + hashedLen != e.Key.Length) continue;
-            yield return (Bin.Utf8Z(Bin.Slice(e.Key, 12, hashedLen)), Bin.U32(e.Key, 8) >> 10);
+            yield return (Bin.Utf8NameZ(Bin.Slice(e.Key, 12, hashedLen)), Bin.U32(e.Key, 8) >> 10);
         }
     }
 
@@ -297,9 +313,9 @@ public sealed class ApfsVolume
         int hashedLen = (int)(Bin.U32(key, 8) & 0x3FF);
         int plainLen = Bin.U16(key, 8);
         if (12 + hashedLen == key.Length)
-            name = Bin.Utf8Z(Bin.Slice(key, 12, hashedLen));
+            name = Bin.Utf8NameZ(Bin.Slice(key, 12, hashedLen));
         else if (10 + plainLen == key.Length)
-            name = Bin.Utf8Z(Bin.Slice(key, 10, plainLen));
+            name = Bin.Utf8NameZ(Bin.Slice(key, 10, plainLen));
         else
             throw ApfsException.Corrupt(CoreText.T("Volume.DirEntryKeyLength"));
         if (val.Length < 18) throw ApfsException.Corrupt(CoreText.T("Volume.DirEntryValueShort"));
@@ -413,7 +429,7 @@ public sealed class ApfsVolume
         if (inode.IsCompressed)
             return Compression.Decmpfs.Open(this, inode);
         var extents = inode.HasDataStream ? GetExtents(inode.PrivateId) : [];
-        return new FileDataReader(this, extents, inode.DataSize, inode.PrivateId, (inode.InternalFlags & Inode.InternalIsSparse) != 0);
+        return new FileDataReader(this, extents, inode.DataSize, inode.PrivateId);
     }
 
     /// <summary>

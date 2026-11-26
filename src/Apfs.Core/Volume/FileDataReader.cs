@@ -2,27 +2,24 @@ namespace Apfs.Volume;
 
 /// <summary>
 /// Bir veri akışını extent listesi üzerinden okur. İş parçacığı güvenlidir (durum tutmaz).
-/// Extent'ler arasındaki boşluklar ve PhysBlock = 0 olan extent'ler seyrek alandır ve sıfır döner. Seyrek OLMAYAN akışta son
-/// extent'in ötesi okunamaz (Corrupt): macOS ve yazıcımız seyrek dosyanın deliklerini de extent olarak yazar ve INODE_IS_SPARSE
-/// koyar; boyu ayrılandan büyük seyrek olmayan dosya bozuktur (önceden sonsuz sıfır okunuyordu).
+/// Extent'ler arasındaki boşluklar ve PhysBlock = 0 olan extent'ler seyrek alandır ve sıfır döner. Son extent'in ötesi okunamaz
+/// (Corrupt), seyrek akışta da: macOS ve yazıcımız seyrek dosyanın deliklerini (sondakini de) extent olarak yazar (Mac görüntülerinde
+/// seyrek boy = kaplanan); boyu ayrılandan büyük dosya bozuktur (önceden sonsuz sıfır okunuyordu; INODE_IS_SPARSE + dev boy da).
 /// </summary>
 public sealed class FileDataReader : IDataReader
 {
     private readonly ApfsVolume _volume;
     private readonly FileExtent[] _extents;
     private readonly ulong _streamId;
-    private readonly bool _sparse;
 
     /// <param name="extents">Mantıksal ofsete göre sıralı extent'ler. Dizi paylaşılabilir (önbellek); değiştirilmez.</param>
     /// <param name="streamId">Veri akışının kimliği (extent anahtarlarındaki nesne kimliği); şifreleme dönüşümü sürerken yarıda
     /// kalan akışı tanımak için (<see cref="ApfsVolume.Rolling"/>).</param>
-    /// <param name="sparse">Akış seyrek mi (dosyanın INODE_IS_SPARSE bayrağı); değilse son extent'in ötesi okunamaz.</param>
-    public FileDataReader(ApfsVolume volume, FileExtent[] extents, ulong size, ulong streamId = 0, bool sparse = false)
+    public FileDataReader(ApfsVolume volume, FileExtent[] extents, ulong size, ulong streamId = 0)
     {
         _volume = volume;
         _extents = extents;
         _streamId = streamId;
-        _sparse = sparse;
         Length = size;
         ulong prevEnd = 0;
         foreach (var e in _extents)
@@ -38,7 +35,7 @@ public sealed class FileDataReader : IDataReader
 
     public ulong Length { get; }
 
-    /// <summary>Extent'lerin kapladığı uzunluk (son extent'in sonu); seyrek olmayan akışta okunabilen en çok bayt.</summary>
+    /// <summary>Extent'lerin kapladığı uzunluk (son extent'in sonu); okunabilen en çok bayt.</summary>
     public ulong CoveredLength { get; }
 
     /// <summary><paramref name="offset"/>'ten başlayarak okur; dosya sonunda kısalır. Okunan bayt sayısını döndürür.</summary>
@@ -46,7 +43,7 @@ public sealed class FileDataReader : IDataReader
     {
         if (offset >= Length) return 0;
         int toRead = (int)Math.Min((ulong)buffer.Length, Length - offset);
-        if (!_sparse && offset + (ulong)toRead > CoveredLength)
+        if (offset + (ulong)toRead > CoveredLength)
             throw ApfsException.Corrupt(CoreText.T("Volume.DataBeyondAllocation", Length, CoveredLength));
         buffer = buffer[..toRead];
         uint bs = _volume.Reader.BlockSize;

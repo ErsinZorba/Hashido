@@ -16,19 +16,39 @@ public static class UserSettings
     private const string UpdateNotifiedValue = "UpdateNotified";   // metin, en son bildirilen sürüm ("1.4.0")
     private const string UpdateUrlValue = "UpdateUrl";             // metin, o sürümün Release sayfası
 
-    /// <summary>Otomatik raporlama onayı: true/false, cevaplanmadıysa null (o hâlde hiçbir şey toplanmaz ve gönderilmez).</summary>
+    /// <summary>
+    /// Otomatik raporlama onayı: true/false, cevaplanmadıysa null (o hâlde hiçbir şey toplanmaz ve gönderilmez). Yazılamazsa
+    /// (1.9.1) seçilen değer bu süreç boyunca yine geçerlidir (hizmete o gider; kayıttaki eski değer geri okunmaz): "Hayır" diyen
+    /// kullanıcının raporları, kayıt defteri yazılamadı diye gönderilmeye devam etmesin.
+    /// </summary>
     public static bool? ReportsConsent
     {
-        get => ReadInt(ReportsValue) is int v ? v != 0 : null;
-        set => Write(ReportsValue, value is null ? null : value.Value ? 1 : 0);
+        get => _consentUnsaved ? _consentThisRun : ReadInt(ReportsValue) is int v ? v != 0 : null;
+        set => SetReportsConsent(value);
+    }
+
+    private static bool _consentUnsaved;
+    private static bool? _consentThisRun;
+
+    /// <inheritdoc cref="ReportsConsent"/>
+    /// <returns>Kayda yazıldı.</returns>
+    public static bool SetReportsConsent(bool? value)
+    {
+        bool ok = Write(ReportsValue, value is null ? null : value.Value ? 1 : 0);
+        _consentThisRun = value;
+        _consentUnsaved = !ok;
+        return ok;
     }
 
     /// <summary>"Yeni sürüm var" bildirimi (varsayılan açık).</summary>
     public static bool UpdateNotify
     {
         get => ReadInt(UpdateNotifyValue) is not 0;
-        set => Write(UpdateNotifyValue, value ? 1 : 0);
+        set => SetUpdateNotify(value);
     }
+
+    /// <returns>Kayda yazıldı (1.9.1: Ayarlar kaydedilemeyeni söyler).</returns>
+    public static bool SetUpdateNotify(bool value) => Write(UpdateNotifyValue, value ? 1 : 0);
 
     public static DateTime? UpdateLastCheckUtc
     {
@@ -59,8 +79,11 @@ public static class UserSettings
     public static bool UpdateAutoInstall
     {
         get => ReadInt(UpdateAutoInstallValue) is not 0;
-        set => Write(UpdateAutoInstallValue, value ? 1 : 0);
+        set => SetUpdateAutoInstall(value);
     }
+
+    /// <returns>Kayda yazıldı.</returns>
+    public static bool SetUpdateAutoInstall(bool value) => Write(UpdateAutoInstallValue, value ? 1 : 0);
 
     /// <summary>Kendiliğinden kurulumu reddedilen (izin verilmedi, setup hata verdi) ya da uygulanamayan son sürüm.</summary>
     public static string? UpdateDeclinedVersion
@@ -94,8 +117,12 @@ public static class UserSettings
     public static NotificationMode Notifications
     {
         get => ParseNotifications(ReadString(NotificationsValue));
-        set => Write(NotificationsValue, value switch { NotificationMode.Important => "important", NotificationMode.Off => "off", _ => "all" });
+        set => SetNotifications(value);
     }
+
+    /// <returns>Kayda yazıldı.</returns>
+    public static bool SetNotifications(NotificationMode value) =>
+        Write(NotificationsValue, value switch { NotificationMode.Important => "important", NotificationMode.Off => "off", _ => "all" });
 
     private static NotificationMode ParseNotifications(string? s) => s?.Trim().ToLowerInvariant() switch
     {
@@ -123,15 +150,21 @@ public static class UserSettings
     public static AppDesign Design
     {
         get => ParseDesign(ReadString(DesignValue));
-        set => Write(DesignValue, value == AppDesign.Windows ? "windows" : "brand");
+        set => SetDesign(value);
     }
+
+    /// <returns>Kayda yazıldı (yazılamadıysa tasarım için yeniden başlamak boşunadır).</returns>
+    public static bool SetDesign(AppDesign value) => Write(DesignValue, value == AppDesign.Windows ? "windows" : "brand");
 
     /// <summary>Tepsinin teması (1.6.0): Windows'a uy (varsayılan), açık ya da koyu. Bilinmeyen değer → Windows'a uy.</summary>
     public static ThemeMode ThemeMode
     {
         get => ParseTheme(ReadString(ThemeValue));
-        set => Write(ThemeValue, value switch { ThemeMode.Light => "light", ThemeMode.Dark => "dark", _ => "system" });
+        set => SetThemeMode(value);
     }
+
+    /// <returns>Kayda yazıldı.</returns>
+    public static bool SetThemeMode(ThemeMode value) => Write(ThemeValue, value switch { ThemeMode.Light => "light", ThemeMode.Dark => "dark", _ => "system" });
 
     /// <summary>
     /// <see cref="Design"/>'ı okur; false = kayıt OKUNAMADI (değer yoksa true + varsayılan). Çalışırken tema yeniden başlaması
@@ -206,9 +239,13 @@ public static class UserSettings
 
     private static string? ReadString(string name) => Read(name) as string;
 
+    /// <summary>Test kancası: değer adı için true dönerse yazma kayıt defteri hatası gibi başarısız olur (dil seçimi: "Language").</summary>
+    internal static Func<string, bool>? WriteFault { get; set; }
+
     /// <returns>Yazıldı (yetki/G/Ç hatası sessizce yutulur: false).</returns>
     private static bool Write(string name, object? value)
     {
+        if (WriteFault?.Invoke(name) == true) return false;
         try
         {
             using var key = Registry.CurrentUser.CreateSubKey(LanguageSetting.KeyPath);

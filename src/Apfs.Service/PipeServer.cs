@@ -13,7 +13,9 @@ internal sealed class PipeServer(MountManager manager, ReportRecorder reports) :
 {
     private readonly CancellationTokenSource _cts = new();
     private readonly ReportLease _lease = new();
+    private readonly RecentKeys _configLogged = new(); // reports-config günlük satırı: hesap başına 10 dk'da bir (kilit: kendisi)
     private Task? _loop;
+    private int _devFaulted;
 
     public void Start() => _loop = Task.Run(() => LoopAsync(_cts.Token));
 
@@ -26,6 +28,7 @@ internal sealed class PipeServer(MountManager manager, ReportRecorder reports) :
     {
         System.IO.Pipes.NamedPipeServerStream? listening = null;
         bool first = true, takenLogged = false;
+        int served = 0;
         try
         {
             while (!ct.IsCancellationRequested)
@@ -37,6 +40,10 @@ internal sealed class PipeServer(MountManager manager, ReportRecorder reports) :
                         listening = PipeProtocol.CreateServer(firstInstance: first);
                         first = false;
                     }
+                    // Yalnız geliştirme (konsol) kipi: ilk bağlantıdan sonraki beklemede bir kez genel hata (genel yolu sınamak için)
+                    if (served == 1 && ServiceLog.EchoToConsole && Environment.GetEnvironmentVariable("APFS_DEV_PIPE_FAULT_ONCE") == "1"
+                        && Interlocked.Exchange(ref _devFaulted, 1) == 0)
+                        throw new InvalidOperationException("APFS_DEV_PIPE_FAULT_ONCE");
                     try { await listening.WaitForConnectionAsync(ct); }
                     catch (IOException) when (!ct.IsCancellationRequested)
                     {
@@ -51,6 +58,7 @@ internal sealed class PipeServer(MountManager manager, ReportRecorder reports) :
                     }
                     var connected = listening;
                     listening = null;
+                    served++;
                     try { listening = PipeProtocol.CreateServer(); }
                     finally { _ = Task.Run(() => HandleAsync(connected, ct), ct); }
                 }
@@ -64,9 +72,15 @@ internal sealed class PipeServer(MountManager manager, ReportRecorder reports) :
                 catch (Exception e)
                 {
                     ServiceLog.Write(WinText.T("Svc.PipeError", e.Message));
-                    listening?.Dispose();
+                    // Yeni örnek beklemeden ve eskisi atılmadan ÖNCE açılır (1.9.1): önceden örnek atılıyor, ad 1 sn boş kalıyordu
+                    // (o arada adı başka bir süreç kapabilirdi). İlk örnek hiç açılmadıysa (ad başkasındaydı) ek örnek AÇILMAZ.
+                    var broken = listening;
                     listening = null;
-                    await Task.Delay(1000, ct).ContinueWith(_ => { }, TaskScheduler.Default);
+                    if (!first)
+                        try { listening = PipeProtocol.CreateServer(); }
+                        catch (Exception again) { ServiceLog.Write(WinText.T("Svc.PipeError", again.Message)); } // döngü hiç durmaz
+                    broken?.Dispose();
+                    if (listening is null) await Task.Delay(1000, ct).ContinueWith(_ => { }, TaskScheduler.Default);
                 }
             }
         }
@@ -93,12 +107,16 @@ internal sealed class PipeServer(MountManager manager, ReportRecorder reports) :
                     "status" => manager.Status(req.Since),
                     "unlock" when req.Disk is not null && req.Password is not null =>
                         await manager.UnlockAsync(req.Disk, req.Container, req.Volume, req.Password, CallerOf(server)),
-                    "rescan" => await Task.Run(() => { manager.ForgetReleased(); manager.Rescan(); return new UnlockResponse(true, WinText.T("Svc.Rescanned")); }, ct),
+                    "rescan" => await RescanAsync(ct),
                     "eject" when req.Disk is not null => await Task.Run(() => manager.Eject(req.Disk, req.Force), ct),
                     "set-writable" when req.Disk is not null => await Task.Run(() => manager.SetWritable(req.Disk, req.Container, req.Enable, req.Force), ct),
                     "reports-pull" => PullReports(req.ReportAfter, req.ReportLease),
                     "reports-ack" => Ack(req.ReportAfter, req.ReportLease),
-                    "reports-config" => Configure(req.Enable),
+                    "reports-config" => Configure(req.Enable, CallerOf(server)),
+                    // Yalnız geliştirme modu (--image; testler): uyku/uyanış ve kimlik okuma hatası taklidi. Kurulu hizmette "bilinmeyen istek".
+                    "dev-power" when manager.IsDevelopment =>
+                        await Task.Run(() => { manager.DevPower(req.Enable); return new UnlockResponse(true, ""); }, ct),
+                    "dev-identity-fail" when manager.IsDevelopment => DevIdentityFail(req.Volume),
                     _ => new UnlockResponse(false, WinText.T("Svc.UnknownRequest")),
                 };
                 using var writeTimeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
@@ -114,6 +132,23 @@ internal sealed class PipeServer(MountManager manager, ReportRecorder reports) :
                 ServiceLog.Write(WinText.T("Svc.RequestFailed", e.GetType().Name, e.Message));
             }
         }
+    }
+
+    private UnlockResponse DevIdentityFail(int count)
+    {
+        manager.DevIdentityFail(count);
+        return new UnlockResponse(true, "");
+    }
+
+    /// <summary>
+    /// "Yeniden tara": ayrılmış diskler ve yanıtsız listesi unutulur, sonra istekten sonra başlayan birleşik tarama beklenir (1.9.1;
+    /// <see cref="MountManager.RescanAsync"/>: eşzamanlı istekler tek taramayı paylaşır, havuzda iş parçacığı bekletilmez).
+    /// </summary>
+    private async Task<UnlockResponse> RescanAsync(CancellationToken ct)
+    {
+        manager.ForgetReleased();
+        await manager.RescanAsync().WaitAsync(ct);
+        return new UnlockResponse(true, WinText.T("Svc.Rescanned"));
     }
 
     /// <summary>
@@ -153,7 +188,8 @@ internal sealed class PipeServer(MountManager manager, ReportRecorder reports) :
 
     /// <summary>
     /// Kanaldaki istemcinin hesabı (SID): parola denemesi sınırının sayacı hesap başınadır, başka hesap sahibini bekletemez.
-    /// Öğrenilemezse (istemci kimliğini vermeyen anonim düzeyle bağlandıysa) "?" — bu istemciler ortak sayaçtadır.
+    /// Öğrenilemezse (istemci kimliğini vermeyen anonim düzeyle bağlandıysa) <see cref="MountManager.AnonymousCaller"/>: böyle
+    /// istemcinin kilit açması ve rapor ayarı reddedilir/yok sayılır (1.9.1).
     /// </summary>
     private static string CallerOf(NamedPipeServerStream server)
     {
@@ -166,12 +202,17 @@ internal sealed class PipeServer(MountManager manager, ReportRecorder reports) :
                 {
                     using var id = WindowsIdentity.GetCurrent(ifImpersonating: true);
                     sid = id?.User?.Value;
+                    // Yalnız geliştirme (konsol) kipi: testler tek kullanıcıyla koşar; bürünme düzeyi veren istemci "başka hesap"
+                    // sayılır (ürünün istemcileri Identification verir)
+                    if (sid is not null && ServiceLog.EchoToConsole && id!.ImpersonationLevel == TokenImpersonationLevel.Impersonation
+                        && Environment.GetEnvironmentVariable("APFS_DEV_CALLER_BY_LEVEL") == "1")
+                        sid += "#dev-other";
                 }
                 catch (Exception) { } // anonim düzeyde belirteç açılamaz
             });
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidOperationException) { }
-        return sid ?? "?";
+        return sid ?? MountManager.AnonymousCaller;
     }
 
     private const uint NoConsoleSession = 0xFFFFFFFF;
@@ -183,9 +224,13 @@ internal sealed class PipeServer(MountManager manager, ReportRecorder reports) :
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool GetNamedPipeClientSessionId(Microsoft.Win32.SafeHandles.SafePipeHandle pipe, out uint clientSessionId);
 
-    /// <summary>Başka bir tepsi kuyruğu çekerken (kira) boş sayfa: olaylar iki kez gönderilmesin.</summary>
+    /// <summary>
+    /// Başka bir tepsi kuyruğu çekerken (kira) boş sayfa: olaylar iki kez gönderilmesin. Raporlama etkin değilken de boş sayfa
+    /// (1.9.1): kapatma kuyruğu siler, arada kalan olay gönderilmez.
+    /// </summary>
     private ReportsResponse PullReports(long after, string? lease)
     {
+        if (!reports.Enabled) return new ReportsResponse([], false, false);
         if (!_lease.TryHold(lease)) return new ReportsResponse([], false, reports.Enabled);
         var (list, more) = reports.Queue.Pull(after, PipeProtocol.MaxReportPageBytes);
         return new ReportsResponse(list, more, reports.Enabled);
@@ -199,10 +244,15 @@ internal sealed class PipeServer(MountManager manager, ReportRecorder reports) :
         return new UnlockResponse(true, "");
     }
 
-    private UnlockResponse Configure(bool enabled)
+    private UnlockResponse Configure(bool enabled, string caller)
     {
-        if (enabled != reports.Enabled) ServiceLog.Write(enabled ? WinText.T("Svc.ReportsEnabled") : WinText.T("Svc.ReportsDisabled"));
-        reports.SetEnabled(enabled);
+        if (caller == MountManager.AnonymousCaller) return new UnlockResponse(true, ""); // hesabı bilinmeyen seçim yok sayılır
+        var (changed, _, after) = reports.SetEnabled(enabled, caller); // hesap başına seçim, "Hayır kazanır"
+        // Günlük satırı yalnız bu hesabın seçimi değişince ve hesap başına 10 dk'da bir (1.9.1): önceden her açma/kapamada bir
+        // satırdı; kanala erişen her hesap saniyeler içinde binlerce istekle günlüğü döndürüp eski kayıtları sildirebiliyordu
+        bool log;
+        lock (_configLogged) log = changed && _configLogged.TryMark(caller, TimeSpan.FromMinutes(10));
+        if (log) ServiceLog.Write(after ? WinText.T("Svc.ReportsEnabled") : WinText.T("Svc.ReportsDisabled"));
         return new UnlockResponse(true, "");
     }
 

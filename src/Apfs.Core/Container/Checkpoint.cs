@@ -114,7 +114,9 @@ public sealed class Checkpoint
                 if (Bin.U32(b, e + 12) != 0) problems.Add(CoreText.T("Cp.MappingPadding", m.Oid));
                 if (m.Size == 0 || m.Size % _reader.BlockSize != 0) { problems.Add(CoreText.T("Cp.MappingSize", m.Oid)); continue; }
                 mapped += m.Size / _reader.BlockSize;
-                if (mapped > _sb.XpDataBlocks) { overflow = true; break; } // halkayı bir kezden çok dolduramaz; aşağıda sorun
+                // Bu checkpoint'in geçici nesneleri tam xp_data_len blok kaplar: aşan eşleme okunmadan bozuk (1.9.1; önce
+                // sınır bütün veri halkasıydı, şişirilmiş ~400 bin eşleme × 64 blok kapıyı USB'de dakikalarca okuturdu)
+                if (mapped > _sb.XpDataLen) { overflow = true; break; }
                 if (m.Paddr != DataBlock(_sb, dataIdx)) problems.Add(CoreText.T("Cp.MappingOrder", m.Oid));
                 if (!_byOid.TryAdd(m.Oid, m)) problems.Add(CoreText.T("Cp.MappingDuplicate", m.Oid));
                 mappings.Add(m);

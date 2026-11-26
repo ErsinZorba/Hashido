@@ -19,14 +19,23 @@ if (ServiceLog.EchoToConsole)
     if (Console.IsOutputRedirected) Console.SetOut(new StreamWriter(Console.OpenStandardOutput(), utf8) { AutoFlush = true });
 }
 // Kurulu hizmet (LocalSystem): günlük ve rapor klasörünü ilk yazmadan ÖNCE güvenceye al (1.8.1). Geliştirme kipinde dokunulmaz.
+// Güvenceye alınamayan alan (günlük / raporlar) bu çalışmada SYSTEM'in kendi LOCALAPPDATA'sına yazılır (1.9.1).
+bool reportsTrusted = true;
 if (!ServiceLog.EchoToConsole)
 {
     using var me = System.Security.Principal.WindowsIdentity.GetCurrent();
     if (me.IsSystem)
     {
         var secured = DataDirSecurity.SecureServiceDataDirectory();
+        reportsTrusted = secured.ReportsTrusted;
+        if (!secured.LogTrusted) ServiceLog.UseFallbackOnly();
         if (secured.LinksRemoved > 0) ServiceLog.Write(WinText.T("Svc.DataDirLinksRemoved", secured.LinksRemoved));
+        foreach (string aside in secured.MovedAside ?? []) ServiceLog.Write(WinText.T("Svc.DataDirMovedAside", aside));
         if (secured.FirstError is not null) ServiceLog.Write(WinText.T("Svc.DataDirSecureFailed", secured.FirstError));
+        if (!secured.LogTrusted)
+            ServiceLog.Write(WinText.T("Svc.DataDirUntrusted", Path.GetDirectoryName(ServiceLog.PathName)!, ServiceLog.FallbackPathName));
+        if (!secured.ReportsTrusted)
+            ServiceLog.Write(WinText.T("Svc.DataDirUntrusted", ReportRecorder.DefaultServiceDirectory, ReportRecorder.DefaultUserDirectory));
     }
 }
 for (int i = 0; i < args.Length - 1; i++)
@@ -45,7 +54,7 @@ if (ServiceLog.EchoToConsole)
 // Konsol kipinde varsayılan kuyruk kanala özgü geçici klasör: kurulu hizmetin ProgramData'daki kuyruğuna dokunulmaz
 reportsDir ??= ServiceLog.EchoToConsole
     ? Path.Combine(Path.GetTempPath(), "apfs-dev-reports", Apfs.Windows.Ipc.PipeProtocol.PipeName)
-    : ReportRecorder.DefaultServiceDirectory;
+    : reportsTrusted ? ReportRecorder.DefaultServiceDirectory : ReportRecorder.DefaultUserDirectory;
 var reports = new ReportRecorder(reportsDir);
 // Çökme olayı (onay varsa) eşzamanlı kuyruğa yazılır; istisna yutulmaz, süreç yine çöker ve SCM yeniden başlatır
 AppDomain.CurrentDomain.UnhandledException += (_, e) => reports.RecordCrash(e.ExceptionObject as Exception, "service");
@@ -55,6 +64,7 @@ internal sealed class ApfsService(IReadOnlyList<string>? images, ReportRecorder 
 {
     private MountManager? _manager;
     private PipeServer? _pipe;
+    private PowerEvents? _power;
     private DeviceNotifications.Registration? _diskWatch;
     private Timer? _timer;
     private int _scanning;
@@ -66,6 +76,9 @@ internal sealed class ApfsService(IReadOnlyList<string>? images, ReportRecorder 
         _manager.ScanRequested += () => ScheduleScan(TimeSpan.FromSeconds(1));
         _pipe = new PipeServer(_manager, reports);
         _pipe.Start();
+        // Uyku/uyanış (1.9.1): uykudan önce yazma oturumları kaydedilip bekletilir, uyanışta salt okunura döner
+        var manager = _manager;
+        _power = new PowerEvents(() => manager.PrepareForSleep(MountManager.SleepBudget), manager.ResumeFromSleep);
         // Disk takıldığında/çıkarıldığında hemen; ayrıca bildirim kaçarsa diye 15 saniyede bir tara.
         _diskWatch = DeviceNotifications.WatchDiskInterfaces(_ =>
         {
@@ -110,6 +123,7 @@ internal sealed class ApfsService(IReadOnlyList<string>? images, ReportRecorder 
 
     protected override void OnStop()
     {
+        _power?.Dispose();
         _timer?.Dispose();
         _diskWatch?.Dispose();
         _pipe?.Dispose();

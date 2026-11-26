@@ -105,6 +105,16 @@ public sealed class UpdateChecker : IDisposable
         }
     }
 
+    /// <summary>
+    /// Açık deponun Release sayfası mı (1.9.1): yalnız https, github.com ve <c>/ErsinZorba/Hashido/releases/</c> yolu. Kayıt
+    /// defterinden okunan bağlantı (HKCU <c>UpdateUrl</c>) yalnız böyleyse açılır; önceden github.com'daki herhangi bir adres (ya da
+    /// http) kabul ediliyordu.
+    /// </summary>
+    public static bool IsReleasePage(Uri u) =>
+        u.Scheme == Uri.UriSchemeHttps && u.Host == "github.com" && u.IsDefaultPort && u.AbsolutePath.StartsWith(ReleasesPath, StringComparison.Ordinal);
+
+    private const string ReleasesPath = "/ErsinZorba/Hashido/releases/";
+
     /// <summary>Açık deponun Release dosyalarının adres öneki (etiket ve dosya adı eklenir).</summary>
     public const string DownloadPrefix = "https://github.com/ErsinZorba/Hashido/releases/download/";
 

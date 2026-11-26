@@ -374,6 +374,9 @@
   <data name="Settings.ReportsHeading" xml:space="preserve">
     <value>自動レポート</value>
   </data>
+  <data name="Settings.SaveFailed" xml:space="preserve">
+    <value>一部の設定を保存できなかったため、保持されない可能性があります。しばらくしてからもう一度お試しください。</value>
+  </data>
   <data name="Settings.ShowSent" xml:space="preserve">
     <value>送信した内容を表示</value>
   </data>
@@ -462,7 +465,7 @@
     <value>バージョン {0} が公開されました</value>
   </data>
   <data name="Update.Ready" xml:space="preserve">
-    <value>{0} {1} の準備ができました。ここをクリックして "インストール" を選んでください。</value>
+    <value>{0} {1} の準備ができました。ここをクリックし、下部のリンクからインストールしてください。</value>
   </data>
   <data name="Update.Updated" xml:space="preserve">
     <value>{0} はバージョン {1} に更新されました。</value>

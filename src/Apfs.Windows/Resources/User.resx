@@ -374,6 +374,9 @@
   <data name="Settings.ReportsHeading" xml:space="preserve">
     <value>Automatic reports</value>
   </data>
+  <data name="Settings.SaveFailed" xml:space="preserve">
+    <value>Some settings could not be saved and may not be kept. Try again later.</value>
+  </data>
   <data name="Settings.ShowSent" xml:space="preserve">
     <value>Show what was sent</value>
   </data>
@@ -462,7 +465,7 @@
     <value>Version {0} is available</value>
   </data>
   <data name="Update.Ready" xml:space="preserve">
-    <value>{0} {1} is ready. Click here, then choose "Install".</value>
+    <value>{0} {1} is ready. Click here, then install it from the link at the bottom.</value>
   </data>
   <data name="Update.Updated" xml:space="preserve">
     <value>{0} has been updated to version {1}.</value>

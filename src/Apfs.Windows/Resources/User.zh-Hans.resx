@@ -374,6 +374,9 @@
   <data name="Settings.ReportsHeading" xml:space="preserve">
     <value>自动报告</value>
   </data>
+  <data name="Settings.SaveFailed" xml:space="preserve">
+    <value>部分设置无法保存，可能不会保留。请稍后再试。</value>
+  </data>
   <data name="Settings.ShowSent" xml:space="preserve">
     <value>显示已发送的内容</value>
   </data>
@@ -462,7 +465,7 @@
     <value>版本 {0} 已发布</value>
   </data>
   <data name="Update.Ready" xml:space="preserve">
-    <value>{0} {1} 已准备就绪。单击此处，然后选择"安装"。</value>
+    <value>{0} {1} 已准备就绪。单击此处，然后通过底部的链接进行安装。</value>
   </data>
   <data name="Update.Updated" xml:space="preserve">
     <value>{0} 已更新到版本 {1}。</value>

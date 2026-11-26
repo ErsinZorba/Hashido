@@ -1,7 +1,7 @@
 # Privacy statement / Gizlilik açıklaması
 
-Last updated: 2026-11-17. The English text is binding; the Turkish translation is for information only.
-Son güncelleme: 2026-11-17. Bağlayıcı olan İngilizce metindir; Türkçe çeviri bilgi amaçlıdır.
+Last updated: 2026-11-25. The English text is binding; the Turkish translation is for information only.
+Son güncelleme: 2026-11-25. Bağlayıcı olan İngilizce metindir; Türkçe çeviri bilgi amaçlıdır.
 
 The same text is in the README ([English](../README.md#privacy), [Türkçe](../README.tr.md#gizlilik)).
 
@@ -9,7 +9,9 @@ The same text is in the README ([English](../README.md#privacy), [Türkçe](../R
 
 **Automatic reports are off until you say yes.** The first time the program starts it asks once whether it may send anonymous
 reports. Until you answer "Yes, send", nothing is collected or sent. You can change your choice at any time in **Settings**;
-turning reports off also deletes the reports on your computer that have not been sent yet.
+turning reports off also deletes the reports on your computer that have not been sent yet. On a computer with several Windows
+accounts each account's choice counts: reports are collected only while no account that used the program in the last 30 days
+has answered "No" — one account's "No" stops them for every account.
 
 **What is sent and why.** Reports describe errors, crashes and successful operations (connecting a disk, unlocking, enabling
 writing, a writing session, safely ejecting). They help find bugs and show which disks and situations cause problems, especially
@@ -34,7 +36,9 @@ not sold, not used for advertising and not shared with anyone else.
 
 **On your computer.** Reports waiting to be sent are kept in `%ProgramData%\APFS for Windows\reports\` (at most 200) and, for
 the tray program's own crash reports, in `%LOCALAPPDATA%\APFS for Windows\reports\`. The last 20 reports sent are shown, exactly
-as sent, under **Settings › Show what was sent**.
+as sent, under **Settings › Show what was sent**. The program's log (`%ProgramData%\APFS for Windows\log.txt`, shown by
+"Open log") is never sent, but every account on this computer can read it; it contains the names of the disks and volumes that
+were connected and, when something goes wrong with a file, that file's name.
 
 **Your rights.** Because reports contain no identifier, nobody (including the developer) can tell which reports came from you,
 so individual reports cannot be found or deleted on request. Turning reports off stops all future reports.
@@ -56,7 +60,9 @@ statement are visible in the repository history.
 
 **Otomatik raporlar siz "evet" diyene kadar kapalıdır.** Program ilk açılışta bir kez anonim rapor gönderip gönderemeyeceğini
 sorar. "Evet, gönder" demediğiniz sürece hiçbir şey toplanmaz ve gönderilmez. Seçiminizi istediğiniz zaman **Ayarlar**'dan
-değiştirebilirsiniz; raporları kapatmak bilgisayarınızda henüz gönderilmemiş raporları da siler.
+değiştirebilirsiniz; raporları kapatmak bilgisayarınızda henüz gönderilmemiş raporları da siler. Birden çok Windows hesabı olan
+bilgisayarda her hesabın seçimi sayılır: raporlar yalnız son 30 günde programı kullanan hesaplardan hiçbiri "Hayır" demediyse
+toplanır — bir hesabın "Hayır"ı bütün hesaplar için durdurur.
 
 **Ne gönderilir, neden.** Raporlar hataları, çökmeleri ve başarılı işlemleri (disk bağlama, kilit açma, yazmaya açma, yazma
 oturumu, güvenle çıkarma) anlatır. Hataları bulmaya ve özellikle deneysel yazma özelliğinde hangi disklerin ve durumların sorun
@@ -80,7 +86,9 @@ satılmaz, reklam için kullanılmaz ve kimseyle paylaşılmaz.
 **Ne kadar süre.** Raporlar alındıktan 18 ay sonra kendiliğinden silinir.
 
 **Bilgisayarınızda.** Gönderilmeyi bekleyen raporlar `%ProgramData%\APFS for Windows\reports\` klasöründe (en çok 200), tepsi
-programının kendi çökme raporları ise `%LOCALAPPDATA%\APFS for Windows\reports\` klasöründe durur. Gönderilen son 20 rapor, gönderildiği biçimiyle **Ayarlar › Gönderilenleri göster**'de görünür.
+programının kendi çökme raporları ise `%LOCALAPPDATA%\APFS for Windows\reports\` klasöründe durur. Gönderilen son 20 rapor, gönderildiği biçimiyle **Ayarlar › Gönderilenleri göster**'de görünür. Programın günlüğü
+(`%ProgramData%\APFS for Windows\log.txt`, "Günlüğü aç"ın gösterdiği) hiç gönderilmez ama bu bilgisayardaki her hesap onu
+okuyabilir; günlükte bağlanan disklerin ve birimlerin adları ve bir dosyada sorun çıkınca o dosyanın adı bulunur.
 
 **Haklarınız.** Raporlar hiçbir kimlik taşımadığı için hiç kimse (geliştirici dahil) hangi raporun sizden geldiğini bilemez; bu
 yüzden tek tek raporlar istek üzerine bulunamaz ya da silinemez. Raporları kapatmak bundan sonraki bütün raporları durdurur.

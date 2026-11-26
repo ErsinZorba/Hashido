@@ -55,8 +55,9 @@ internal static class KeyOrder
     {
         ReadOnlySpan<byte> s = type switch
         {
-            Volume.JType.DirRec => IsHashedDrec(k) ? k[12..] : k[10..],
-            Volume.JType.Xattr or Volume.JType.SnapName => k[10..],
+            // Kısa (bozuk) anahtar boş ad sayılır: tam denetimin sıra denetimi diskteki her anahtarı karşılaştırır (1.9.1)
+            Volume.JType.DirRec => IsHashedDrec(k) ? k[12..] : k.Length > 10 ? k[10..] : [],
+            Volume.JType.Xattr or Volume.JType.SnapName => k.Length > 10 ? k[10..] : [],
             _ => [],
         };
         int nul = s.IndexOf((byte)0);

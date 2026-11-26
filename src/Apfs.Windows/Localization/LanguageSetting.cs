@@ -35,6 +35,11 @@ public static class LanguageSetting
 
     internal static bool Save(CultureInfo? language, Action<string> log)
     {
+        if (UserSettings.WriteFault?.Invoke(ValueName) == true)
+        {
+            log(WinText.T("Language.SaveFailed", "test"));
+            return false;
+        }
         try
         {
             using var key = Registry.CurrentUser.CreateSubKey(KeyPath);

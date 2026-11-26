@@ -124,10 +124,25 @@ public sealed class Spaceman
         new(Bin.U64(r, o), Bin.U64(r, o + 8), Bin.U64(r, o + 16), Bin.U16(r, o + 24));
 
     /// <summary>Alan yöneticisi nesnesinin içindeki bir u64 dizisi (ofset nesne başından).</summary>
-    public ulong ArrayU64(uint offset, uint index) => Bin.U64(Raw, checked((int)(offset + index * 8)));
+    public ulong ArrayU64(uint offset, uint index) => Bin.U64(Raw, ArrayPos(offset, index, 8));
 
     /// <summary>Alan yöneticisi nesnesinin içindeki bir u16 dizisi.</summary>
-    public ushort ArrayU16(uint offset, uint index) => Bin.U16(Raw, checked((int)(offset + index * 2)));
+    public ushort ArrayU16(uint offset, uint index) => Bin.U16(Raw, ArrayPos(offset, index, 2));
+
+    /// <summary>
+    /// Dizi öğesinin konumu; nesnenin dışına düşerse bozuk disk (1.9.1: taşan ofset tam denetimi ve kapıyı "Beklenmeyen bir
+    /// hata" ile düşürüyordu; apfsck "offset overlaps with structure").
+    /// </summary>
+    private int ArrayPos(uint offset, uint index, int size)
+    {
+        long pos = (long)offset + (long)index * size;
+        if (pos + size > Raw.Length) throw ApfsException.Corrupt(CoreText.T("Sm.ArrayOutside", offset));
+        return (int)pos;
+    }
+
+    /// <summary>Her CIB'deki parça sayısı, CIB sırasıyla (<see cref="MainChunks"/> okununca dolar; tam denetim kullanır).</summary>
+    public IReadOnlyList<uint> CibChunkCounts => _cibChunkCounts;
+    private readonly List<uint> _cibChunkCounts = [];
 
     /// <summary>Ana aygıtın CIB adresleri (CAB varsa onların içinden), sırayla.</summary>
     public IReadOnlyList<ulong> MainCibAddresses()
@@ -166,6 +181,7 @@ public sealed class Spaceman
             if (Bin.U32(cib, 32) != (uint)c) throw ApfsException.Corrupt(CoreText.T("Sm.CibWrongIndex", cibs[c]));
             uint n = Bin.U32(cib, 36);
             if (40 + (long)n * 32 > cib.Length) throw ApfsException.Corrupt(CoreText.T("Sm.CibCountTooBig", cibs[c]));
+            _cibChunkCounts.Add(n);
             if ((ulong)list.Count + n > _maxChunks) throw ApfsException.Corrupt(CoreText.T("Sm.TooManyChunks"));
             for (uint i = 0; i < n; i++)
             {

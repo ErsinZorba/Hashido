@@ -24,7 +24,16 @@ public sealed class DownloadedSetup : IDisposable
     public Version Version { get; }
     public string Path { get; }
 
-    public void Dispose() => _handle.Dispose();
+    /// <summary>Tutamak hâlâ açık: dosya doğrulandığından beri değiştirilemedi (1.9.1; kapalıysa yeniden doğrulanmalı).</summary>
+    public bool IsOpen => !_disposed;
+
+    private volatile bool _disposed;
+
+    public void Dispose()
+    {
+        _disposed = true;
+        _handle.Dispose();
+    }
 }
 
 /// <summary>
@@ -181,7 +190,8 @@ public sealed class UpdateDownloader : IDisposable
     internal static Version? ParseVersion(string? s) =>
         s?.Split('+')[0].Trim() is { Length: > 0 } t && Version.TryParse(t, out var v) && v.Build >= 0 ? v : null;
 
-    private static readonly Regex SetupName = new(@"^Hashido-Setup-(\d+\.\d+\.\d+)\.exe(\.part)?$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+    // [0-9] (1.9.1): \d Unicode rakamlarını da tutuyordu ("Hashido-Setup-١.٠.٠.exe"), Version.Parse da onlarda ve taşmada istisna atıyordu
+    private static readonly Regex SetupName = new(@"^Hashido-Setup-([0-9]+\.[0-9]+\.[0-9]+)\.exe(\.part)?$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
 
     /// <summary>
     /// Kurulu sürümden eski ya da ona eşit setup'ları ve yarım indirmeleri (<c>.part</c>) siler (tepsi açılırken). Klasörde başka
@@ -196,7 +206,9 @@ public sealed class UpdateDownloader : IDisposable
             {
                 var m = SetupName.Match(System.IO.Path.GetFileName(f));
                 if (!m.Success) continue;
-                if (m.Groups[2].Success || UpdateChecker.Normalize(Version.Parse(m.Groups[1].Value)) <= UpdateChecker.Normalize(installed)) TryDelete(f);
+                if (m.Groups[2].Success) TryDelete(f);
+                // Sayı taşarsa (99999999999.0.0) sürüm okunamaz: dosyaya dokunulmaz
+                else if (Version.TryParse(m.Groups[1].Value, out var v) && UpdateChecker.Normalize(v) <= UpdateChecker.Normalize(installed)) TryDelete(f);
             }
         }
         catch (Exception e) when (e is IOException or UnauthorizedAccessException) { }

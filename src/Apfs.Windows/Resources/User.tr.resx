@@ -374,6 +374,9 @@
   <data name="Settings.ReportsHeading" xml:space="preserve">
     <value>Otomatik raporlar</value>
   </data>
+  <data name="Settings.SaveFailed" xml:space="preserve">
+    <value>Bazı ayarlar kaydedilemedi, geçerli kalmayabilir. Daha sonra yeniden deneyin.</value>
+  </data>
   <data name="Settings.ShowSent" xml:space="preserve">
     <value>Gönderilenleri göster</value>
   </data>
@@ -462,7 +465,7 @@
     <value>{0} sürümü çıktı</value>
   </data>
   <data name="Update.Ready" xml:space="preserve">
-    <value>{0} {1} hazır; tıklayıp Kur'a basabilirsiniz.</value>
+    <value>{0} {1} hazır. Tıklayın, sonra alttaki bağlantıdan kurun.</value>
   </data>
   <data name="Update.Updated" xml:space="preserve">
     <value>{0} {1} sürümüne güncellendi.</value>

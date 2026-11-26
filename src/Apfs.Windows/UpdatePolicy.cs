@@ -76,6 +76,13 @@ public static class UpdatePolicy
     public static bool ShouldAnnounceReady(UpdateInstallConditions c) =>
         c.AutoInstall && c.SetupReady && c.DiskCount > 0 && c.IsAdministrator && !c.DeclinedRecently && !c.SetupRunning;
 
+    /// <summary>
+    /// Zamanlayıcı (6 sa) denetiminin indirdiği sürüm için "hazır" haberi (1.9.1): zamanlayıcı kurmaz, o yüzden disk sayısına
+    /// bakılmaz; öbür koşullar <see cref="ShouldAnnounceReady"/> ile aynı. Sürüm başına bir kez (tepsi hatırlar).
+    /// </summary>
+    public static bool ShouldAnnounceTimerReady(UpdateInstallConditions c) =>
+        c.AutoInstall && c.SetupReady && c.IsAdministrator && !c.DeclinedRecently && !c.SetupRunning;
+
     /// <summary>Setup kendiliğinden indirilsin mi (kurulamayacaksa indirilmez: yönetici olmayan kullanıcı, setup bilgisi yok).</summary>
     public static bool ShouldDownload(bool autoInstall, bool hasSetup, bool isAdministrator) => autoInstall && hasSetup && isAdministrator;
 
@@ -102,13 +109,58 @@ public static class UpdatePolicy
         catch (Exception e) when (e is System.Security.SecurityException or UnauthorizedAccessException) { return false; }
     }
 
-    /// <summary>Bu ya da başka bir oturumda Hashido setup'ı çalışıyor mu (<c>Hashido-Setup-…</c> ve onun <c>.tmp</c> süreci).</summary>
+    /// <summary>
+    /// Bir Hashido setup'ı çalışıyor mu (1.9.1): Inno'nun <c>Global\HashidoSetup</c> mutex'i (bütün oturumlar; <c>.iss</c>
+    /// <c>SetupMutex</c>) ya da BU oturumda <c>Hashido-Setup…</c> adlı süreç. Önceden her oturumdaki süreç adına bakılıyordu: başka bir
+    /// hesap o adla bir süreç çalıştırarak güncellemeleri süresiz bekletebiliyordu. Kendi oturumundaki süreç yine sayılır: Inno mutex'i
+    /// ancak yükseltilmiş süreç başladıktan birkaç saniye sonra açıyor, elle açılan setup'ın UAC penceresi açıkken mutex YOK (ölçüldü,
+    /// surum191Plan P6.7).
+    /// </summary>
     public static bool AnySetupRunning()
     {
-        foreach (var p in Process.GetProcesses())
+        int session;
+        using (var self = Process.GetCurrentProcess()) session = self.SessionId;
+        var names = new List<(string, int)>();
+        Process[] all;
+        try { all = Process.GetProcesses(); }
+        catch (Exception e) when (e is InvalidOperationException or System.ComponentModel.Win32Exception) { all = []; } // liste yok: yalnız mutex
+        foreach (var p in all)
             using (p)
-                if (p.ProcessName.StartsWith("Hashido-Setup", StringComparison.OrdinalIgnoreCase)) return true;
-        return false;
+            {
+                try { names.Add((p.ProcessName, p.SessionId)); }
+                catch (Exception e) when (e is InvalidOperationException or System.ComponentModel.Win32Exception) { } // süreç bitti
+            }
+        return SetupRunning(SetupMutexExists(), names, session);
+    }
+
+    /// <summary><see cref="AnySetupRunning"/>'in saf kararı: mutex varsa ya da bu oturumda setup adlı süreç varsa.</summary>
+    internal static bool SetupRunning(bool mutexExists, IEnumerable<(string Name, int Session)> processes, int session) =>
+        mutexExists || processes.Any(p => p.Session == session && p.Name.StartsWith("Hashido-Setup", StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>Setup'ın tek uçuş mutex'i (<c>.iss</c> <c>SetupMutex=HashidoSetup,Global\HashidoSetup</c>).</summary>
+    internal const string SetupMutexName = @"Global\HashidoSetup";
+
+    /// <summary>Mutex var mı (yükseltilmiş setup'ınkine erişim reddi de "var").</summary>
+    internal static bool SetupMutexExists(string name = SetupMutexName)
+    {
+        try
+        {
+            if (!System.Threading.Mutex.TryOpenExisting(name, out var m)) return false;
+            m.Dispose();
+            return true;
+        }
+        catch (UnauthorizedAccessException) { return true; }
+    }
+
+    /// <summary>
+    /// Güncelleme klasörü ağ yolunda mı (UNC; 1.9.1): öyleyse kendiliğinden indirme ve kurulum yapılmaz, yalnız haber verilir ve "Kur"
+    /// Release sayfasını açar (setup ağ paylaşımından yükseltilmiş çalışmasın; doğrulamadan sonra paylaşımın sahibi dosyayı
+    /// değiştirebilir). Yol çözülemezse de öyle sayılır (güvenli yön).
+    /// </summary>
+    public static bool IsNetworkPath(string path)
+    {
+        try { return new Uri(System.IO.Path.GetFullPath(path)).IsUnc; }
+        catch (Exception e) when (e is ArgumentException or UriFormatException or NotSupportedException or System.IO.PathTooLongException) { return true; }
     }
 
     private const int TokenElevationType = 18;

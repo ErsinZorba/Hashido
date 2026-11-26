@@ -253,10 +253,21 @@ public sealed partial class VolumeWriter
         if (!_fs.TryGet(Records.Key(ino.PrivateId, JType.DstreamId), out _))
             FsPut(Records.Key(ino.PrivateId, JType.DstreamId), Records.DstreamIdVal(1));
         long now = NowNs();
-        ino.ModNs = ino.ChangeNs = now;
+        if (!_keepModTime) ino.ModNs = now;
+        ino.ChangeNs = now;
         PutInode(id, ino);
         Touch();
     }
+
+    // İçerik değişikliği değiştirme zamanına dokunmasın (yalnız Write/SetSize'ın değişiklik evresinde; bkz. keepModTime)
+    private bool _keepModTime;
+
+    private void MutateContent(bool keepModTime, Action change) => Mutate(() =>
+    {
+        _keepModTime = keepModTime;
+        try { change(); }
+        finally { _keepModTime = false; }
+    });
 
     // ---------------------------------------------------------------------------------------------------------------
     // Uzatmada eski dosya sonunun ötesi
@@ -359,6 +370,23 @@ public sealed partial class VolumeWriter
         Mutate(() => UpdateStream(id, GetInode(id)!, size, exts));
     }
 
+    /// <summary>
+    /// Testler: macOS'un satır içi (gömülü) xattr'ını taklit eder — <paramref name="id"/>'ye <paramref name="length"/> baytlık
+    /// XATTR_DATA_EMBEDDED değerli <paramref name="name"/> kaydı (macOS 3 804 bayta dek gömer; büyük kayıt B-ağacı bölünmesini
+    /// sınar). Ürün kodu xattr yazmaz.
+    /// </summary>
+    internal void SetEmbeddedXattrForTest(ulong id, string name, int length)
+    {
+        if (GetInode(id) is null) throw new ApfsException(ApfsErrorCode.NotFound, $"inode {id}");
+        var key = Records.XattrKey(id, name);
+        var val = new byte[4 + length];
+        BinaryPrimitives.WriteUInt16LittleEndian(val, Records.XattrDataEmbedded);
+        BinaryPrimitives.WriteUInt16LittleEndian(val.AsSpan(2), (ushort)length);
+        for (int i = 0; i < length; i++) val[4 + i] = (byte)('a' + i % 26);
+        EnsureSpace(Room.Metadata, new OpCost(1, 1, 1, (ulong)(key.Length + val.Length + 8)));
+        Mutate(() => { FsPut(key, val); Touch(); });
+    }
+
     /// <summary>Dosyadan okur (delikler ve dosya sonu ötesi sıfır); okunan bayt sayısını döndürür.</summary>
     public int Read(ulong id, ulong offset, Span<byte> buffer)
     {
@@ -391,8 +419,10 @@ public sealed partial class VolumeWriter
     /// <summary>
     /// Dosyaya yazar (gerekirse uzatır). Kısmi ilk/son blok mevcut içerikle tamamlanır; bloklar <see cref="ReplaceBlocks"/> ile
     /// yeni bloklara yazılır. Gereken yeni bloklar önce boş alanla karşılaştırılır (sığmazsa hiçbir şey değişmeden DiskFull).
+    /// <paramref name="keepModTime"/>: değiştirme zamanı değişmez (değişiklik zamanı yine "şimdi") — Windows'ta tanıtıcıda yazma
+    /// zamanı açıkça ayarlandıysa o tanıtıcının sonraki yazımları zamanı güncellemez (NTFS; 1.9.1).
     /// </summary>
-    public void Write(ulong id, ulong offset, ReadOnlySpan<byte> data)
+    public void Write(ulong id, ulong offset, ReadOnlySpan<byte> data, bool keepModTime = false)
     {
         if (data.IsEmpty) return;
         // Denetim (hiçbir şey değişmez; bkz. Mutate)
@@ -414,7 +444,7 @@ public sealed partial class VolumeWriter
         var stale = end > size ? PlanStaleZeroing(exts, size, first) : null;
         if (stale is not null) { cost += stale.Cost; newBlocks += stale.DataBlocks; }
         EnsureSpace(newBlocks > 0 ? Room.Data : Room.Metadata, cost, newBlocks);
-        Mutate(() =>
+        MutateContent(keepModTime, () =>
         {
             if (stale is not null) ApplyStaleZeroing(id, ino.PrivateId, exts, stale, size);
             ReplaceBlocks(id, ino.PrivateId, exts, first, buf, Math.Max(size, end));
@@ -456,9 +486,10 @@ public sealed partial class VolumeWriter
     /// Kısaltmada sıfırlanan son kısmi blok yeni bloğa yazılır: o blok önceden denetlenir (disk tam doluysa hiçbir şey değişmeden
     /// DiskFull; önceden kısaltma yapılıp sıfırlama yarıda kalıyordu). Kesilen bloklardan bu işlemde ayrılmış olanlar hemen boşa
     /// çıktığı için o bloğa sayılır (önceden paydaki diskte böyle kısaltma "disk dolu" alıyordu). Yer açan kısaltma payı
-    /// kullanabilir, seyrek uzatma yalnız üst veri büyütür (bkz. <see cref="Room"/>).
+    /// kullanabilir, seyrek uzatma yalnız üst veri büyütür (bkz. <see cref="Room"/>). <paramref name="keepModTime"/>: bkz.
+    /// <see cref="Write"/>.
     /// </summary>
-    public void SetSize(ulong id, ulong newSize)
+    public void SetSize(ulong id, ulong newSize, bool keepModTime = false)
     {
         // Denetim (hiçbir şey değişmez; bkz. Mutate)
         var ino = RequireWritableFile(id);
@@ -479,8 +510,8 @@ public sealed partial class VolumeWriter
             foreach (var x in exts)
             {
                 if (x.Phys == 0 || x.End <= newBlocks) continue;
-                for (ulong blk = Math.Max(x.Start, newBlocks); blk < x.End; blk++)
-                    if (_s.Spaceman.IsAllocatedThisTx(x.Phys + (blk - x.Start))) credit++;
+                ulong from = Math.Max(x.Start, newBlocks);
+                credit += _s.Spaceman.CountAllocatedThisTx(x.Phys + (from - x.Start), x.End - from); // blok blok değil
             }
         }
         else if (newBlocks > allocEnd) cost = ExtendCost(MergeablePairs(exts));
@@ -507,7 +538,7 @@ public sealed partial class VolumeWriter
         }
         EnsureSpace(room, cost, data, credit);
 
-        Mutate(() =>
+        MutateContent(keepModTime, () =>
         {
             if (newBlocks < allocEnd) TruncateExtents(ino.PrivateId, exts, newBlocks);
             if (stale is not null) ApplyStaleZeroing(id, ino.PrivateId, exts, stale, size);

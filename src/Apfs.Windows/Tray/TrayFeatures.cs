@@ -18,6 +18,8 @@ public sealed class TrayFeatures : IDisposable
     private readonly UiTimer _startupTimer;
     private readonly UiTimer _periodicTimer;
     private ReportClient? _client;
+    /// <summary>Güncelleme klasörü yerel (ağ yolunda değil): yalnız o zaman setup indirilir ve kurulur (1.9.1).</summary>
+    private readonly bool _localUpdates;
 
     /// <param name="ui">Arayüz iş parçacığının bağlamı (zamanlayıcılar ve "güncellendi" balonu buraya).</param>
     /// <param name="host">"Kur" onayı (alt bağlantı).</param>
@@ -32,6 +34,7 @@ public sealed class TrayFeatures : IDisposable
         _host = host;
         _services = services ?? UpdateServices.Default;
         _diskCount = diskCount;
+        _localUpdates = !UpdatePolicy.IsNetworkPath(_services.UpdatesDirectory);
         Local = local;
         Sent = new SentLog(Path.Combine(local.Directory, "sent.jsonl"));
         _startupTimer = new UiTimer(ui, TimeSpan.FromSeconds(30), time);
@@ -62,7 +65,7 @@ public sealed class TrayFeatures : IDisposable
             if (!UserSettings.UpdateNotify) return null;
             if (!Version.TryParse(UserSettings.UpdateNotifiedVersion, out var v) || UpdateChecker.Normalize(v) <= UpdateChecker.Normalize(_services.CurrentVersion())) return null;
             // Kayıttaki değer "1.9" gibi iki bileşenli olabilir (elle değiştirilmiş): metinler ToString(3) kullanır
-            return Uri.TryCreate(UserSettings.UpdateUrl, UriKind.Absolute, out var u) && u.Host == "github.com" ? new UpdateInfo(UpdateChecker.Normalize(v), u) : null;
+            return Uri.TryCreate(UserSettings.UpdateUrl, UriKind.Absolute, out var u) && UpdateChecker.IsReleasePage(u) ? new UpdateInfo(UpdateChecker.Normalize(v), u) : null;
         }
     }
 
@@ -81,7 +84,12 @@ public sealed class TrayFeatures : IDisposable
         _client = _services.NewReportClient(Local, Sent);
         _client?.Start(TimeSpan.FromSeconds(30));
         var current = _services.CurrentVersion();
-        _ = Task.Run(() => UpdateDownloader.CleanUp(_services.UpdatesDirectory, current));
+        _ = Task.Run(() =>
+        {
+            // Beklenmeyen hata da sessizce kaybolmasın (1.9.1): günlüğe
+            try { UpdateDownloader.CleanUp(_services.UpdatesDirectory, current); }
+            catch (Exception e) { _services.Log(WinText.T("Update.CleanUpFailed", e.GetType().Name, e.Message)); }
+        });
         if (updated) ReportUpdated(current);
         // Güncelleme: açılıştan ~30 sn sonra (saatte bir; bekleyen sürüm varsa her açılışta), sonra 6 saatte bir (günde bir)
         _startupTimer.Start();
@@ -159,21 +167,28 @@ public sealed class TrayFeatures : IDisposable
             }
             _latest = info;
             bool isAdmin = _services.IsAdministrator();
+            bool hasSetup = info.Setup is not null && _localUpdates; // ağ yolundaki klasöre indirilmez: yalnız haber
             if (UpdateChecker.ShouldNotify(info, UserSettings.UpdateNotifiedVersion))
             {
                 UserSettings.UpdateNotifiedVersion = info.Version.ToString(3);
                 UserSettings.UpdateUrl = info.ReleasePage.ToString();
-                if (UserSettings.UpdateNotify && UpdatePolicy.ShouldAnnounceFound(AutoInstall, info.Setup is not null, isAdmin))
+                if (UserSettings.UpdateNotify && UpdatePolicy.ShouldAnnounceFound(AutoInstall, hasSetup, isAdmin))
                     // Kullanıcı Ayarlar › Güncellemeler'de "haber ver"i açıkça istedi: "yalnız önemli"de de gösterilir (yoksa iki ayar çakışırdı)
                     Announce(WinText.U("Update.Available", info.Version.ToString(3), Branding.ProductName), requested: true);
             }
             UpdateChanged?.Invoke();
             bool held = UpdatePolicy.DeclinedRecently(info.Version, UserSettings.UpdateDeclinedVersion, UserSettings.UpdateDeclinedUtc, DateTime.UtcNow);
-            if (UpdatePolicy.ShouldDownload(AutoInstall, info.Setup is not null, isAdmin) && !held)
+            if (UpdatePolicy.ShouldDownload(AutoInstall, hasSetup, isAdmin) && !held)
             {
                 // Elle denetim indirmeyi beklemez (Ayarlar'daki düğme ve alt bağlantı hemen sonuç alır; indirme arkada sürer)
                 if (trigger == UpdateTrigger.Manual) _ = DownloadAsync(info);
-                else if (await DownloadAsync(info) is not null && trigger == UpdateTrigger.Startup) await TryAutoInstallAsync();
+                else if (await DownloadAsync(info) is { } got)
+                {
+                    if (trigger == UpdateTrigger.Startup) await TryAutoInstallAsync();
+                    // Zamanlayıcı kurmaz (kurulum anı açılış ve ana pencere kapanışı), ama haber verir (1.9.1): yoksa tepsisi günlerce
+                    // açık kalan yönetici indirilen sürümü hiç duymuyordu
+                    else if (trigger == UpdateTrigger.Timer) AnnounceTimerReady(got);
+                }
             }
             return result;
         }
@@ -183,12 +198,13 @@ public sealed class TrayFeatures : IDisposable
 
     /// <summary>
     /// Sunucu "güncel" dedi: bildirilmiş daha yeni sürüm geri çekilmiş demektir. Alt bağlantı ve kayıt unutulur, elde doğrulanmış
-    /// setup varsa bırakılır (geri çekilen sürüm kendiliğinden kurulmasın). Sunucu yanıt vermediyse çağrılmaz.
+    /// setup varsa bırakılır (geri çekilen sürüm kendiliğinden kurulmasın). Sunucu yanıt vermediyse çağrılmaz. Elle "Kur" ya da setup
+    /// sürerken elde tutulan setup'a dokunulmaz (1.9.1): Kur onu başlatacak; bırakılırsa dosya doğrulandıktan sonra değiştirilebilirdi.
     /// </summary>
     private void ForgetWithdrawn(Version current)
     {
         _latest = null;
-        if (_ready is { } r && !SetupRunning)
+        if (_ready is { } r && !UpdateBusy)
         {
             _ready = null;
             r.Dispose();
@@ -201,19 +217,29 @@ public sealed class TrayFeatures : IDisposable
         }
     }
 
+    /// <summary>Elle "Kur" ya da bu tepsinin başlattığı setup sürüyor: elde tutulan setup'ı yalnız Kur'un kendisi değiştirebilir.</summary>
+    private bool UpdateBusy => Updating || SetupRunning;
+
     /// <summary>
     /// Setup'ı indirir ve doğrular (önceden indirilmiş ve doğrulananı kullanır); aynı anda tek indirme. Başarısızlık günlüğe
-    /// yazılır, null döner.
+    /// yazılır, null döner. Elle "Kur" ya da setup sürerken başka bir sürüm için elde tutulanı bırakmaz, null döner (1.9.1).
     /// </summary>
-    public async Task<DownloadedSetup?> DownloadAsync(UpdateInfo info)
+    public Task<DownloadedSetup?> DownloadAsync(UpdateInfo info) => DownloadAsync(info, owner: false);
+
+    /// <param name="owner">Çağıran elle "Kur" akışı: elde tutulanı değiştirebilir.</param>
+    private async Task<DownloadedSetup?> DownloadAsync(UpdateInfo info, bool owner)
     {
-        if (info.Setup is null) return null;
-        if (_ready is { } r && UpdateChecker.Normalize(r.Version) == UpdateChecker.Normalize(info.Version)) return r;
-        if (_download is { } running)
+        if (info.Setup is null || !_localUpdates) return null;
+        // Süren indirme bitene dek beklenir; aynı sürümü getirdiyse o kullanılır. Döngü: bekleyen ikinci çağıran, öncekinin başlattığı
+        // yeni indirmeyi de bekler (önceden ikisi birden yeni indirme başlatabiliyordu)
+        while (true)
         {
+            if (_ready is { } r && UpdateChecker.Normalize(r.Version) == UpdateChecker.Normalize(info.Version) && r.IsOpen) return r;
+            if (_download is not { } running) break;
             var got = await running;
-            if (got is not null && UpdateChecker.Normalize(got.Version) == UpdateChecker.Normalize(info.Version)) return got;
+            if (got is not null && UpdateChecker.Normalize(got.Version) == UpdateChecker.Normalize(info.Version) && got.IsOpen) return got;
         }
+        if (UpdateBusy && !owner) return null;
         _ready?.Dispose();
         _ready = null;
         var report = new Progress<int>(p => { if (_download is not null) { DownloadPercent = p; UpdateChanged?.Invoke(); } });
@@ -251,22 +277,18 @@ public sealed class TrayFeatures : IDisposable
     /// <summary>Kendiliğinden kurulum koşulları tutuyorsa (<see cref="UpdatePolicy.ShouldAutoInstall"/>) setup'ı başlatır.</summary>
     private async Task TryAutoInstallAsync()
     {
-        if (_ready is not { } ready || SetupRunning) return;
+        // Elle "Kur" sürüyorsa kurulumu o sahiplenir (1.9.1): çıkardığı diskleri ret ya da hata olursa yalnız o geri bağlar
+        if (_ready is not { } ready || SetupRunning || Updating) return;
         // Yalnız hâlâ bildirilen sürüm (sunucu sonradan "güncel" dediyse geri çekilmiştir)
         if (!Version.TryParse(UserSettings.UpdateNotifiedVersion, out var notified) || UpdateChecker.Normalize(notified) != UpdateChecker.Normalize(ready.Version)) return;
         int? disks = await _diskCount();
+        if (Updating) return; // disk sorgusu sürerken elle Kur başladı
         var c = new UpdateInstallConditions(
             AutoInstall, _ready == ready, disks, _services.IsAdministrator(),
             UpdatePolicy.DeclinedRecently(ready.Version, UserSettings.UpdateDeclinedVersion, UserSettings.UpdateDeclinedUtc, DateTime.UtcNow),
             SetupRunning || _services.AnySetupRunning());
         string version = ready.Version.ToString(3);
-        if (UpdatePolicy.ShouldAnnounceReady(c) && UserSettings.UpdateReadyAnnounced != version)
-        {
-            UserSettings.UpdateReadyAnnounced = version;
-            // Yalnız haber (kullanıcı kararı 2026-11-23): kurulum anı değişmez; tık ana pencereyi açar (alt bağlantı ve Ayarlar'da Kur).
-            // "Yeni sürüm çıkınca haber ver"in sonucu → "yalnız önemli"de de
-            Announce(WinText.U("Update.Ready", Branding.ProductName, version), requested: true);
-        }
+        if (UpdatePolicy.ShouldAnnounceReady(c)) AnnounceReady(version);
         if (!UpdatePolicy.ShouldAutoInstall(c)) return;
         if (_announcedInstall != version)
         {
@@ -276,6 +298,31 @@ public sealed class TrayFeatures : IDisposable
             Balloon?.Invoke(WinText.U("Update.Installing", Branding.ProductName, version));
         }
         StartSetup(ready);
+    }
+
+    /// <summary>
+    /// "Hazır" haberi, sürüm başına bir kez (HKCU <c>UpdateReady</c>). Yalnız haber (kullanıcı kararı 2026-11-23): kurulum anı
+    /// değişmez; tık ana pencereyi açar (alt bağlantı ve Ayarlar'da Kur). "Yeni sürüm çıkınca haber ver"in sonucu → "yalnız önemli"de de.
+    /// </summary>
+    private void AnnounceReady(string version)
+    {
+        if (UserSettings.UpdateReadyAnnounced == version) return;
+        UserSettings.UpdateReadyAnnounced = version;
+        Announce(WinText.U("Update.Ready", Branding.ProductName, version), requested: true);
+    }
+
+    /// <summary>
+    /// 6 saatlik denetimin indirdiği sürüm (1.9.1): kurulmaz, kendiliğinden kurulumun öbür koşulları tutuyorsa (disk sayısı hariç:
+    /// şimdi kurulmayacak) "hazır" haberi verilir. Yalnız hâlâ bildirilen sürüm, Kur ya da setup sürmüyorken.
+    /// </summary>
+    private void AnnounceTimerReady(DownloadedSetup ready)
+    {
+        if (UpdateBusy || _ready != ready) return;
+        if (!Version.TryParse(UserSettings.UpdateNotifiedVersion, out var notified) || UpdateChecker.Normalize(notified) != UpdateChecker.Normalize(ready.Version)) return;
+        var c = new UpdateInstallConditions(AutoInstall, true, null, _services.IsAdministrator(),
+            UpdatePolicy.DeclinedRecently(ready.Version, UserSettings.UpdateDeclinedVersion, UserSettings.UpdateDeclinedUtc, DateTime.UtcNow),
+            _services.AnySetupRunning());
+        if (UpdatePolicy.ShouldAnnounceTimerReady(c)) AnnounceReady(ready.Version.ToString(3));
     }
 
     /// <summary>
@@ -321,6 +368,9 @@ public sealed class TrayFeatures : IDisposable
                 Decline(setup.Version);
                 failed = true;
             }
+            // Elle güncellemenin çıkardığı diskler SetupRunning düşmeden geri bağlanır (1.9.1): bekleyen dil/tasarım yeniden
+            // başlaması "setup bitti" olayıyla tetiklenip geri bağlamayı kesmesin
+            if (failed && afterFailure is not null) await afterFailure();
         }
         catch (Exception e) when (e is InvalidOperationException or System.ComponentModel.Win32Exception) { }
         finally
@@ -331,7 +381,6 @@ public sealed class TrayFeatures : IDisposable
             setup.Dispose(); // tutamak bırakılır; dosya klasörde kalır, yeniden indirmeden doğrulanıp kullanılabilir
             UpdateChanged?.Invoke();
         }
-        if (failed && afterFailure is not null) await afterFailure();
     }
 
     /// <summary>Sürüm 24 saat kendiliğinden indirilmez/kurulmaz: setup reddedildi, uygulanamadı ya da doğrulanamadı.</summary>
@@ -388,7 +437,7 @@ public sealed class TrayFeatures : IDisposable
             var known = AvailableUpdate;
             var result = await CheckNowAsync();
             var info = result.Update;
-            if (info?.Setup is null)
+            if (info?.Setup is null || !_localUpdates) // setup bilgisi yok ya da indirme klasörü ağ yolunda: Release sayfası
             {
                 if (result.Answered && info is null) return; // sunucu "güncel" dedi: sürüm geri çekilmiş, bağlantı kalktı (sayfası yok)
                 if ((info?.ReleasePage ?? known?.ReleasePage) is { } page) _services.OpenPage(page);
@@ -397,7 +446,7 @@ public sealed class TrayFeatures : IDisposable
             string version = info.Version.ToString(3);
             if (!await AppController.ModalAsync(() => _host.ConfirmAsync(owner, WinText.U("Update.ConfirmHeading", Branding.ProductName, version),
                 WinText.U("Update.ConfirmText"), WinText.U("Action.Install"), ConfirmTone.Caution))) return;
-            var setup = await DownloadAsync(info);
+            var setup = await DownloadAsync(info, owner: true);
             if (setup is null)
             {
                 _services.OpenPage(info.ReleasePage);
@@ -425,6 +474,17 @@ public sealed class TrayFeatures : IDisposable
                 await app.PollAsync();
             }
             Func<Task>? restore = ejected ? app.RescanAsync : null;
+            // Tutamak kapandıysa (dosya doğrulandıktan sonra değişmiş olabilir) yeniden doğrulanır (1.9.1)
+            if (!setup.IsOpen)
+            {
+                if (await DownloadAsync(info, owner: true) is not { } fresh)
+                {
+                    if (restore is not null) await restore();
+                    _services.OpenPage(info.ReleasePage);
+                    return;
+                }
+                setup = fresh;
+            }
             if (!StartSetup(setup, restore))
             {
                 if (SetupRunning) return; // arada kendiliğinden kurulum başladı: diskler onunla kalır, sayfa açılmaz

@@ -66,12 +66,13 @@ public sealed partial class VolumeWriter
     /// <summary>Şifreli birimde şifreleyici (fs ağacı düğümleri ve dosya verisi); şifresiz birimde null.</summary>
     internal Crypto.VolumeCrypto? Crypto { get; }
 
-    /// <summary>Oturum biterken anahtar kopyası sıfırlanır.</summary>
+    /// <summary>Oturum biterken anahtar kopyası sıfırlanır; oturumun görüntüsünün şifreleyicisi de atılır (1.9.1).</summary>
     internal void ReleaseKey()
     {
         _key?.Dispose();
         _key = null;
         Crypto?.Dispose();
+        _view?.Dispose();
     }
 
     public bool CaseInsensitive { get; }
@@ -284,12 +285,19 @@ public sealed partial class VolumeWriter
 
     public static long NowNs() => (DateTime.UtcNow - DateTime.UnixEpoch).Ticks * 100;
 
-    /// <summary>APFS ad kuralları: boş değil, "." / ".." değil, "/" ve NUL içermez, UTF-8 en fazla 255 bayt.</summary>
+    /// <summary>
+    /// APFS ad kuralları: boş değil, "." / ".." değil, "/" ve NUL içermez, UTF-8 en fazla 255 bayt. Geçersiz UTF-8 baytlarının
+    /// kaçış aralığından (<see cref="Bin.NameEscapeFirst"/>) karakter de yazılmaz: okuyucu o aralığı geçersiz Mac adlarını göstermek
+    /// için kullanır; aynı karakteri yazmak ikisini karıştırırdı (1.9.1).
+    /// </summary>
     public static void ValidateName(string name)
     {
         if (name.Length == 0 || name is "." or "..") throw new ApfsException(ApfsErrorCode.InvalidArgument, CoreText.T("VolWriter.InvalidName"));
         if (name.Contains('/') || name.Contains('\0')) throw new ApfsException(ApfsErrorCode.InvalidArgument, CoreText.T("VolWriter.InvalidNameChar"));
-        if (Encoding.UTF8.GetByteCount(name) > 255) throw new ApfsException(ApfsErrorCode.InvalidArgument, CoreText.T("VolWriter.NameTooLong"));
+        if (Encoding.UTF8.GetByteCount(name) > 255) throw new ApfsException(ApfsErrorCode.NameTooLong, CoreText.T("VolWriter.NameTooLong"));
+        foreach (char c in name)
+            if (c is >= Bin.NameEscapeFirst and <= Bin.NameEscapeLast)
+                throw new ApfsException(ApfsErrorCode.InvalidName, CoreText.T("VolWriter.InvalidNameEscape"));
     }
 
     private InodeRecord RequireDirectory(ulong dirId)

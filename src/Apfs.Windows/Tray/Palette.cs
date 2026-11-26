@@ -89,9 +89,13 @@ public sealed record Palette(Color Paper, Color Washi, Color Ink, Color InkSoft,
     /// <summary>Girdileri okuyup paleti seçer (<see cref="Resolve"/>). <paramref name="current"/>: çalışırken geçerli palet.</summary>
     public static Palette Effective(Palette? current = null) => Resolve(ReadInputs(), current);
 
-    public static PaletteInputs ReadInputs() => new(
-        Environment.GetEnvironmentVariable("APFS_DEV_THEME"),
-        Environment.GetEnvironmentVariable("APFS_DEV_DESIGN"),
+    public static PaletteInputs ReadInputs() => ReadInputs(Ipc.PipeProtocol.PipeName != Ipc.PipeProtocol.DefaultPipeName);
+
+    /// <param name="dev">Geliştirme kanalı (<c>--pipe</c> varsayılandan farklı): yalnız o zaman <c>APFS_DEV_THEME</c>/<c>APFS_DEV_DESIGN</c>
+    /// okunur (1.9.1; kurulu tepside etkisiz, öbür geliştirme kancaları gibi).</param>
+    internal static PaletteInputs ReadInputs(bool dev) => new(
+        dev ? Environment.GetEnvironmentVariable("APFS_DEV_THEME") : null,
+        dev ? Environment.GetEnvironmentVariable("APFS_DEV_DESIGN") : null,
         UserSettings.TryReadThemeMode(out var mode) ? mode : null,
         UserSettings.TryReadDesign(out var design) ? design : null,
         ReadHkcu(@"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize", "AppsUseLightTheme", out var light)

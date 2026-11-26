@@ -25,6 +25,7 @@ internal sealed class TrayHost
     private readonly Dispatcher _dispatcher;
     private readonly DispatcherTimer _reveal;
     private readonly RegisteredWaitHandle? _showWait;
+    private readonly DeferredRestart _restart;
     private MainWindow? _main;
     private bool _exiting;
 
@@ -75,13 +76,14 @@ internal sealed class TrayHost
 
         if (options.ShowEvent is { } showEvent)
             _showWait = ThreadPool.RegisterWaitForSingleObject(showEvent, (_, _) => _dispatcher.BeginInvoke(ShowMain), null, Timeout.Infinite, executeOnlyOnce: false);
-        // Kendiliğinden kurulum koşulu: hizmete taze sorulan disk sayısı (yanıt yoksa null = kurma)
-        _features = new TrayFeatures(ui, host, options.Reports, async () =>
-        {
-            await _app.PollAsync();
-            return _app.ServiceDown || _app.Status is null ? null : _app.Status.Disks.Count;
-        });
+        // Kendiliğinden kurulum koşulu: hizmete taze sorulan disk sayısı (yanıt yoksa null = kurma); yoklamanın yan etkisi yok,
+        // açık parola penceresini beklemez (1.9.1)
+        _features = new TrayFeatures(ui, host, options.Reports, _app.FreshDiskCountAsync);
         _features.Balloon += text => _icon.ShowBalloon(8000, text, NoticeLevel.Info);
+        // Dil/tasarım yeniden başlaması süren işi (Kur, setup, kutu, çıkarma…) kesmez: bitince bir kez (1.9.1)
+        _restart = new DeferredRestart(ui, () => TrayModel.RestartMustWait(_features.Updating, _features.SetupRunning, _app.Idle), () => Restart());
+        _features.UpdateChanged += _restart.Recheck;
+        _app.Changed += _restart.Recheck;
         _app.Start();
         _features.Start(options.Updated);
         if (options.Show) ShowMain();
@@ -101,7 +103,7 @@ internal sealed class TrayHost
         {
             _main = new MainWindow(_app, _features);
             _main.HiddenToTray += () => _icon.ShowBalloon(4000, WinText.U("Tray.StillRunning"), NoticeLevel.Info);
-            _main.RestartRequested += () => Restart();
+            _main.RestartRequested += _restart.Request;
             _main.ClosedToTray += _features.MainWindowClosed;
         }
         bool wasVisible = _main.IsShown;
@@ -138,8 +140,9 @@ internal sealed class TrayHost
     /// </summary>
     private void Restart(bool show = true)
     {
+        if (_exiting) return; // Çıkış seçildikten sonra yeni örnek başlamaz
         string exe = Environment.ProcessPath!;
-        string args = "--restart" + (show ? " --show" : "") + (PipeProtocol.PipeName == PipeProtocol.DefaultPipeName ? "" : $" --pipe \"{PipeProtocol.PipeName}\"");
+        string args = $"--restart {RestartHandoff.FromArg} {Environment.ProcessId}" + (show ? " --show" : "") + (PipeProtocol.PipeName == PipeProtocol.DefaultPipeName ? "" : $" --pipe \"{PipeProtocol.PipeName}\"");
         try { Process.Start(new ProcessStartInfo(exe, args) { UseShellExecute = false }); }
         catch (Exception e) when (e is System.ComponentModel.Win32Exception or IOException) { return; }
         Exit();
@@ -153,6 +156,7 @@ internal sealed class TrayHost
         _reveal.Stop();
         _showWait?.Unregister(null);
         _app.Dispose();
+        _restart.Dispose();
         _features.Dispose();
         _icon.Dispose();
         _flyout.CloseForExit();
